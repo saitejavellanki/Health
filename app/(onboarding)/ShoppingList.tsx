@@ -1,192 +1,289 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, X, Check } from 'lucide-react-native';
+import { ChevronLeft, Check } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { getDoc, doc, query, collection, where, getDocs } from 'firebase/firestore';
+import { db, auth } from '../../components/firebase/Firebase'; // Adjust path and make sure auth is exported
+
+// Gemini API credentials
+const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export default function ShoppingList() {
-  const params = useLocalSearchParams();
   const [fullPlan, setFullPlan] = useState([]);
   const [timeSpan, setTimeSpan] = useState('week'); // Default to a week
-  const [shoppingList, setShoppingList] = useState([]);
+  const [shoppingList, setShoppingList] = useState({});
   const [checkedItems, setCheckedItems] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Fetch plan data from Firebase based on the current user
   useEffect(() => {
-    if (params.fullPlan) {
+    const fetchUserPlanData = async () => {
       try {
-        const planData = JSON.parse(params.fullPlan);
-        setFullPlan(planData);
-        generateShoppingList(planData, timeSpan);
-      } catch (error) {
-        console.error("Error parsing plan data:", error);
-      }
-    }
-  }, [params.fullPlan]);
-
-  const generateShoppingList = (planData, span) => {
-    // Determine how many days to include based on the timeSpan
-    let daysToInclude = 7; // Default to a week
-    if (span === 'day') {
-      daysToInclude = 1;
-    } else if (span === 'month') {
-      daysToInclude = 30;
-    }
-
-    // Limit the plan to the number of days we want
-    const limitedPlan = planData.slice(0, daysToInclude);
-
-    // Create a map to track ingredients and their quantities
-    const ingredientsMap = new Map();
-
-    // Process each day's meals to extract ingredients
-    limitedPlan.forEach(dayPlan => {
-      if (!dayPlan.sections) return;
-      
-      // Process all meal types
-      const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
-      
-      mealTypes.forEach(mealType => {
-        if (!dayPlan.sections[mealType]) return;
+        // Check if user is authenticated
+        const currentUser = auth.currentUser;
         
-        // For each meal in this meal type
-        dayPlan.sections[mealType].forEach(meal => {
-          // Parse the meal to extract ingredients
-          // This is a simplified approach assuming meal names contain ingredients
-          // In a real app, you'd have a more structured meal database with ingredients
-          extractIngredientsFromMeal(meal, ingredientsMap);
-        });
-      });
-    });
-
-    // Convert the ingredients map to an array for display
-    const ingredientsList = Array.from(ingredientsMap, ([name, details]) => ({
-      name,
-      quantity: details.quantity,
-      unit: details.unit
-    }));
-
-    // Sort alphabetically
-    ingredientsList.sort((a, b) => a.name.localeCompare(b.name));
-
-    // Group by food category
-    const categorizedList = categorizeIngredients(ingredientsList);
-    
-    setShoppingList(categorizedList);
-  };
-
-  // Function to extract ingredients from a meal description
-  const extractIngredientsFromMeal = (mealDescription, ingredientsMap) => {
-    // This function would ideally parse a structured meal object
-    // For this demo, we'll use a simple rule-based approach
-    
-    // Common ingredients by food category
-    const commonIngredients = {
-      'Proteins': ['chicken', 'beef', 'fish', 'salmon', 'tuna', 'eggs', 'tofu', 'tempeh', 'beans', 'lentils', 'turkey'],
-      'Vegetables': ['spinach', 'kale', 'broccoli', 'carrots', 'tomatoes', 'bell peppers', 'onions', 'garlic', 'mushrooms', 'zucchini', 'cucumber', 'lettuce'],
-      'Fruits': ['apples', 'bananas', 'oranges', 'berries', 'strawberries', 'blueberries', 'avocado', 'mango', 'pineapple'],
-      'Grains': ['rice', 'quinoa', 'oats', 'bread', 'pasta', 'tortilla', 'cereal'],
-      'Dairy': ['milk', 'cheese', 'yogurt', 'butter', 'cream'],
-      'Other': ['olive oil', 'nuts', 'seeds', 'honey', 'spices', 'herbs']
-    };
-    
-    // Convert meal description to lowercase for easier matching
-    const lowerMeal = mealDescription.toLowerCase();
-    
-    // For each category and its ingredients
-    Object.entries(commonIngredients).forEach(([category, ingredients]) => {
-      ingredients.forEach(ingredient => {
-        if (lowerMeal.includes(ingredient)) {
-          // If the ingredient is already in the map, update quantity
-          if (ingredientsMap.has(ingredient)) {
-            const existingDetails = ingredientsMap.get(ingredient);
-            
-            // Determine if we need to increment quantity
-            // If it's a different meal, we increment
-            if (!existingDetails.meals.includes(mealDescription)) {
-              existingDetails.quantity += getIngredientQuantity(ingredient);
-              existingDetails.meals.push(mealDescription);
-              ingredientsMap.set(ingredient, existingDetails);
+        if (!currentUser) {
+          setError('You must be logged in to view your shopping list');
+          setLoading(false);
+          return;
+        }
+        
+        const userId = currentUser.uid;
+        
+        // Query to find the most recent plan for this user
+        const plansQuery = query(
+          collection(db, 'userplans'),
+          where('userId', '==', userId)
+        );
+        
+        const querySnapshot = await getDocs(plansQuery);
+        
+        if (querySnapshot.empty) {
+          setError('No meal plan found. Please create a plan first.');
+          setLoading(false);
+          return;
+        }
+        
+        // Find the most recent plan
+        let latestPlan = null;
+        let latestDate = new Date(0); // Initialize with oldest possible date
+        
+        querySnapshot.forEach((doc) => {
+          const planData = doc.data();
+          // Check if createdAt exists and is a Firestore timestamp before calling toDate()
+          if (planData.createdAt && typeof planData.createdAt.toDate === 'function') {
+            const planDate = planData.createdAt.toDate();
+            if (planDate > latestDate) {
+              latestDate = planDate;
+              latestPlan = { id: doc.id, ...planData };
             }
-          } else {
-            // Add new ingredient
-            ingredientsMap.set(ingredient, {
-              quantity: getIngredientQuantity(ingredient),
-              unit: getIngredientUnit(ingredient),
-              category: category,
-              meals: [mealDescription]
-            });
           }
+        });
+        
+        // If no plan with valid timestamp was found, use the first one
+        if (!latestPlan && querySnapshot.docs.length > 0) {
+          latestPlan = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+        }
+        
+        // Parse the JSON plan data
+        const parsedPlan = JSON.parse(latestPlan.parsedPlan);
+        setFullPlan(parsedPlan);
+        
+        // Generate initial shopping list with the default timespan
+        generateShoppingList(parsedPlan, timeSpan);
+      } catch (error) {
+        console.error("Error fetching user plan data:", error);
+        setError('Failed to load plan data');
+        setLoading(false);
+      }
+    };
+
+    fetchUserPlanData();
+  }, []);
+
+  // Generate shopping list using Gemini API
+  const generateShoppingList = async (planData, span) => {
+    setLoading(true);
+    
+    try {
+      // Determine how many days to include based on the timeSpan
+      let daysToInclude = 7; // Default to a week
+      if (span === 'day') {
+        daysToInclude = 1;
+      } else if (span === 'month') {
+        daysToInclude = 30;
+      }
+
+      // Limit the plan to the number of days we want
+      const limitedPlan = planData.slice(0, Math.min(daysToInclude, planData.length));
+      
+      // Extract all meals for the specified timespan
+      let meals = [];
+      limitedPlan.forEach(dayPlan => {
+        if (dayPlan.sections) {
+          const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
+          
+          mealTypes.forEach(mealType => {
+            if (dayPlan.sections[mealType]) {
+              dayPlan.sections[mealType].forEach(meal => {
+                meals.push(meal);
+              });
+            }
+          });
         }
       });
-    });
-  };
 
-  // Function to get estimated quantity based on ingredient type
-  const getIngredientQuantity = (ingredient) => {
-    // This would be replaced with actual recipe data in a real app
-    const quantities = {
-      'chicken': 200, 'beef': 200, 'fish': 150, 'salmon': 150, 'tuna': 100,
-      'eggs': 2, 'tofu': 200, 'tempeh': 100, 'beans': 200, 'lentils': 150,
-      'spinach': 100, 'kale': 100, 'broccoli': 150, 'carrots': 100, 'tomatoes': 2,
-      'bell peppers': 1, 'onions': 1, 'garlic': 2, 'mushrooms': 100, 'zucchini': 1,
-      'apples': 1, 'bananas': 2, 'oranges': 1, 'berries': 100, 'strawberries': 100,
-      'rice': 150, 'quinoa': 150, 'oats': 80, 'bread': 2, 'pasta': 100,
-      'milk': 250, 'cheese': 50, 'yogurt': 150, 'butter': 50,
-      'olive oil': 15, 'nuts': 50, 'seeds': 30, 'honey': 15, 'spices': 5
-    };
-    
-    return quantities[ingredient] || 1;
-  };
-
-  // Function to get appropriate unit based on ingredient
-  const getIngredientUnit = (ingredient) => {
-    const units = {
-      'chicken': 'g', 'beef': 'g', 'fish': 'g', 'salmon': 'g', 'tuna': 'g',
-      'eggs': '', 'tofu': 'g', 'tempeh': 'g', 'beans': 'g', 'lentils': 'g',
-      'spinach': 'g', 'kale': 'g', 'broccoli': 'g', 'carrots': 'g', 'tomatoes': '',
-      'bell peppers': '', 'onions': '', 'garlic': 'cloves', 'mushrooms': 'g', 'zucchini': '',
-      'apples': '', 'bananas': '', 'oranges': '', 'berries': 'g', 'strawberries': 'g',
-      'rice': 'g', 'quinoa': 'g', 'oats': 'g', 'bread': 'slices', 'pasta': 'g',
-      'milk': 'ml', 'cheese': 'g', 'yogurt': 'g', 'butter': 'g',
-      'olive oil': 'ml', 'nuts': 'g', 'seeds': 'g', 'honey': 'ml', 'spices': 'g'
-    };
-    
-    return units[ingredient] || '';
-  };
-
-  // Function to categorize ingredients by food group
-  const categorizeIngredients = (ingredientsList) => {
-    const categories = {
-      'Proteins': [],
-      'Vegetables': [],
-      'Fruits': [],
-      'Grains': [],
-      'Dairy': [],
-      'Other': []
-    };
-    
-    ingredientsList.forEach(ingredient => {
-      // Get the ingredient details from the map
-      // Determine which category it belongs to
-      let category = 'Other';
+      // Create prompt for Gemini
+      const prompt = `
+      Generate a detailed shopping list based on the following meals for a ${span}:
+      ${meals.join('\n')}
       
-      // Example logic to assign categories
-      if (['chicken', 'beef', 'fish', 'eggs', 'tofu', 'beans', 'lentils'].some(item => ingredient.name.includes(item))) {
-        category = 'Proteins';
-      } else if (['spinach', 'broccoli', 'carrots', 'tomatoes', 'peppers', 'onions'].some(item => ingredient.name.includes(item))) {
-        category = 'Vegetables';
-      } else if (['apple', 'banana', 'orange', 'berries', 'strawberry'].some(item => ingredient.name.includes(item))) {
-        category = 'Fruits';
-      } else if (['rice', 'quinoa', 'oats', 'bread', 'pasta'].some(item => ingredient.name.includes(item))) {
-        category = 'Grains';
-      } else if (['milk', 'cheese', 'yogurt', 'butter'].some(item => ingredient.name.includes(item))) {
-        category = 'Dairy';
+      Format your response as a JSON object with the following structure:
+      {
+        "Proteins": [{"name": "ingredient name", "quantity": number, "unit": "unit of measurement"}],
+        "Vegetables": [{"name": "ingredient name", "quantity": number, "unit": "unit of measurement"}],
+        "Fruits": [{"name": "ingredient name", "quantity": number, "unit": "unit of measurement"}],
+        "Grains": [{"name": "ingredient name", "quantity": number, "unit": "unit of measurement"}],
+        "Dairy": [{"name": "ingredient name", "quantity": number, "unit": "unit of measurement"}],
+        "Other": [{"name": "ingredient name", "quantity": number, "unit": "unit of measurement"}]
       }
       
-      categories[category].push(ingredient);
-    });
-    
-    return categories;
+      Keep your response concise. Extract all relevant ingredients, estimate reasonable quantities, and organize them by food category.
+      IMPORTANT: Only include the JSON with no extra text. Do not truncate or cut off any part of the JSON.
+      `;
+
+      // Call Gemini API with increased maxOutputTokens to handle longer responses
+      const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 2048, // Increased from 1024 to allow for larger responses
+          }
+        })
+      });
+
+      const data = await response.json();
+      
+      try {
+        if (data.candidates && data.candidates[0]?.content?.parts?.length > 0) {
+          const responseText = data.candidates[0].content.parts[0].text;
+          console.log("Raw API response:", responseText); // Log the raw response for debugging
+          
+          // More robust JSON extraction
+          // First try to find JSON by looking for text between first { and last }
+          let jsonText = responseText.trim();
+          
+          // If the response is wrapped in backticks or contains "json" marker, extract just the JSON part
+          if (jsonText.includes('```json')) {
+            jsonText = jsonText.split('```json')[1].split('```')[0].trim();
+          } else if (jsonText.includes('```')) {
+            jsonText = jsonText.split('```')[1].split('```')[0].trim();
+          }
+          
+          // If the text doesn't start with { or ends without }, look for brackets
+          const firstBrace = jsonText.indexOf('{');
+          const lastBrace = jsonText.lastIndexOf('}');
+          
+          if (firstBrace !== -1 && lastBrace !== -1) {
+            jsonText = jsonText.substring(firstBrace, lastBrace + 1);
+          }
+          
+          // Try to parse the extracted JSON
+          try {
+            const parsedResponse = JSON.parse(jsonText);
+            console.log("Successfully parsed response:", parsedResponse);
+            
+            // Validate the structure - ensure all required categories exist
+            const requiredCategories = ['Proteins', 'Vegetables', 'Fruits', 'Grains', 'Dairy', 'Other'];
+            requiredCategories.forEach(category => {
+              if (!parsedResponse[category]) {
+                parsedResponse[category] = [];
+              }
+            });
+            
+            setShoppingList(parsedResponse);
+          } catch (parseError) {
+            console.error("JSON parsing error:", parseError);
+            
+            // More aggressive JSON repair attempt for truncated responses
+            try {
+              let repairAttempt = jsonText;
+              
+              // Check for unclosed brackets
+              const openBraces = (repairAttempt.match(/{/g) || []).length;
+              const closeBraces = (repairAttempt.match(/}/g) || []).length;
+              
+              if (openBraces > closeBraces) {
+                // Add missing closing braces
+                repairAttempt += '}'.repeat(openBraces - closeBraces);
+              }
+              
+              // Check for trailing commas before closing brackets
+              repairAttempt = repairAttempt.replace(/,\s*}/g, '}');
+              repairAttempt = repairAttempt.replace(/,\s*]/g, ']');
+              
+              const repairedJson = JSON.parse(repairAttempt);
+              console.log("Repaired JSON:", repairedJson);
+              
+              // Validate structure after repair
+              const requiredCategories = ['Proteins', 'Vegetables', 'Fruits', 'Grains', 'Dairy', 'Other'];
+              requiredCategories.forEach(category => {
+                if (!repairedJson[category]) {
+                  repairedJson[category] = [];
+                }
+              });
+              
+              setShoppingList(repairedJson);
+            } catch (repairError) {
+              console.error("JSON repair failed:", repairError);
+              // Ultimate fallback - create an empty structure
+              setShoppingList({
+                "Proteins": [],
+                "Vegetables": [],
+                "Fruits": [],
+                "Grains": [],
+                "Dairy": [],
+                "Other": []
+              });
+              setError('Could not process the shopping list. Please try again.');
+            }
+          }
+        } else {
+          console.error("Invalid API response structure:", data);
+          setError('Invalid response from API');
+          // Create default empty structure
+          setShoppingList({
+            "Proteins": [],
+            "Vegetables": [],
+            "Fruits": [],
+            "Grains": [],
+            "Dairy": [],
+            "Other": []
+          });
+        }
+      } catch (error) {
+        console.error("Error processing API response:", error);
+        setError('Error processing API response');
+        // Create default empty structure
+        setShoppingList({
+          "Proteins": [],
+          "Vegetables": [],
+          "Fruits": [],
+          "Grains": [],
+          "Dairy": [],
+          "Other": []
+        });
+      }
+    } catch (error) {
+      console.error("Error generating shopping list:", error);
+      setError('Failed to generate shopping list');
+      // Create default empty structure
+      setShoppingList({
+        "Proteins": [],
+        "Vegetables": [],
+        "Fruits": [],
+        "Grains": [],
+        "Dairy": [],
+        "Other": []
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleItemCheck = (itemName) => {
@@ -195,6 +292,107 @@ export default function ShoppingList() {
       [itemName]: !prevState[itemName]
     }));
   };
+
+  // If still loading the initial data
+  if (loading && Object.keys(shoppingList).length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft size={24} color="#1a1a1a" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Shopping List</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#22c55e" />
+          <Text style={styles.loadingText}>Generating your shopping list...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // If there was an error
+  if (error && Object.keys(shoppingList).length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft size={24} color="#1a1a1a" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Shopping List</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable 
+            style={styles.retryButton}
+            onPress={() => {
+              // Reset error so we can try again
+              setError(null);
+              setLoading(true);
+              
+              const fetchUserPlanData = async () => {
+                try {
+                  const currentUser = auth.currentUser;
+                  
+                  if (!currentUser) {
+                    setError('You must be logged in to view your shopping list');
+                    setLoading(false);
+                    return;
+                  }
+                  
+                  const userId = currentUser.uid;
+                  const plansQuery = query(
+                    collection(db, 'userplans'),
+                    where('userId', '==', userId)
+                  );
+                  const querySnapshot = await getDocs(plansQuery);
+                  
+                  if (querySnapshot.empty) {
+                    setError('No meal plan found. Please create a plan first.');
+                    setLoading(false);
+                    return;
+                  }
+                  
+                  // Use the same safer approach to find the latest plan
+                  let latestPlan = null;
+                  let latestDate = new Date(0);
+                  
+                  querySnapshot.forEach((doc) => {
+                    const planData = doc.data();
+                    if (planData.createdAt && typeof planData.createdAt.toDate === 'function') {
+                      const planDate = planData.createdAt.toDate();
+                      if (planDate > latestDate) {
+                        latestDate = planDate;
+                        latestPlan = { id: doc.id, ...planData };
+                      }
+                    }
+                  });
+                  
+                  // If no plan with valid timestamp was found, use the first one
+                  if (!latestPlan && querySnapshot.docs.length > 0) {
+                    latestPlan = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+                  }
+                  
+                  const parsedPlan = JSON.parse(latestPlan.parsedPlan);
+                  setFullPlan(parsedPlan);
+                  
+                  generateShoppingList(parsedPlan, timeSpan);
+                } catch (error) {
+                  console.error("Error fetching user plan data:", error);
+                  setError('Failed to load plan data');
+                  setLoading(false);
+                }
+              };
+              
+              fetchUserPlanData();
+            }}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -235,44 +433,51 @@ export default function ShoppingList() {
         </Pressable>
       </View>
       
-      <ScrollView style={styles.listContainer}>
-        {Object.entries(shoppingList).map(([category, items]) => (
-          items.length > 0 && (
-            <View key={category} style={styles.categorySection}>
-              <Text style={styles.categoryTitle}>{category}</Text>
-              {items.map((item, index) => (
-                <Pressable 
-                  key={`${item.name}-${index}`}
-                  style={[
-                    styles.itemRow,
-                    checkedItems[item.name] && styles.checkedItem
-                  ]}
-                  onPress={() => toggleItemCheck(item.name)}
-                >
-                  <View style={styles.checkboxContainer}>
-                    {checkedItems[item.name] ? (
-                      <Check size={18} color="#22c55e" />
-                    ) : (
-                      <View style={styles.uncheckedBox} />
-                    )}
-                  </View>
-                  <View style={styles.itemDetails}>
-                    <Text style={[
-                      styles.itemName,
-                      checkedItems[item.name] && styles.checkedItemText
-                    ]}>
-                      {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
-                    </Text>
-                    <Text style={styles.itemQuantity}>
-                      {item.quantity}{item.unit}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          )
-        ))}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#22c55e" />
+          <Text style={styles.loadingText}>Updating shopping list...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.listContainer}>
+          {Object.entries(shoppingList).map(([category, items]) => (
+            items.length > 0 && (
+              <View key={category} style={styles.categorySection}>
+                <Text style={styles.categoryTitle}>{category}</Text>
+                {items.map((item, index) => (
+                  <Pressable 
+                    key={`${item.name}-${index}`}
+                    style={[
+                      styles.itemRow,
+                      checkedItems[item.name] && styles.checkedItem
+                    ]}
+                    onPress={() => toggleItemCheck(item.name)}
+                  >
+                    <View style={styles.checkboxContainer}>
+                      {checkedItems[item.name] ? (
+                        <Check size={18} color="#22c55e" />
+                      ) : (
+                        <View style={styles.uncheckedBox} />
+                      )}
+                    </View>
+                    <View style={styles.itemDetails}>
+                      <Text style={[
+                        styles.itemName,
+                        checkedItems[item.name] && styles.checkedItemText
+                      ]}>
+                        {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                      </Text>
+                      <Text style={styles.itemQuantity}>
+                        {item.quantity} {item.unit}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            )
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -375,5 +580,51 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     fontSize: 14,
     color: '#64748b',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#64748b',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#ef4444',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: 'white',
   },
 });

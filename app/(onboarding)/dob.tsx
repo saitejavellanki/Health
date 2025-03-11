@@ -7,9 +7,12 @@ import {
   Alert,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowRight, ChevronLeft } from 'lucide-react-native';
+import { ArrowRight, ChevronLeft, Calendar } from 'lucide-react-native';
+import { db, auth } from '../../components/firebase/Firebase'; // Update this path as needed
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 
 export default function DateOfBirth() {
   // Generate arrays for days, months, and years
@@ -117,7 +120,7 @@ export default function DateOfBirth() {
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     try {
       setIsLoading(true);
 
@@ -151,9 +154,48 @@ export default function DateOfBirth() {
         return;
       }
 
-      // Save DOB data or navigate to the next step
+      // Format DOB for storage
+      const formattedDOB = {
+        day: selectedDay,
+        month: selectedMonth,
+        year: selectedYear,
+        timestamp: date.toISOString(),
+        age: actualAge
+      };
+
+      // Get current user
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        Alert.alert('Error', 'No authenticated user found. Please log in again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Save to Firestore
+      const userRef = doc(db, 'users', currentUser.uid);
+      
+      // Update the user document
+      await updateDoc(userRef, {
+        dateOfBirth: formattedDOB,
+        updatedAt: new Date().toISOString()
+      }).catch(async (error) => {
+        // If document doesn't exist yet, create it
+        if (error.code === 'not-found') {
+          await setDoc(userRef, {
+            dateOfBirth: formattedDOB,
+            userId: currentUser.uid,
+            email: currentUser.email || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          throw error;
+        }
+      });
+
       console.log(
-        `Date of Birth: ${selectedDay} ${selectedMonth} ${selectedYear}`
+        `Date of Birth saved: ${selectedDay} ${selectedMonth} ${selectedYear}`
       );
 
       // Navigate to the next screen
@@ -171,161 +213,172 @@ export default function DateOfBirth() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.backButtonContainer}>
+      <View style={styles.header}>
         <Pressable
           style={styles.backButton}
           onPress={() => router.push('/weight')}
         >
           <ChevronLeft size={24} color="#000" />
         </Pressable>
+        <View style={styles.progressBar}>
+          <View style={styles.progressFill} />
+        </View>
       </View>
 
       <View style={styles.contentContainer}>
-        <Text style={styles.title}>Select your date of birth</Text>
+        <View style={styles.titleContainer}>
+          <Calendar size={28} color="#8cc63f" style={styles.icon} />
+          <Text style={styles.title}>When were you born?</Text>
+          <Text style={styles.subtitle}>
+            Your age helps us personalize your fitness journey
+          </Text>
+        </View>
 
-        <View style={styles.pickerContainer}>
-          {/* Day Picker */}
-          <View style={styles.pickerColumn}>
-            {/* <Text style={styles.pickerLabel}>Day</Text> */}
-            <View style={styles.pickerWrapper}>
-              <ScrollView
-                ref={dayScrollRef}
-                showsVerticalScrollIndicator={false}
-                snapToInterval={ITEM_HEIGHT}
-                decelerationRate="fast"
-                style={[styles.picker, { height: scrollViewHeight }]}
-                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
-                onScroll={(event) => {
-                  const y = event.nativeEvent.contentOffset.y;
-                  const index = Math.round(y / ITEM_HEIGHT);
-                  if (index >= 0 && index < days.length) {
-                    setSelectedDay(days[index]);
-                  }
-                }}
-                onMomentumScrollEnd={handleDayScroll}
-                scrollEventThrottle={16}
-              >
-                {days.map((day) => (
-                  <Pressable
-                    key={`day-${day}`}
-                    style={[
-                      styles.pickerItem,
-                      day === selectedDay && styles.selectedPickerItem,
-                    ]}
-                    onPress={() => {
-                      setSelectedDay(day);
-                      centerValueInScrollView(dayScrollRef, day, days);
-                    }}
-                  >
-                    <Text
+        <View style={styles.pickerOuterContainer}>
+          <View style={styles.pickerContainer}>
+            {/* Day Picker */}
+            <View style={styles.pickerColumn}>
+              <Text style={styles.pickerLabel}>Day</Text>
+              <View style={styles.pickerWrapper}>
+                <ScrollView
+                  ref={dayScrollRef}
+                  showsVerticalScrollIndicator={false}
+                  snapToInterval={ITEM_HEIGHT}
+                  decelerationRate="fast"
+                  style={[styles.picker, { height: scrollViewHeight }]}
+                  contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+                  onScroll={(event) => {
+                    const y = event.nativeEvent.contentOffset.y;
+                    const index = Math.round(y / ITEM_HEIGHT);
+                    if (index >= 0 && index < days.length) {
+                      setSelectedDay(days[index]);
+                    }
+                  }}
+                  onMomentumScrollEnd={handleDayScroll}
+                  scrollEventThrottle={16}
+                >
+                  {days.map((day) => (
+                    <Pressable
+                      key={`day-${day}`}
                       style={[
-                        styles.pickerItemText,
-                        day === selectedDay && styles.selectedPickerItemText,
+                        styles.pickerItem,
+                        day === selectedDay && styles.selectedPickerItem,
                       ]}
+                      onPress={() => {
+                        setSelectedDay(day);
+                        centerValueInScrollView(dayScrollRef, day, days);
+                      }}
                     >
-                      {day}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <View style={styles.pickerHighlight} pointerEvents="none" />
+                      <Text
+                        style={[
+                          styles.pickerItemText,
+                          day === selectedDay && styles.selectedPickerItemText,
+                        ]}
+                      >
+                        {day}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <View style={styles.pickerHighlight} pointerEvents="none" />
+              </View>
             </View>
-          </View>
 
-          {/* Month Picker */}
-          <View style={[styles.pickerColumn, { flex: 2 }]}>
-            {/* <Text style={styles.pickerLabel}>Month</Text> */}
-            <View style={styles.pickerWrapper}>
-              <ScrollView
-                ref={monthScrollRef}
-                showsVerticalScrollIndicator={false}
-                snapToInterval={ITEM_HEIGHT}
-                decelerationRate="fast"
-                style={[styles.picker, { height: scrollViewHeight }]}
-                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
-                onScroll={(event) => {
-                  const y = event.nativeEvent.contentOffset.y;
-                  const index = Math.round(y / ITEM_HEIGHT);
-                  if (index >= 0 && index < months.length) {
-                    setSelectedMonth(months[index]);
-                  }
-                }}
-                onMomentumScrollEnd={handleMonthScroll}
-                scrollEventThrottle={16}
-              >
-                {months.map((month) => (
-                  <Pressable
-                    key={`month-${month}`}
-                    style={[
-                      styles.pickerItem,
-                      month === selectedMonth && styles.selectedPickerItem,
-                    ]}
-                    onPress={() => {
-                      setSelectedMonth(month);
-                      centerValueInScrollView(monthScrollRef, month, months);
-                    }}
-                  >
-                    <Text
+            {/* Month Picker */}
+            <View style={[styles.pickerColumn, { flex: 2 }]}>
+              <Text style={styles.pickerLabel}>Month</Text>
+              <View style={styles.pickerWrapper}>
+                <ScrollView
+                  ref={monthScrollRef}
+                  showsVerticalScrollIndicator={false}
+                  snapToInterval={ITEM_HEIGHT}
+                  decelerationRate="fast"
+                  style={[styles.picker, { height: scrollViewHeight }]}
+                  contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+                  onScroll={(event) => {
+                    const y = event.nativeEvent.contentOffset.y;
+                    const index = Math.round(y / ITEM_HEIGHT);
+                    if (index >= 0 && index < months.length) {
+                      setSelectedMonth(months[index]);
+                    }
+                  }}
+                  onMomentumScrollEnd={handleMonthScroll}
+                  scrollEventThrottle={16}
+                >
+                  {months.map((month) => (
+                    <Pressable
+                      key={`month-${month}`}
                       style={[
-                        styles.pickerItemText,
-                        month === selectedMonth &&
-                          styles.selectedPickerItemText,
+                        styles.pickerItem,
+                        month === selectedMonth && styles.selectedPickerItem,
                       ]}
+                      onPress={() => {
+                        setSelectedMonth(month);
+                        centerValueInScrollView(monthScrollRef, month, months);
+                      }}
                     >
-                      {month}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <View style={styles.pickerHighlight} pointerEvents="none" />
+                      <Text
+                        style={[
+                          styles.pickerItemText,
+                          month === selectedMonth &&
+                            styles.selectedPickerItemText,
+                        ]}
+                      >
+                        {month}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <View style={styles.pickerHighlight} pointerEvents="none" />
+              </View>
             </View>
-          </View>
 
-          {/* Year Picker */}
-          <View style={styles.pickerColumn}>
-            {/* <Text style={styles.pickerLabel}>Year</Text> */}
-            <View style={styles.pickerWrapper}>
-              <ScrollView
-                ref={yearScrollRef}
-                showsVerticalScrollIndicator={false}
-                snapToInterval={ITEM_HEIGHT}
-                decelerationRate="fast"
-                style={[styles.picker, { height: scrollViewHeight }]}
-                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
-                onScroll={(event) => {
-                  const y = event.nativeEvent.contentOffset.y;
-                  const index = Math.round(y / ITEM_HEIGHT);
-                  if (index >= 0 && index < years.length) {
-                    setSelectedYear(years[index]);
-                  }
-                }}
-                onMomentumScrollEnd={handleYearScroll}
-                scrollEventThrottle={16}
-              >
-                {years.map((year) => (
-                  <Pressable
-                    key={`year-${year}`}
-                    style={[
-                      styles.pickerItem,
-                      year === selectedYear && styles.selectedPickerItem,
-                    ]}
-                    onPress={() => {
-                      setSelectedYear(year);
-                      centerValueInScrollView(yearScrollRef, year, years);
-                    }}
-                  >
-                    <Text
+            {/* Year Picker */}
+            <View style={styles.pickerColumn}>
+              <Text style={styles.pickerLabel}>Year</Text>
+              <View style={styles.pickerWrapper}>
+                <ScrollView
+                  ref={yearScrollRef}
+                  showsVerticalScrollIndicator={false}
+                  snapToInterval={ITEM_HEIGHT}
+                  decelerationRate="fast"
+                  style={[styles.picker, { height: scrollViewHeight }]}
+                  contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+                  onScroll={(event) => {
+                    const y = event.nativeEvent.contentOffset.y;
+                    const index = Math.round(y / ITEM_HEIGHT);
+                    if (index >= 0 && index < years.length) {
+                      setSelectedYear(years[index]);
+                    }
+                  }}
+                  onMomentumScrollEnd={handleYearScroll}
+                  scrollEventThrottle={16}
+                >
+                  {years.map((year) => (
+                    <Pressable
+                      key={`year-${year}`}
                       style={[
-                        styles.pickerItemText,
-                        year === selectedYear && styles.selectedPickerItemText,
+                        styles.pickerItem,
+                        year === selectedYear && styles.selectedPickerItem,
                       ]}
+                      onPress={() => {
+                        setSelectedYear(year);
+                        centerValueInScrollView(yearScrollRef, year, years);
+                      }}
                     >
-                      {year}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <View style={styles.pickerHighlight} pointerEvents="none" />
+                      <Text
+                        style={[
+                          styles.pickerItemText,
+                          year === selectedYear && styles.selectedPickerItemText,
+                        ]}
+                      >
+                        {year}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <View style={styles.pickerHighlight} pointerEvents="none" />
+              </View>
             </View>
           </View>
         </View>
@@ -337,10 +390,14 @@ export default function DateOfBirth() {
           disabled={isLoading}
           onPress={handleContinue}
         >
-          <Text style={styles.buttonText}>
-            {isLoading ? 'Saving...' : 'Continue'}
-          </Text>
-          {!isLoading && <ArrowRight size={20} color="#fff" />}
+          {isLoading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>Continue</Text>
+              <ArrowRight size={20} color="#fff" />
+            </>
+          )}
         </Pressable>
       </View>
     </View>
@@ -353,9 +410,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 20,
   },
-  backButtonContainer: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingTop: 20,
-    // paddingHorizontal: 24,
+    marginBottom: 20,
   },
   backButton: {
     width: 48,
@@ -364,26 +423,60 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
-    
+    marginRight: 15,
+  },
+  progressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    width: '60%', // Adjust based on progress
+    height: '100%',
+    backgroundColor: '#8cc63f',
+    borderRadius: 4,
   },
   contentContainer: {
     flex: 1,
     justifyContent: 'center',
+  },
+  titleContainer: {
     alignItems: 'center',
+    marginBottom: 30,
+  },
+  icon: {
+    marginBottom: 15,
   },
   title: {
     fontSize: 28,
     fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 40,
+    color: '#334155',
+    marginBottom: 10,
     textAlign: 'center',
     fontFamily: 'Inter-Bold',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+    maxWidth: '80%',
+  },
+  pickerOuterContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   pickerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    marginBottom: 40,
   },
   pickerColumn: {
     flex: 1,
@@ -391,9 +484,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   pickerLabel: {
-    fontSize: 16,
-    color: '#5a6a7e',
+    fontSize: 14,
+    color: '#64748b',
     marginBottom: 10,
+    fontWeight: '500',
   },
   pickerWrapper: {
     position: 'relative',
@@ -410,11 +504,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectedPickerItem: {
-    backgroundColor: 'rgba(140, 198, 63, 0.1)',
+    backgroundColor: 'rgba(140, 198, 63, 0.15)',
+    borderRadius: 8,
   },
   pickerItemText: {
     fontSize: 18,
-    color: '#5a6a7e',
+    color: '#64748b',
     textAlign: 'center',
   },
   selectedPickerItemText: {
@@ -436,6 +531,7 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 'auto',
     width: '100%',
+    paddingVertical: 20,
   },
   button: {
     flexDirection: 'row',
@@ -443,8 +539,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#8cc63f',
     borderRadius: 30,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    shadowColor: '#8cc63f',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonLoading: {
     backgroundColor: '#a9d178',

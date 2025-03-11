@@ -11,12 +11,14 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
+import { doc, updateDoc } from "firebase/firestore";
+import { auth, db } from '../../components/firebase/Firebase'; // Update this path to point to your firebase config file
 
 export default function Weight() {
   const [weight, setWeight] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!weight) {
       Alert.alert('Error', 'Please enter your weight.');
       return;
@@ -24,9 +26,22 @@ export default function Weight() {
 
     try {
       setIsLoading(true);
+      
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        Alert.alert('Error', 'You must be logged in to save your weight.');
+        return;
+      }
+      
+      // Update the user document in the users collection
+      const userRef = doc(db, "users", currentUser.uid);
+      await updateDoc(userRef, {
+        weight: parseInt(weight),
+        updatedAt: new Date()
+      });
 
-      // Save weight data or navigate to the next step
-      console.log(`Weight: ${weight} kgs`);
+      console.log(`Weight saved: ${weight} kgs`);
 
       // Navigate to the next screen
       router.push('/dob');

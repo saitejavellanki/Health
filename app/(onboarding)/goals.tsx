@@ -7,6 +7,8 @@ import {
   Pressable,
   Image,
   Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
@@ -21,6 +23,15 @@ const GOALS = [
       'Healthy and sustainable weight loss through balanced nutrition',
     image:
       'https://images.unsplash.com/photo-1576678927484-cc907957088c?q=80&w=800&auto=format&fit=crop',
+    requiresTarget: true,
+  },
+  {
+    id: 'weight-gain',
+    title: 'Weight Gain',
+    description: 'Healthy weight gain with nutrient-dense meal plans',
+    image:
+      'https://images.unsplash.com/photo-1507120878965-54b2d3939100?q=80&w=800&auto=format&fit=crop',
+    requiresTarget: true,
   },
   {
     id: 'muscle-gain',
@@ -48,10 +59,24 @@ const GOALS = [
 export default function FitnessGoals() {
   const [selected, setSelected] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [targetWeight, setTargetWeight] = useState('');
 
   const handleContinue = async () => {
     if (!selected) return;
-
+    
+    // Check if the selected goal requires a target weight
+    const selectedGoal = GOALS.find((goal) => goal.id === selected);
+    
+    if (selectedGoal?.requiresTarget && !targetWeight) {
+      setShowTargetModal(true);
+      return;
+    }
+    
+    saveGoal();
+  };
+  
+  const saveGoal = async () => {
     try {
       setIsLoading(true);
 
@@ -70,15 +95,23 @@ export default function FitnessGoals() {
         throw new Error('Selected goal not found');
       }
 
+      // Create the goal object with optional target weight
+      const goalToSave = {
+        id: selectedGoal.id,
+        title: selectedGoal.title,
+        createdAt: new Date(),
+      };
+      
+      // Add targetWeight if it exists
+      if (targetWeight) {
+        goalToSave.targetWeight = parseFloat(targetWeight);
+      }
+
       // Update the user's goals in Firestore
       // Using arrayUnion to add the goal to the goals array
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, {
-        goals: arrayUnion({
-          id: selectedGoal.id,
-          title: selectedGoal.title,
-          createdAt: new Date(),
-        }),
+        goals: arrayUnion(goalToSave),
       });
 
       // Navigate to the next screen
@@ -91,8 +124,60 @@ export default function FitnessGoals() {
     }
   };
 
+  const handleTargetWeightSubmit = () => {
+    if (!targetWeight || isNaN(parseFloat(targetWeight))) {
+      Alert.alert('Error', 'Please enter a valid target weight');
+      return;
+    }
+    
+    setShowTargetModal(false);
+    saveGoal();
+  };
+
   return (
     <View style={styles.container}>
+      <Modal
+        visible={showTargetModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowTargetModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {selected === 'weight-loss' ? 'Target Weight (kg)' : 'Goal Weight (kg)'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {selected === 'weight-loss' 
+                ? 'What weight would you like to achieve?' 
+                : 'What weight would you like to gain to?'}
+            </Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={targetWeight}
+              onChangeText={setTargetWeight}
+              placeholder="Enter weight in kg"
+              placeholderTextColor="#94a3b8"
+            />
+            <View style={styles.modalButtons}>
+              <Pressable 
+                style={styles.modalCancelButton} 
+                onPress={() => setShowTargetModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable 
+                style={styles.modalSubmitButton}
+                onPress={handleTargetWeightSubmit}
+              >
+                <Text style={styles.modalSubmitText}>Confirm</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.header}>
         <Pressable
           style={styles.backButton}
@@ -246,5 +331,65 @@ const styles = StyleSheet.create({
   },
   buttonTextDisabled: {
     color: '#94a3b8',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 20,
+    color: '#1a1a1a',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalCancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  modalCancelText: {
+    color: '#64748b',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+  },
+  modalSubmitButton: {
+    backgroundColor: '#22c55e',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  modalSubmitText: {
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
   },
 });

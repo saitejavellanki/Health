@@ -169,16 +169,30 @@ const parseDailyPlan = (planText) => {
 };
 
 // Modified prompt (unchanged)
+// Modified prompt to use the new database structure
 const createPrompt = (userData) => {
-  const goal =
-    userData.goals && userData.goals.length > 0
-      ? userData.goals[0]?.title
-      : 'health improvement';
+  const goal = userData.goals && userData.goals.length > 0
+    ? userData.goals[0]?.title
+    : 'health improvement';
+  
+  const targetWeight = userData.goals && userData.goals.length > 0 && userData.goals[0]?.targetWeight
+    ? userData.goals[0]?.targetWeight
+    : null;
+  
+  const weightGoalText = targetWeight 
+    ? `with a target weight of ${targetWeight}kg` 
+    : '';
+  
   const diet = userData.preferences?.diet || 'balanced';
   const allergies = userData.preferences?.allergies?.join(',') || 'none';
-  const state = userData.state || 'general South Indian';
+  const state = userData.preferences?.state || 'general South Indian';
+  const currentWeight = userData.weight || null;
+  
+  const weightContext = currentWeight && targetWeight
+    ? `Current weight: ${currentWeight}kg, target: ${targetWeight}kg. `
+    : '';
 
-  return `Create a 7-day wellness plan for ${goal}. Diet preference: ${diet} with Indian food specific to ${state} region. Allergies: ${allergies}.
+  return `Create a 7-day wellness plan for ${goal} ${weightGoalText}. ${weightContext}Diet preference: ${diet} with Indian food specific to ${state} region. Allergies: ${allergies}.
 
 For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
 - Start with just the day name (e.g., "Monday")

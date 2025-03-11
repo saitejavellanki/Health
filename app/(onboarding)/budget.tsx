@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,15 +12,39 @@ import {
   Modal,
   FlatList,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ChevronLeft, ArrowRight, ChevronDown } from 'lucide-react-native';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../../components/firebase/Firebase'; // Update this path
 
 export default function Budget() {
   const [budget, setBudget] = useState('');
   const [currency, setCurrency] = useState('INR'); // Set default to INR
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch existing budget data if available
+  useEffect(() => {
+    const fetchBudgetData = async () => {
+      if (auth.currentUser) {
+        try {
+          const userDocRef = doc(db, 'users', auth.currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists() && userDoc.data().budget) {
+            setBudget(userDoc.data().budget.amount || '');
+            setCurrency(userDoc.data().budget.currency || 'INR');
+          }
+        } catch (error) {
+          console.error('Error fetching budget data:', error);
+        }
+      }
+    };
+    
+    fetchBudgetData();
+  }, []);
 
   const handleBudgetChange = (text) => {
     const numericValue = text.replace(/[^0-9]/g, '');
@@ -29,9 +53,42 @@ export default function Budget() {
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    if (!budget) {
+      Alert.alert('Budget Required', 'Please enter your monthly budget.');
+      return;
+    }
+
     setIsLoading(true);
-    router.push('/plan');
+    
+    try {
+      if (auth.currentUser) {
+        const userDocRef = doc(db, 'users', auth.currentUser.uid);
+        
+        // Get existing user data first
+        const userDoc = await getDoc(userDocRef);
+        const userData = userDoc.exists() ? userDoc.data() : {};
+        
+        // Update only the budget field, preserving other user data
+        await setDoc(userDocRef, {
+          ...userData,
+          budget: {
+            amount: budget,
+            currency: currency,
+            updatedAt: new Date().toISOString()
+          }
+        }, { merge: true });
+        
+        router.push('/plan');
+      } else {
+        Alert.alert('Error', 'You must be signed in to continue.');
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Error saving budget:', error);
+      Alert.alert('Error', 'Failed to save your budget. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   const toggleCurrencyModal = () => {

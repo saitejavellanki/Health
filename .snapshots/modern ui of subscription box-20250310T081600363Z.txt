@@ -1,0 +1,1084 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert, ActivityIndicator } from 'react-native';
+import { Check, ChevronRight, MapPin, Navigation, Plus, Minus, Clock } from 'lucide-react-native';
+import * as Location from 'expo-location';
+
+// Enhanced subscription types with more delivery options
+const SUBSCRIPTION_TYPES = [
+  {
+    id: 'oneTime',
+    title: 'One-Time Delivery',
+    price: 79.99,
+    description: 'Single box without subscription',
+    image: 'https://images.unsplash.com/photo-1607349913338-fca6f7fc42d0?q=80&w=800&auto=format&fit=crop',
+  },
+  {
+    id: 'weekly',
+    title: 'Weekly Subscription',
+    price: 69.99,
+    description: 'Delivered every week',
+    savings: 'Save 12%',
+    image: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?q=80&w=800&auto=format&fit=crop',
+  },
+  {
+    id: 'biweekly',
+    title: 'Bi-Weekly Subscription',
+    price: 74.99,
+    description: 'Delivered every two weeks',
+    savings: 'Save 6%',
+    image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?q=80&w=800&auto=format&fit=crop',
+  },
+  {
+    id: 'monthly',
+    title: 'Monthly Subscription',
+    price: 76.99,
+    description: 'Delivered once a month',
+    savings: 'Save 4%',
+    image: 'https://images.unsplash.com/photo-1607349913338-fca6f7fc42d0?q=80&w=800&auto=format&fit=crop',
+  },
+];
+
+// Product data organized by categories
+const PRODUCT_CATEGORIES = [
+  {
+    title: 'Fresh Vegetables',
+    products: [
+      {
+        id: 'veg1',
+        name: 'Organic Spinach',
+        price: 2.99,
+        weight: '250g',
+        image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '10 min'
+      },
+      {
+        id: 'veg2',
+        name: 'Bell Peppers Mix',
+        price: 3.49,
+        weight: '500g',
+        image: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '10 min'
+      },
+      {
+        id: 'veg3',
+        name: 'Broccoli',
+        price: 2.79,
+        weight: '400g',
+        image: 'https://images.unsplash.com/photo-1583663848850-46af132dc08e?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '10 min'
+      },
+      {
+        id: 'veg4',
+        name: 'Cherry Tomatoes',
+        price: 3.99,
+        weight: '300g',
+        image: 'https://images.unsplash.com/photo-1546094096-0df4bcabd31c?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '10 min'
+      },
+    ]
+  },
+  {
+    title: 'Protein Options',
+    products: [
+      {
+        id: 'protein1',
+        name: 'Chicken Breast',
+        price: 7.99,
+        weight: '500g',
+        image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '15 min'
+      },
+      {
+        id: 'protein2',
+        name: 'Salmon Fillet',
+        price: 9.99,
+        weight: '400g',
+        image: 'https://images.unsplash.com/photo-1499125562588-29fb8a56b5d5?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '15 min'
+      },
+      {
+        id: 'protein3',
+        name: 'Tofu',
+        price: 3.99,
+        weight: '350g',
+        image: 'https://images.unsplash.com/photo-1583874044705-d37fc6708960?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '15 min'
+      },
+      {
+        id: 'protein4',
+        name: 'Free-Range Eggs',
+        price: 4.49,
+        weight: '12 pcs',
+        image: 'https://images.unsplash.com/photo-1511994714008-b6d68a8b32a2?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '15 min'
+      },
+    ]
+  },
+  {
+    title: 'Healthy Snacks',
+    products: [
+      {
+        id: 'snack1',
+        name: 'Mixed Nuts',
+        price: 6.99,
+        weight: '200g',
+        image: 'https://images.unsplash.com/photo-1606937921474-3a7cd8a851ed?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '10 min'
+      },
+      {
+        id: 'snack2',
+        name: 'Greek Yogurt',
+        price: 4.49,
+        weight: '500g',
+        image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '10 min'
+      },
+      {
+        id: 'snack3',
+        name: 'Granola Bars',
+        price: 5.99,
+        weight: '6 pcs',
+        image: 'https://images.unsplash.com/photo-1578027458176-05cd379b662c?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '10 min'
+      },
+      {
+        id: 'snack4',
+        name: 'Dried Fruits Mix',
+        price: 4.29,
+        weight: '150g',
+        image: 'https://images.unsplash.com/photo-1596810574821-9a71e38cb27d?q=80&w=400&auto=format&fit=crop',
+        deliveryTime: '10 min'
+      },
+    ]
+  },
+];
+
+export default function SubscriptionBox() {
+  const [selectedType, setSelectedType] = useState('');
+  const [cartItems, setCartItems] = useState({});
+  const [location, setLocation] = useState(null);
+  const [address, setAddress] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [activeStep, setActiveStep] = useState(1); // 1: Plan Selection, 2: Product Selection, 3: Delivery Details
+  const [duration, setDuration] = useState(4); // Default duration for subscriptions (weeks/months)
+  
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Get current location
+        let location = await Location.getCurrentPositionAsync({});
+        setLocation(location);
+        
+        // Reverse geocode to get address
+        let geocode = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude
+        });
+        
+        if (geocode.length > 0) {
+          const addressData = geocode[0];
+          // Format address
+          const formattedAddress = [
+            addressData.name,
+            addressData.street,
+            addressData.district,
+            addressData.city,
+            addressData.region,
+            addressData.postalCode
+          ].filter(Boolean).join(', ');
+          
+          setAddress(formattedAddress);
+        }
+      } catch (error) {
+        setErrorMsg('Error fetching location');
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const refreshLocation = async () => {
+    setLoading(true);
+    try {
+      let location = await Location.getCurrentPositionAsync({});
+      setLocation(location);
+      
+      let geocode = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+      
+      if (geocode.length > 0) {
+        const addressData = geocode[0];
+        const formattedAddress = [
+          addressData.name,
+          addressData.street,
+          addressData.district,
+          addressData.city,
+          addressData.region,
+          addressData.postalCode
+        ].filter(Boolean).join(', ');
+        
+        setAddress(formattedAddress);
+      }
+    } catch (error) {
+      setErrorMsg('Error refreshing location');
+      Alert.alert('Location Error', 'Could not refresh location. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleAddToCart = (productId) => {
+    setCartItems(prev => ({
+      ...prev,
+      [productId]: (prev[productId] || 0) + 1,
+    }));
+  };
+
+  const handleRemoveFromCart = (productId) => {
+    setCartItems(prev => {
+      const newCart = { ...prev };
+      if (newCart[productId] > 1) {
+        newCart[productId] -= 1;
+      } else {
+        delete newCart[productId];
+      }
+      return newCart;
+    });
+  };
+
+  const calculateSubtotal = () => {
+    let total = 0;
+    
+    // Add subscription price if selected
+    if (selectedType) {
+      const plan = SUBSCRIPTION_TYPES.find(type => type.id === selectedType);
+      if (plan) {
+        total += plan.price;
+      }
+    }
+    
+    // Add individual product prices
+    Object.entries(cartItems).forEach(([productId, quantity]) => {
+      // Find the product in all categories
+      for (const category of PRODUCT_CATEGORIES) {
+        const product = category.products.find(p => p.id === productId);
+        if (product) {
+          total += product.price * quantity;
+          break;
+        }
+      }
+    });
+    
+    return total.toFixed(2);
+  };
+
+  const totalItems = Object.values(cartItems).reduce((sum, count) => sum + count, 0);
+  
+  let locationText = 'Fetching your location...';
+  if (errorMsg) {
+    locationText = errorMsg;
+  } else if (address) {
+    locationText = address;
+  }
+
+  const handleNext = () => {
+    if (activeStep === 1 && selectedType) {
+      setActiveStep(2);
+    } else if (activeStep === 2 && totalItems > 0) {
+      setActiveStep(3);
+    }
+  };
+
+  const handleBack = () => {
+    if (activeStep > 1) {
+      setActiveStep(activeStep - 1);
+    }
+  };
+
+  const progressPercentage = ((activeStep - 1) / 2) * 100;
+
+  const renderProgressBar = () => (
+    <View style={styles.progressContainer}>
+      <View style={styles.progressSteps}>
+        <View style={[styles.progressStep, activeStep >= 1 && styles.activeStep]}>
+          <Text style={[styles.stepNumber, activeStep >= 1 && styles.activeStepNumber]}>1</Text>
+        </View>
+        <View style={[styles.progressLine, activeStep >= 2 && styles.activeProgressLine]} />
+        <View style={[styles.progressStep, activeStep >= 2 && styles.activeStep]}>
+          <Text style={[styles.stepNumber, activeStep >= 2 && styles.activeStepNumber]}>2</Text>
+        </View>
+        <View style={[styles.progressLine, activeStep >= 3 && styles.activeProgressLine]} />
+        <View style={[styles.progressStep, activeStep >= 3 && styles.activeStep]}>
+          <Text style={[styles.stepNumber, activeStep >= 3 && styles.activeStepNumber]}>3</Text>
+        </View>
+      </View>
+      <View style={styles.progressLabels}>
+        <Text style={[styles.progressLabel, activeStep === 1 && styles.activeProgressLabel]}>
+          Choose Plan
+        </Text>
+        <Text style={[styles.progressLabel, activeStep === 2 && styles.activeProgressLabel]}>
+          Add Items
+        </Text>
+        <Text style={[styles.progressLabel, activeStep === 3 && styles.activeProgressLabel]}>
+          Delivery
+        </Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Location Header */}
+      <View style={styles.locationContainer}>
+        <View style={styles.locationHeader}>
+          <MapPin size={20} color="#22c55e" />
+          <View style={styles.locationInfo}>
+            <Text style={styles.locationTitle}>
+              {loading ? 'Detecting location...' : 'Deliver to'}
+            </Text>
+            
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#22c55e" />
+                <Text style={styles.loadingText}>Fetching your location...</Text>
+              </View>
+            ) : (
+              <Text numberOfLines={2} style={styles.locationAddress}>
+                {errorMsg ? errorMsg : locationText}
+              </Text>
+            )}
+          </View>
+          <Pressable onPress={refreshLocation} style={styles.refreshButton}>
+            <Navigation size={20} color="#22c55e" />
+          </Pressable>
+        </View>
+      </View>
+
+      {renderProgressBar()}
+
+      <ScrollView style={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Meal Subscription Box</Text>
+          <Text style={styles.subtitle}>
+            {activeStep === 1 ? "Choose your delivery schedule" : 
+             activeStep === 2 ? "Customize the items in your box" : 
+             "Review and confirm your subscription"}
+          </Text>
+        </View>
+
+        {/* Step 1: Plan Selection */}
+        {activeStep === 1 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Your Delivery Plan</Text>
+            {SUBSCRIPTION_TYPES.map((type) => (
+              <Pressable
+                key={type.id}
+                style={[
+                  styles.planCard,
+                  selectedType === type.id && styles.planCardSelected,
+                ]}
+                onPress={() => setSelectedType(type.id)}>
+                <Image source={{ uri: type.image }} style={styles.planImage} />
+                <View style={styles.planContent}>
+                  <View style={styles.planHeader}>
+                    <Text style={styles.planTitle}>{type.title}</Text>
+                    <View>
+                      <Text style={styles.planPrice}>${type.price}</Text>
+                      {type.savings && (
+                        <Text style={styles.savingsText}>{type.savings}</Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={styles.planDescription}>{type.description}</Text>
+                  
+                  {/* Show duration selector for subscription plans */}
+                  {type.id !== 'oneTime' && selectedType === type.id && (
+                    <View style={styles.durationContainer}>
+                      <Text style={styles.durationLabel}>
+                        Duration: {duration} {type.id === 'monthly' ? 'months' : 'weeks'}
+                      </Text>
+                      <View style={styles.durationControls}>
+                        <Pressable 
+                          onPress={() => setDuration(Math.max(1, duration - 1))}
+                          style={styles.durationButton}
+                        >
+                          <Minus size={16} color="#22c55e" />
+                        </Pressable>
+                        <Text style={styles.durationValue}>{duration}</Text>
+                        <Pressable 
+                          onPress={() => setDuration(Math.min(12, duration + 1))}
+                          style={styles.durationButton}
+                        >
+                          <Plus size={16} color="#22c55e" />
+                        </Pressable>
+                      </View>
+                    </View>
+                  )}
+                </View>
+                {selectedType === type.id && (
+                  <View style={styles.checkmark}>
+                    <Check size={24} color="#22c55e" />
+                  </View>
+                )}
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Step 2: Product Selection */}
+        {activeStep === 2 && (
+          <View style={styles.section}>
+            <View style={styles.stepHeader}>
+              <Text style={styles.sectionTitle}>Add Items to Your Box</Text>
+              <Text style={styles.itemsSelectedText}>
+                {totalItems} items selected
+              </Text>
+            </View>
+            
+            {PRODUCT_CATEGORIES.map((category) => (
+              <View key={category.title} style={styles.categoryContainer}>
+                <Text style={styles.categoryTitle}>{category.title}</Text>
+                <View style={styles.productGrid}>
+                  {category.products.map((product) => (
+                    <View key={product.id} style={styles.productCard}>
+                      <View style={styles.deliveryBadge}>
+                        <Clock size={10} color="#fff" style={styles.deliveryIcon} />
+                        <Text style={styles.deliveryText}>
+                          {product.deliveryTime}
+                        </Text>
+                      </View>
+                      <Image source={{ uri: product.image }} style={styles.productImage} />
+                      <View style={styles.productInfo}>
+                        <View style={styles.productPriceRow}>
+                          <Text style={styles.priceText}>${product.price}</Text>
+                          <Text style={styles.weightText}>{product.weight}</Text>
+                        </View>
+                        <Text numberOfLines={2} style={styles.productName}>{product.name}</Text>
+                      </View>
+                      
+                      {cartItems[product.id] ? (
+                        <View style={styles.quantityControl}>
+                          <Pressable
+                            onPress={() => handleRemoveFromCart(product.id)}
+                            style={styles.quantityButton}
+                          >
+                            <Minus size={18} color="#22c55e" />
+                          </Pressable>
+                          <Text style={styles.quantityText}>{cartItems[product.id]}</Text>
+                          <Pressable
+                            onPress={() => handleAddToCart(product.id)}
+                            style={styles.quantityButton}
+                          >
+                            <Plus size={18} color="#22c55e" />
+                          </Pressable>
+                        </View>
+                      ) : (
+                        <Pressable
+                          style={styles.addButton}
+                          onPress={() => handleAddToCart(product.id)}
+                        >
+                          <Text style={styles.addButtonText}>ADD</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Step 3: Order Review */}
+        {activeStep === 3 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Review Your Subscription</Text>
+            
+            <View style={styles.orderSummaryCard}>
+              <Text style={styles.orderSummaryTitle}>Subscription Details</Text>
+              
+              {selectedType && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Plan:</Text>
+                  <Text style={styles.summaryValue}>
+                    {SUBSCRIPTION_TYPES.find(t => t.id === selectedType)?.title}
+                  </Text>
+                </View>
+              )}
+              
+              {selectedType !== 'oneTime' && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Duration:</Text>
+                  <Text style={styles.summaryValue}>
+                    {duration} {selectedType === 'monthly' ? 'months' : 'weeks'}
+                  </Text>
+                </View>
+              )}
+              
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Items:</Text>
+                <Text style={styles.summaryValue}>{totalItems} products</Text>
+              </View>
+              
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Delivery Address:</Text>
+                <Text style={styles.summaryValue} numberOfLines={2}>
+                  {address || 'Loading address...'}
+                </Text>
+              </View>
+              
+              <View style={styles.divider} />
+              
+              <View style={styles.pricingDetails}>
+                <Text style={styles.pricingTitle}>Price Breakdown</Text>
+                
+                {selectedType && (
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingLabel}>Subscription Box:</Text>
+                    <Text style={styles.pricingValue}>
+                      ${SUBSCRIPTION_TYPES.find(t => t.id === selectedType)?.price}
+                    </Text>
+                  </View>
+                )}
+                
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingLabel}>Additional Items:</Text>
+                  <Text style={styles.pricingValue}>
+                    ${(calculateSubtotal() - (SUBSCRIPTION_TYPES.find(t => t.id === selectedType)?.price || 0)).toFixed(2)}
+                  </Text>
+                </View>
+                
+                <View style={styles.pricingTotal}>
+                  <Text style={styles.pricingTotalLabel}>Total:</Text>
+                  <Text style={styles.pricingTotalValue}>${calculateSubtotal()}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        {activeStep > 1 && (
+          <Pressable
+            style={styles.backButton}
+            onPress={handleBack}>
+            <Text style={styles.backButtonText}>Back</Text>
+          </Pressable>
+        )}
+        
+        <Pressable
+          style={[
+            styles.button,
+            (activeStep === 1 && !selectedType) || 
+            (activeStep === 2 && totalItems === 0) ? 
+            styles.buttonDisabled : styles.buttonEnabled
+          ]}
+          disabled={(activeStep === 1 && !selectedType) || (activeStep === 2 && totalItems === 0)}
+          onPress={activeStep === 3 ? () => Alert.alert('Success', 'Your subscription has been placed!') : handleNext}>
+          <Text style={[
+            styles.buttonText,
+            (activeStep === 1 && !selectedType) || 
+            (activeStep === 2 && totalItems === 0) ? 
+            styles.buttonTextDisabled : styles.buttonTextEnabled
+          ]}>
+            {activeStep === 1 ? 'Continue to Items' : 
+             activeStep === 2 ? 'Review Order' : 
+             'Place Order'}
+          </Text>
+          <ChevronRight 
+            size={20} 
+            color={
+              (activeStep === 1 && !selectedType) || 
+              (activeStep === 2 && totalItems === 0) ? 
+              '#94a3b8' : '#fff'
+            } 
+          />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  // Progress bar
+  progressContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  progressSteps: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressStep: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeStep: {
+    backgroundColor: '#22c55e',
+  },
+  stepNumber: {
+    fontFamily: 'Inter-SemiBold',
+    color: '#64748b',
+  },
+  activeStepNumber: {
+    color: '#fff',
+  },
+  progressLine: {
+    height: 3,
+    width: 60,
+    backgroundColor: '#e2e8f0',
+  },
+  activeProgressLine: {
+    backgroundColor: '#22c55e',
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingHorizontal: 8,
+  },
+  progressLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    color: '#64748b',
+  },
+  activeProgressLabel: {
+    color: '#22c55e',
+    fontFamily: 'Inter-SemiBold',
+  },
+  // Location styles
+  locationContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#fff',
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 50, // Extra padding for status bar
+  },
+  locationInfo: {
+    flex: 1,
+    marginLeft: 8,
+    marginRight: 8,
+  },
+  locationTitle: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  locationAddress: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#64748b',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#64748b',
+    marginLeft: 8,
+  },
+  refreshButton: {
+    padding: 8,
+  },
+  // Header styles
+  header: {
+    padding: 24,
+    backgroundColor: '#f8fafc',
+  },
+  title: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 28,
+    color: '#1a1a1a',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#64748b',
+    lineHeight: 24,
+  },
+  section: {
+    padding: 24,
+    paddingBottom: 100, // Add extra padding at bottom for scrolling
+  },
+  stepHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 20,
+    color: '#1a1a1a',
+    marginBottom: 16,
+  },
+  itemsSelectedText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#22c55e',
+  },
+  // Plan card styles
+  planCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+  },
+  planCardSelected: {
+    borderColor: '#22c55e',
+  },
+  planImage: {
+    width: '100%',
+    height: 140,
+    resizeMode: 'cover',
+  },
+  planContent: {
+    padding: 16,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  planTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: '#1a1a1a',
+  },
+  planPrice: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#22c55e',
+    textAlign: 'right',
+  },
+  savingsText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#f59e0b',
+    textAlign: 'right',
+  },
+  planDescription: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 12,
+  },
+  checkmark: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 4,
+  },
+  // Duration selector
+  durationContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+  },
+  durationLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#166534',
+    marginBottom: 8,
+  },
+  durationControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  durationButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+  durationValue: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    color: '#166534',
+    paddingHorizontal: 16,
+  },
+  // Product grid styles
+  categoryContainer: {
+    marginBottom: 24,
+  },
+  categoryTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: '#1a1a1a',
+    marginBottom: 12,
+  },
+  productGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  productCard: {
+    width: '48%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    height: 100,
+    borderRadius: 8,
+    marginBottom: 8,
+    resizeMode: 'cover',
+  },
+  productInfo: {
+    marginBottom: 12,
+  },
+  productName: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#1a1a1a',
+    lineHeight: 20,
+  },
+  productPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  priceText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#22c55e',
+  },
+  weightText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    color: '#64748b',
+  },
+  addButton: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+  addButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#22c55e',
+  },
+  quantityControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f0fdf4',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+  quantityButton: {
+    padding: 4,
+  },
+  quantityText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#166534',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  deliveryBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(34, 197, 94, 0.9)',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    zIndex: 1,
+  },
+  deliveryIcon: {
+    marginRight: 2,
+  },
+  deliveryText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 10,
+    color: '#fff',
+  },
+  // Order summary styles
+  orderSummaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  orderSummaryTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: '#1a1a1a',
+    marginBottom: 16,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  summaryLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#64748b',
+    flex: 1,
+  },
+  summaryValue: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#1a1a1a',
+    flex: 2,
+    textAlign: 'right',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 16,
+  },
+  pricingDetails: {
+    marginTop: 8,
+  },
+  pricingTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#1a1a1a',
+    marginBottom: 12,
+  },
+  pricingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  pricingLabel: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 15,
+    color: '#64748b',
+  },
+  pricingValue: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 15,
+    color: '#1a1a1a',
+  },
+  pricingTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  pricingTotalLabel: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#1a1a1a',
+  },
+  pricingTotalValue: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#22c55e',
+  },
+  // Footer styles
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    padding: 16,
+    paddingBottom: 32, // Extra padding for safe area
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  button: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonEnabled: {
+    backgroundColor: '#22c55e',
+  },
+  buttonDisabled: {
+    backgroundColor: '#e2e8f0',
+  },
+  buttonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  buttonTextEnabled: {
+    color: '#fff',
+  },
+  buttonTextDisabled: {
+    color: '#94a3b8',
+  },
+  backButton: {
+    marginRight: 16,
+    padding: 8,
+  },
+  backButtonText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#64748b',
+  },
+});

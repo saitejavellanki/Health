@@ -11,13 +11,15 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
+import { doc, updateDoc } from "firebase/firestore";
+import { auth, db } from '../../components/firebase/Firebase'; // Update this path to point to your firebase config file
 
 export default function Height() {
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!heightFeet || !heightInches) {
       Alert.alert('Error', 'Please enter your height in both fields.');
       return;
@@ -26,10 +28,30 @@ export default function Height() {
     try {
       setIsLoading(true);
 
-      // Save height data or navigate to the next step
-      console.log(`Height: ${heightFeet} ft ${heightInches} in`);
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        Alert.alert('Error', 'You must be logged in to save your height.');
+        return;
+      }
 
-      // Navigate to the next screen (adjust route as needed)
+      // Convert to total height in inches for easier calculations later if needed
+      const totalHeightInInches = (parseInt(heightFeet) * 12) + parseInt(heightInches);
+      
+      // Update the user document in the users collection
+      const userRef = doc(db, "users", currentUser.uid);
+      await updateDoc(userRef, {
+        height: {
+          feet: parseInt(heightFeet),
+          inches: parseInt(heightInches),
+          totalInches: totalHeightInInches
+        },
+        updatedAt: new Date()
+      });
+
+      console.log(`Height saved: ${heightFeet} ft ${heightInches} in`);
+
+      // Navigate to the next screen
       router.push('/weight');
     } catch (error) {
       console.error('Error saving height:', error);
