@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  ActivityIndicator, 
-  KeyboardAvoidingView, 
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   Alert,
@@ -14,13 +14,20 @@ import {
   Pressable,
   StatusBar,
   Modal,
-  FlatList
+  FlatList,
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../components/firebase/Firebase';
-import { User, Mail, Lock, ArrowRight, MapPin, ChevronDown } from 'lucide-react-native';
+import {
+  User,
+  Mail,
+  Lock,
+  ArrowRight,
+  MapPin,
+  ChevronDown,
+} from 'lucide-react-native';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -69,7 +76,7 @@ export default function Register() {
     'Jammu and Kashmir',
     'Ladakh',
     'Lakshadweep',
-    'Puducherry'
+    'Puducherry',
   ];
 
   const handleRegister = async () => {
@@ -78,30 +85,34 @@ export default function Register() {
       setError('Please fill in all fields');
       return;
     }
-  
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-  
+
     if (password.length < 6) {
       setError('Password must be at least 6 characters long');
       return;
     }
-  
+
     try {
       setLoading(true);
       setError('');
-      
+
       // Create user with Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
-      
+
       // Update profile with name
       await updateProfile(user, {
-        displayName: name
+        displayName: name,
       });
-      
+
       // Store additional user data in Firestore with onboarded field set to false
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
@@ -111,9 +122,9 @@ export default function Register() {
         createdAt: new Date(),
         preferences: {},
         goals: [],
-        onboarded: false // Added this field with default value of false
+        onboarded: false, // Added this field with default value of false
       });
-      
+
       // Check onboarded status and redirect accordingly
       router.replace('/(onboarding)');
     } catch (err) {
@@ -127,14 +138,16 @@ export default function Register() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.header}>
             <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1000&auto=format&fit=crop' }}
+              source={{
+                uri: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1000&auto=format&fit=crop',
+              }}
               style={styles.headerImage}
             />
             <View style={styles.logoContainer}>
@@ -144,10 +157,12 @@ export default function Register() {
 
           <View style={styles.formContainer}>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Start your fitness journey today</Text>
-            
+            <Text style={styles.subtitle}>
+              Start your fitness journey today
+            </Text>
+
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            
+
             <View style={styles.inputContainer}>
               <User size={20} color="#666" style={styles.inputIcon} />
               <TextInput
@@ -158,7 +173,6 @@ export default function Register() {
                 onChangeText={setName}
               />
             </View>
-
             <View style={styles.inputContainer}>
               <Mail size={20} color="#666" style={styles.inputIcon} />
               <TextInput
@@ -173,18 +187,13 @@ export default function Register() {
             </View>
 
             {/* State Dropdown */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.inputContainer}
               onPress={() => setStateModalVisible(true)}
             >
               <MapPin size={20} color="#666" style={styles.inputIcon} />
-              <Text 
-                style={[
-                  styles.input, 
-                  !state && { color: '#888' }
-                ]}
-              >
-                {state || "Select your state"}
+              <Text style={[styles.input, !state && { color: '#888' }]}>
+                {state || 'Select your state'}
               </Text>
               <ChevronDown size={20} color="#666" />
             </TouchableOpacity>
@@ -213,7 +222,7 @@ export default function Register() {
               />
             </View>
 
-            <Pressable 
+            <Pressable
               style={styles.button}
               onPress={handleRegister}
               disabled={loading}
@@ -255,7 +264,7 @@ export default function Register() {
                 <Text style={styles.closeButton}>Close</Text>
               </TouchableOpacity>
             </View>
-            
+
             <FlatList
               data={indianStates}
               keyExtractor={(item) => item}
@@ -433,5 +442,5 @@ const styles = StyleSheet.create({
     color: '#22c55e',
     fontSize: 18,
     fontWeight: 'bold',
-  }
+  },
 });

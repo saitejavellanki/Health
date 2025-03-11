@@ -1,18 +1,27 @@
 import React, { useState } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  ActivityIndicator, 
-  KeyboardAvoidingView, 
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  KeyboardAvoidingView,
   Platform,
   Image,
   Alert,
   Pressable,
-  StatusBar
+  StatusBar,
 } from 'react-native';
+
+// Import Expo Font Loader
+import { useFonts } from 'expo-font';
+import {
+  Poppins_400Regular,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
+import * as SplashScreen from 'expo-splash-screen';
+
 import { Link, router } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../components/firebase/Firebase';
@@ -23,6 +32,15 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [fontsLoaded] = useFonts({
+    Poppins_Regular: Poppins_400Regular,
+    Poppins_Bold: Poppins_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return null; // Prevent rendering until fonts are loaded
+  }
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -46,13 +64,15 @@ export default function Login() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <View style={styles.header}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1502224562085-639556652f33?q=80&w=1000&auto=format&fit=crop' }}
+            source={{
+              uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741589074/lcuvkrqkrbhudbj5kqjr.jpg',
+            }}
             style={styles.headerImage}
           />
           <View style={styles.logoContainer}>
@@ -63,9 +83,9 @@ export default function Login() {
         <View style={styles.formContainer}>
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to continue your journey</Text>
-          
+
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          
+
           <View style={styles.inputContainer}>
             <Mail size={20} color="#666" style={styles.inputIcon} />
             <TextInput
@@ -97,7 +117,7 @@ export default function Login() {
             </TouchableOpacity>
           </Link>
 
-          <Pressable 
+          <Pressable
             style={styles.button}
             onPress={handleLogin}
             disabled={loading}
@@ -130,9 +150,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    // backgroundColor:'black',
+    // marginBottom:-20,
   },
   keyboardView: {
     flex: 1,
+    // flexGrow: 1,
+    // justifyContent: 'center',
   },
   header: {
     height: '40%',
@@ -151,8 +175,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoText: {
-    fontSize: 42,
-    fontWeight: 'bold',
+    fontFamily: 'Poppins_Regular',
+    fontSize: 30,
+    // fontWeight: 'bold',
     color: '#fff',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 1, height: 1 },
@@ -161,10 +186,12 @@ const styles = StyleSheet.create({
   formContainer: {
     padding: 24,
     backgroundColor: '#fff',
+    // backgroundColor:'rgba(0, 0, 0, 0.5)',
     flex: 1,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -30,
+    // paddingBottom:100,
   },
   title: {
     fontSize: 28,
@@ -235,5 +262,5 @@ const styles = StyleSheet.create({
     color: '#22c55e',
     fontWeight: '600',
     fontSize: 16,
-  }
+  },
 });

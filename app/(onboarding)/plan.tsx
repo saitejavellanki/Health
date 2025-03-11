@@ -10,18 +10,19 @@ import {
   SafeAreaView,
   Dimensions,
 } from 'react-native';
-import { 
-  RefreshCw, 
-  AlertCircle, 
-  CheckCircle, 
-  Calendar, 
-  Clock, 
-  Dumbbell, 
-  Coffee, 
-  Utensils, 
+import {
+  RefreshCw,
+  AlertCircle,
+  CheckCircle,
+  Calendar,
+  Clock,
+  Dumbbell,
+  Coffee,
+  Utensils,
   Moon,
   Save,
-  Info
+  Info,
+  ChevronLeft,
 } from 'lucide-react-native';
 import { doc, getDoc, setDoc, collection, addDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -31,11 +32,20 @@ import { router } from 'expo-router';
 
 // Same API configuration
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 // Enhanced parsing function (unchanged)
 const parseDailyPlan = (planText) => {
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const days = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
   const dailyPlans = [];
 
   // Split by lines and process
@@ -49,10 +59,11 @@ const parseDailyPlan = (planText) => {
     if (!trimmedLine) continue;
 
     // Check if this line starts a new day - look for exact day names at the start of line
-    const dayMatch = days.find(day =>
-      trimmedLine.startsWith(day) ||
-      trimmedLine.startsWith(`**${day}**`) ||
-      trimmedLine.startsWith(`# ${day}`)
+    const dayMatch = days.find(
+      (day) =>
+        trimmedLine.startsWith(day) ||
+        trimmedLine.startsWith(`**${day}**`) ||
+        trimmedLine.startsWith(`# ${day}`)
     );
 
     if (dayMatch) {
@@ -60,7 +71,7 @@ const parseDailyPlan = (planText) => {
       if (currentDay && currentPlan) {
         dailyPlans.push({
           day: currentDay,
-          sections: currentPlan
+          sections: currentPlan,
         });
       }
 
@@ -73,30 +84,54 @@ const parseDailyPlan = (planText) => {
         lunch: [],
         dinner: [],
         snack: [],
-        tracking: []
+        tracking: [],
       };
     }
     // Determine what section this line belongs to
     else if (currentDay && currentPlan) {
-      if (/^[-•*]?\s*(Exercise|Workout|Physical Activity|Fitness):/i.test(trimmedLine)) {
-        currentPlan.exercise.push(trimmedLine.replace(/^[-•*]?\s*(Exercise|Workout|Physical Activity|Fitness):/i, '').trim());
-      }
-      else if (/^[-•*]?\s*(Breakfast|Morning):/i.test(trimmedLine)) {
-        currentPlan.breakfast.push(trimmedLine.replace(/^[-•*]?\s*(Breakfast|Morning):/i, '').trim());
-      }
-      else if (/^[-•*]?\s*(Lunch|Midday):/i.test(trimmedLine)) {
-        currentPlan.lunch.push(trimmedLine.replace(/^[-•*]?\s*(Lunch|Midday):/i, '').trim());
-      }
-      else if (/^[-•*]?\s*(Dinner|Evening):/i.test(trimmedLine)) {
-        currentPlan.dinner.push(trimmedLine.replace(/^[-•*]?\s*(Dinner|Evening):/i, '').trim());
-      }
-      else if (/^[-•*]?\s*(Snack|Snacks):/i.test(trimmedLine)) {
-        currentPlan.snack.push(trimmedLine.replace(/^[-•*]?\s*(Snack|Snacks):/i, '').trim());
-      }
-      else if (/^[-•*]?\s*(Tracking|Monitoring|Progress|Tips|Mindfulness|Self-care):/i.test(trimmedLine)) {
-        currentPlan.tracking.push(trimmedLine.replace(/^[-•*]?\s*(Tracking|Monitoring|Progress|Tips|Mindfulness|Self-care):/i, '').trim());
-      }
-      else {
+      if (
+        /^[-•*]?\s*(Exercise|Workout|Physical Activity|Fitness):/i.test(
+          trimmedLine
+        )
+      ) {
+        currentPlan.exercise.push(
+          trimmedLine
+            .replace(
+              /^[-•*]?\s*(Exercise|Workout|Physical Activity|Fitness):/i,
+              ''
+            )
+            .trim()
+        );
+      } else if (/^[-•*]?\s*(Breakfast|Morning):/i.test(trimmedLine)) {
+        currentPlan.breakfast.push(
+          trimmedLine.replace(/^[-•*]?\s*(Breakfast|Morning):/i, '').trim()
+        );
+      } else if (/^[-•*]?\s*(Lunch|Midday):/i.test(trimmedLine)) {
+        currentPlan.lunch.push(
+          trimmedLine.replace(/^[-•*]?\s*(Lunch|Midday):/i, '').trim()
+        );
+      } else if (/^[-•*]?\s*(Dinner|Evening):/i.test(trimmedLine)) {
+        currentPlan.dinner.push(
+          trimmedLine.replace(/^[-•*]?\s*(Dinner|Evening):/i, '').trim()
+        );
+      } else if (/^[-•*]?\s*(Snack|Snacks):/i.test(trimmedLine)) {
+        currentPlan.snack.push(
+          trimmedLine.replace(/^[-•*]?\s*(Snack|Snacks):/i, '').trim()
+        );
+      } else if (
+        /^[-•*]?\s*(Tracking|Monitoring|Progress|Tips|Mindfulness|Self-care):/i.test(
+          trimmedLine
+        )
+      ) {
+        currentPlan.tracking.push(
+          trimmedLine
+            .replace(
+              /^[-•*]?\s*(Tracking|Monitoring|Progress|Tips|Mindfulness|Self-care):/i,
+              ''
+            )
+            .trim()
+        );
+      } else {
         // If we can't determine the section, add to overview
         currentPlan.overview.push(trimmedLine);
       }
@@ -107,7 +142,7 @@ const parseDailyPlan = (planText) => {
   if (currentDay && currentPlan) {
     dailyPlans.push({
       day: currentDay,
-      sections: currentPlan
+      sections: currentPlan,
     });
   }
 
@@ -119,14 +154,14 @@ const parseDailyPlan = (planText) => {
     return days.map((day, index) => ({
       day,
       sections: {
-        overview: [(index === startDayIndex) ? 'Today\'s plan' : 'Plan details'],
+        overview: [index === startDayIndex ? "Today's plan" : 'Plan details'],
         exercise: ['Details not available'],
         breakfast: ['Details not available'],
         lunch: ['Details not available'],
         dinner: ['Details not available'],
         snack: ['Details not available'],
-        tracking: ['Details not available']
-      }
+        tracking: ['Details not available'],
+      },
     }));
   }
 
@@ -135,12 +170,15 @@ const parseDailyPlan = (planText) => {
 
 // Modified prompt (unchanged)
 const createPrompt = (userData) => {
-  const goal = userData.goals && userData.goals.length > 0 ? userData.goals[0]?.title : 'health improvement';
+  const goal =
+    userData.goals && userData.goals.length > 0
+      ? userData.goals[0]?.title
+      : 'health improvement';
   const diet = userData.preferences?.diet || 'balanced';
   const allergies = userData.preferences?.allergies?.join(',') || 'none';
   const state = userData.state || 'general South Indian';
 
-  return `Create a 7-day wellness plan for ${goal}. Diet preference: ${diet} with South Indian food specific to ${state} region. Allergies: ${allergies}.
+  return `Create a 7-day wellness plan for ${goal}. Diet preference: ${diet} with Indian food specific to ${state} region. Allergies: ${allergies}.
 
 For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
 - Start with just the day name (e.g., "Monday")
@@ -166,7 +204,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
   const [savingPlan, setSavingPlan] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
-  
+
   // User data fetching useEffect (unchanged)
   useEffect(() => {
     const fetchUserData = async () => {
@@ -261,10 +299,10 @@ const PlanScreen = ({ userData: propUserData, route }) => {
             {
               parts: [
                 {
-                  text: prompt
-                }
-              ]
-            }
+                  text: prompt,
+                },
+              ],
+            },
           ],
           generationConfig: {
             temperature: 0.7,
@@ -274,40 +312,48 @@ const PlanScreen = ({ userData: propUserData, route }) => {
           },
           safetySettings: [
             {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+              category: 'HARM_CATEGORY_HARASSMENT',
+              threshold: 'BLOCK_MEDIUM_AND_ABOVE',
             },
             {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+              category: 'HARM_CATEGORY_HATE_SPEECH',
+              threshold: 'BLOCK_MEDIUM_AND_ABOVE',
             },
             {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+              threshold: 'BLOCK_MEDIUM_AND_ABOVE',
             },
             {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            }
-          ]
+              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+              threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+            },
+          ],
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API response not OK:', response.status, response.statusText, errorText);
+        console.error(
+          'API response not OK:',
+          response.status,
+          response.statusText,
+          errorText
+        );
 
         let errorDetails = errorText;
         try {
           const errorJson = JSON.parse(errorText);
-          errorDetails = errorJson.error?.message || errorJson.error || errorText;
+          errorDetails =
+            errorJson.error?.message || errorJson.error || errorText;
         } catch (e) {
           // Not JSON, use the text response... }
 
           if (response.status === 429) {
             throw new Error('Rate limit exceeded. Please try again later.');
           } else {
-            throw new Error(`API responded with status: ${response.status} - ${errorDetails}`);
+            throw new Error(
+              `API responded with status: ${response.status} - ${errorDetails}`
+            );
           }
         }
       }
@@ -316,7 +362,10 @@ const PlanScreen = ({ userData: propUserData, route }) => {
 
       if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
         const generatedText = data.candidates[0].content.parts[0].text;
-        console.log('Successfully generated plan, first 100 chars:', generatedText.substring(0, 100));
+        console.log(
+          'Successfully generated plan, first 100 chars:',
+          generatedText.substring(0, 100)
+        );
 
         // Store the raw plan
         setRawPlan(generatedText);
@@ -325,7 +374,9 @@ const PlanScreen = ({ userData: propUserData, route }) => {
 
         if (data.error) {
           console.error('API error details:', JSON.stringify(data.error));
-          throw new Error(`API error: ${data.error.message || JSON.stringify(data.error)}`);
+          throw new Error(
+            `API error: ${data.error.message || JSON.stringify(data.error)}`
+          );
         }
 
         throw new Error('Failed to generate plan: Invalid response structure');
@@ -333,7 +384,8 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     } catch (error) {
       console.error('Error generating plan:', error);
 
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       console.error('Error details:', errorMessage);
 
       setErrorMessage(`We couldn't connect to our AI service. ${errorMessage}`);
@@ -358,7 +410,10 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         plan: rawPlan,
         parsedPlan: JSON.stringify(dailyPlans), // Store the parsed plan as well
         createdAt: new Date().toISOString(),
-        goal: userData.goals && userData.goals.length > 0 ? userData.goals[0]?.title : 'health improvement',
+        goal:
+          userData.goals && userData.goals.length > 0
+            ? userData.goals[0]?.title
+            : 'health improvement',
       });
 
       Alert.alert('Success', 'Your plan has been saved successfully!');
@@ -370,7 +425,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     }
   };
 
-  // Reset plan and regenerate (unchanged)
+  // Regenerate plan (unchanged)
   const handleRegenerate = () => {
     setRawPlan(null);
     setDailyPlans([]);
@@ -451,7 +506,9 @@ const PlanScreen = ({ userData: propUserData, route }) => {
             <AlertCircle size={48} color="#fff" />
           </View>
           <Text style={styles.errorTitle}>Unable to load profile</Text>
-          <Text style={styles.errorText}>We couldn't retrieve your information at this time.</Text>
+          <Text style={styles.errorText}>
+            We couldn't retrieve your information at this time.
+          </Text>
           <Pressable
             style={styles.retryButton}
             onPress={() => {
@@ -471,51 +528,44 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     if (!dailyPlans || dailyPlans.length === 0) return null;
 
     return (
-      <View style={styles.dayTabsWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dayTabsContainer}
-        >
-          {dailyPlans.map((day, index) => {
-            const isActive = selectedDayIndex === index;
-            
-            return (
-              <Pressable
-                key={index}
-                style={[
-                  styles.dayTab,
-                  isActive && styles.activeDayTab
-                ]}
-                onPress={() => setSelectedDayIndex(index)}
-              >
-                <Text
-                  style={[
-                    styles.dayTabText,
-                    isActive && styles.activeDayTabText
-                  ]}
-                >
-                  {day.day}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.dayTabsContainer} // Use style instead of contentContainerStyle
+      >
+        {dailyPlans.map((day, index) => (
+          <Pressable
+            key={index}
+            style={[
+              styles.dayTab,
+              selectedDayIndex === index && styles.activeDayTab,
+            ]}
+            onPress={() => setSelectedDayIndex(index)}
+          >
+            <Text
+              style={[
+                styles.dayTabText,
+                selectedDayIndex === index && styles.activeDayTabText,
+              ]}
+            >
+              {day.day}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     );
   };
 
-  // Render day plan (redesigned)
   const renderDayPlan = () => {
     if (!dailyPlans || dailyPlans.length === 0) {
       return (
         <View style={styles.noPlanContainer}>
           <View style={styles.noPlanIconContainer}>
-            <Calendar size={40} color="#22c55e" />
+            <Calendar size={56} color="#22c55e" />
           </View>
-          <Text style={styles.noPlanTitle}>No plan generated yet</Text>
+          <Text style={styles.noPlanTitle}>Wellness Plan Awaits</Text>
           <Text style={styles.noPlanText}>
-            Generate a personalized wellness plan based on your profile and preferences.
+            Personalize your journey by generating a plan tailored to you!
           </Text>
           <Pressable
             style={styles.generateButton}
@@ -525,7 +575,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
             {loading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.generateButtonText}>Generate Plan</Text>
+              <Text style={styles.generateButtonText}>Create My Plan</Text>
             )}
           </Pressable>
         </View>
@@ -537,39 +587,47 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     if (!selectedDay) {
       return (
         <View style={styles.noPlanContainer}>
-          <Text style={styles.noPlanText}>Plan not available for this day.</Text>
+          <Text style={styles.noPlanText}>
+            Plan not available for this day.
+          </Text>
         </View>
       );
     }
 
     return (
-      <ScrollView 
+      <ScrollView
         style={styles.dayPlanContainer}
         contentContainerStyle={styles.dayPlanContentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {Object.entries(selectedDay.sections).map(([sectionKey, sectionItems], index) => {
-          if (!sectionItems || sectionItems.length === 0 || (sectionKey === 'overview' && sectionItems.length <= 1)) {
-            return null; // Skip rendering if the section is empty
-          }
+        {Object.entries(selectedDay.sections).map(
+          ([sectionKey, sectionItems], index) => {
+            if (
+              !sectionItems ||
+              sectionItems.length === 0 ||
+              (sectionKey === 'overview' && sectionItems.length <= 1)
+            ) {
+              return null;
+            }
 
-          return (
-            <View key={index} style={styles.sectionContainer}>
-              {getSectionTitle(sectionKey) !== '' && (
-                <View style={styles.sectionTitleContainer}>
+            return (
+              <View key={index} style={styles.sectionCard}>
+                <View style={styles.sectionHeader}>
                   {getSectionIcon(sectionKey)}
-                  <Text style={styles.sectionTitle}>{getSectionTitle(sectionKey)}</Text>
+                  <Text style={styles.sectionTitle}>
+                    {getSectionTitle(sectionKey)}
+                  </Text>
                 </View>
-              )}
-              {sectionItems.map((item, itemIndex) => (
-                <Text key={itemIndex} style={styles.sectionItem}>
-                  {item}
-                </Text>
-              ))}
-            </View>
-          );
-        })}
-        
+                {sectionItems.map((item, itemIndex) => (
+                  <View key={itemIndex} style={styles.sectionItemWrapper}>
+                    <Text style={styles.sectionItem}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          }
+        )}
+
         <View style={styles.actionButtonsContainer}>
           <Pressable
             style={[styles.actionButton, styles.regenerateButton]}
@@ -585,25 +643,24 @@ const PlanScreen = ({ userData: propUserData, route }) => {
               </>
             )}
           </Pressable>
-          
+
           <Pressable
-  style={[styles.actionButton, styles.saveButton]}
-  onPress={async () => {
-    await savePlanToFirebase();
-    // After saving is complete, navigate to tabs using Expo Router
-    router.replace('/(tabs)');
-  }}
-  disabled={savingPlan || loading || !rawPlan}
->
-  {savingPlan ? (
-    <ActivityIndicator size="small" color="#fff" />
-  ) : (
-    <>
-      <Save size={18} color="#fff" />
-      <Text style={styles.actionButtonText}>Save Plan</Text>
-    </>
-  )}
-</Pressable>
+            style={[styles.actionButton, styles.saveButton]}
+            onPress={async () => {
+              await savePlanToFirebase();
+              router.replace('/(tabs)');
+            }}
+            disabled={savingPlan || loading || !rawPlan}
+          >
+            {savingPlan ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Save size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Save Plan</Text>
+              </>
+            )}
+          </Pressable>
         </View>
       </ScrollView>
     );
@@ -613,6 +670,12 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => router.push('/allergies')}
+          >
+            <ChevronLeft size={24} color="#22c55e" />
+          </Pressable>
           <View style={styles.headerTextContainer}>
             <Text style={styles.title}>Your Wellness Plan</Text>
             {userData?.goals && userData.goals.length > 0 && (
@@ -621,7 +684,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
               </Text>
             )}
           </View>
-          
+
           {dailyPlans && dailyPlans.length > 0 && (
             <Pressable
               style={styles.headerButton}
@@ -648,7 +711,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f7f9fc', // Lighter background for a fresher feel
+    backgroundColor: '#f7f9fc',
   },
   container: {
     flex: 1,
@@ -662,6 +725,20 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#edf2f7',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0fff4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   headerTextContainer: {
     flex: 1,
@@ -774,165 +851,134 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  dayTabsWrapper: {
-    backgroundColor: '#edf2f7',
-    borderRadius: 100,
-    marginHorizontal: 20,
-    marginTop: 16,
-    padding: 4,
-  },
   dayTabsContainer: {
-    paddingVertical: 2,
+    height: 50,
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  dayTabsScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
   },
   dayTab: {
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 100,
-    marginHorizontal: 2,
+    borderRadius: 20,
+    marginHorizontal: 5,
+    backgroundColor: '#f0f0f0',
+  },
+  dayTabText: {
+    fontSize: 16,
+    color: '#666',
   },
   activeDayTab: {
     backgroundColor: '#22c55e',
-    shadowColor: '#22c55e',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  dayTabText: {
-    fontSize: 14,
-    color: '#4b5563',
-    fontWeight: '500',
   },
   activeDayTabText: {
     color: '#fff',
-    fontWeight: '600',
-  },
-  dayPlanContainer: {
-    flex: 1,
-    marginTop: 16,
-  },
-  dayPlanContentContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  sectionContainer: {
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  sectionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1a202c',
-    marginLeft: 8,
-  },
-  sectionItem: {
-    fontSize: 15,
-    color: '#4a5568',
-    marginBottom: 6,
-    lineHeight: 22,
   },
   noPlanContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    marginTop: 20,
   },
   noPlanIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#f0fff4',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#22c55e',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   noPlanTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#1a202c',
+    color: '#333',
     marginBottom: 10,
-    textAlign: 'center',
   },
   noPlanText: {
     fontSize: 16,
-    color: '#4a5568',
+    color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
-    maxWidth: 300,
-    lineHeight: 22,
+    marginBottom: 30,
   },
   generateButton: {
     backgroundColor: '#22c55e',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
     borderRadius: 30,
-    shadowColor: '#22c55e',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
   generateButtonText: {
     color: '#fff',
+    fontSize: 18,
+  },
+  dayPlanContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  dayPlanContentContainer: {
+    paddingBottom: 20,
+  },
+  sectionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 10,
+  },
+  sectionItemWrapper: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  sectionItem: {
     fontSize: 16,
-    fontWeight: '600',
+    color: '#555',
+    lineHeight: 24,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     marginTop: 20,
   },
   actionButton: {
-    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 30,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  regenerateButton: {
     backgroundColor: '#3b82f6',
-    marginRight: 8,
-    shadowColor: '#3b82f6',
-  },
-  saveButton: {
-    backgroundColor: '#22c55e',
-    marginLeft: 8,
-    shadowColor: '#22c55e',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 25,
   },
   actionButtonText: {
     color: '#fff',
-    marginLeft: 8,
     fontSize: 16,
-    fontWeight: '600',
-  }
+    marginLeft: 8,
+  },
+  regenerateButton: {
+    backgroundColor: '#3b82f6',
+  },
+  saveButton: {
+    backgroundColor: '#22c55e',
+  },
 });
 
 export default PlanScreen;

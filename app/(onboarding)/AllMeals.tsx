@@ -1,29 +1,35 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 export default function AllMeals() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+
   // Parse the JSON string back into an object
   const meals = params.meals ? JSON.parse(params.meals.toString()) : null;
   const day = params.day?.toString() || 'Today';
-  
+
   // Calculate meal calories - in a real app, these would come from your database
   const mealCalories = {
     breakfast: 450,
     lunch: 650,
     dinner: 550,
-    snack: 200
+    snack: 200,
   };
 
   if (!meals) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
+          <TouchableOpacity
+            style={styles.backButton}
             onPress={() => router.back()}
           >
             <ArrowLeft size={24} color="#1a1a1a" />
@@ -37,26 +43,28 @@ export default function AllMeals() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={() => router.back()}
         >
           <ArrowLeft size={24} color="#1a1a1a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>All Meals for {day}</Text>
       </View>
-      
+
       <ScrollView style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Breakfast</Text>
           {meals.breakfast.map((meal, index) => (
             <View key={`breakfast-${index}`} style={styles.mealCard}>
               <Text style={styles.mealName}>{meal}</Text>
-              <Text style={styles.calories}>{mealCalories.breakfast} calories</Text>
+              <Text style={styles.calories}>
+                {mealCalories.breakfast} calories
+              </Text>
             </View>
           ))}
         </View>
-        
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Lunch</Text>
           {meals.lunch.map((meal, index) => (
@@ -66,17 +74,19 @@ export default function AllMeals() {
             </View>
           ))}
         </View>
-        
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Dinner</Text>
           {meals.dinner.map((meal, index) => (
             <View key={`dinner-${index}`} style={styles.mealCard}>
               <Text style={styles.mealName}>{meal}</Text>
-              <Text style={styles.calories}>{mealCalories.dinner} calories</Text>
+              <Text style={styles.calories}>
+                {mealCalories.dinner} calories
+              </Text>
             </View>
           ))}
         </View>
-        
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Snacks</Text>
           {meals.snack.map((meal, index) => (
@@ -86,11 +96,15 @@ export default function AllMeals() {
             </View>
           ))}
         </View>
-        
+
         <View style={styles.totalSection}>
           <Text style={styles.totalTitle}>Total Daily Calories</Text>
           <Text style={styles.totalCalories}>
-            {mealCalories.breakfast + mealCalories.lunch + mealCalories.dinner + mealCalories.snack} calories
+            {mealCalories.breakfast +
+              mealCalories.lunch +
+              mealCalories.dinner +
+              mealCalories.snack}{' '}
+            calories
           </Text>
         </View>
       </ScrollView>

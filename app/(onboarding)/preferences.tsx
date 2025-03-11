@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Alert,
+  SafeAreaView,
+  Dimensions,
+} from 'react-native';
 import { router } from 'expo-router';
-import { ArrowRight, Check } from 'lucide-react-native';
+import { ArrowRight, Check, ChevronLeft } from 'lucide-react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../components/firebase/Firebase'; // Adjust path as needed
 
 const DIETARY_PREFERENCES = [
   { id: 'vegetarian', label: 'Vegetarian' },
-  { id: 'vegan', label: 'Vegan' },
-  { id: 'pescatarian', label: 'Pescatarian' },
+  { id: 'non-vegetarian', label: 'Non-Vegetarian' },
   { id: 'keto', label: 'Ketogenic' },
-  { id: 'paleo', label: 'Paleo' },
-  { id: 'mediterranean', label: 'Mediterranean' },
-  { id: 'none', label: 'No Specific Diet' },
 ];
 
 export default function DietaryPreferences() {
@@ -21,24 +25,24 @@ export default function DietaryPreferences() {
 
   const handleContinue = async () => {
     if (!selected) return;
-    
+
     try {
       setIsLoading(true);
-      
+
       // Get current user
       const user = auth.currentUser;
-      
+
       if (!user) {
         Alert.alert('Error', 'You must be logged in to save preferences');
         return;
       }
-      
+
       // Update the user's preferences in Firestore
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, {
-        'preferences.diet': selected
+        'preferences.diet': selected,
       });
-      
+
       // Navigate to the next screen
       router.push('/goals');
     } catch (error) {
@@ -50,84 +54,117 @@ export default function DietaryPreferences() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>What's your dietary preference?</Text>
-        <Text style={styles.subtitle}>
-          This helps us customize your meal plans and recommendations
-        </Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.backButtonContainer}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.push('/dob')}
+        >
+          <ChevronLeft size={24} color="#1a1a1a" />
+        </Pressable>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {DIETARY_PREFERENCES.map((preference) => (
-          <Pressable
-            key={preference.id}
-            style={[
-              styles.option,
-              selected === preference.id && styles.optionSelected,
-            ]}
-            onPress={() => setSelected(preference.id)}>
-            <Text style={[
-              styles.optionText,
-              selected === preference.id && styles.optionTextSelected
-            ]}>
-              {preference.label}
-            </Text>
-            {selected === preference.id && (
-              <Check size={24} color="#22c55e" />
-            )}
-          </Pressable>
-        ))}
-      </ScrollView>
+      <View style={styles.mainContent}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>What's your dietary preference?</Text>
+        </View>
+
+        <View style={styles.optionsContainer}>
+          {DIETARY_PREFERENCES.map((preference) => (
+            <Pressable
+              key={preference.id}
+              style={[
+                styles.option,
+                selected === preference.id && styles.optionSelected,
+              ]}
+              onPress={() => setSelected(preference.id)}
+            >
+              <Text
+                style={[
+                  styles.optionText,
+                  selected === preference.id && styles.optionTextSelected,
+                ]}
+              >
+                {preference.label}
+              </Text>
+              {selected === preference.id && (
+                <Check size={24} color="#22c55e" />
+              )}
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.subtitleContainer}>
+          <Text style={[styles.subtitle, { fontStyle: 'italic' }]}>
+            *This helps us customize your meal plans and recommendations
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.footer}>
         <Pressable
           style={[
-            styles.button, 
+            styles.button,
             !selected && styles.buttonDisabled,
-            isLoading && styles.buttonLoading
+            isLoading && styles.buttonLoading,
           ]}
           disabled={!selected || isLoading}
-          onPress={handleContinue}>
-          <Text 
-            style={[
-              styles.buttonText, 
-              !selected && styles.buttonTextDisabled
-            ]}>
+          onPress={handleContinue}
+        >
+          <Text
+            style={[styles.buttonText, !selected && styles.buttonTextDisabled]}
+          >
             {isLoading ? 'Saving...' : 'Continue'}
           </Text>
-          {!isLoading && <ArrowRight size={20} color={selected ? '#fff' : '#94a3b8'} />}
+          {!isLoading && (
+            <ArrowRight size={20} color={selected ? '#fff' : '#94a3b8'} />
+          )}
         </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const { width, height } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    padding: 24,
-    paddingTop: 64,
-    backgroundColor: '#f8fafc',
+  backButtonContainer: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    zIndex: 10,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+  },
+  mainContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  titleContainer: {
+    marginBottom: 40,
+    alignItems: 'center',
   },
   title: {
     fontFamily: 'Inter-Bold',
     fontSize: 28,
     color: '#1a1a1a',
-    marginBottom: 8,
+    textAlign: 'center',
   },
-  subtitle: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#64748b',
-    lineHeight: 24,
-  },
-  content: {
-    flex: 1,
-    padding: 24,
+  optionsContainer: {
+    width: '100%',
+    marginBottom: 40,
   },
   option: {
     flexDirection: 'row',
@@ -139,6 +176,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 2,
     borderColor: '#e2e8f0',
+    width: '100%',
   },
   optionSelected: {
     borderColor: '#22c55e',
@@ -151,6 +189,17 @@ const styles = StyleSheet.create({
   },
   optionTextSelected: {
     color: '#15803d',
+  },
+  subtitleContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  subtitle: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#999999',
+    lineHeight: 24,
+    textAlign: 'center',
   },
   footer: {
     padding: 24,
