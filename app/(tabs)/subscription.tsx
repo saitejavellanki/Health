@@ -1,15 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert, ActivityIndicator } from 'react-native';
-import { Check, ChevronRight, MapPin, Navigation, Plus, Minus } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert, ActivityIndicator, FlatList } from 'react-native';
+import { Check, ChevronRight, MapPin, Navigation, Plus, Minus, Clock, Calendar } from 'lucide-react-native';
 import * as Location from 'expo-location';
+import { router } from 'expo-router';
+// Correct import for styles
+import {styles} from "../Utils/SubscriptionStyles";
 
-const SUBSCRIPTION_TYPES = [
+// Define order types
+const ORDER_TYPES = [
+  {
+    id: 'one-time',
+    title: 'One-Time Order',
+    description: 'Single delivery at your convenience',
+    icon: 'Clock',
+  },
+  {
+    id: 'subscription',
+    title: 'Subscription',
+    description: 'Regular deliveries on your schedule',
+    icon: 'Calendar',
+  }
+];
+
+// Subscription frequency options
+const SUBSCRIPTION_FREQUENCIES = [
+  {
+    id: 'daily',
+    title: 'Daily Box',
+    price: 79.99,
+    description: 'Fresh ingredients every day',
+    image: 'https://images.unsplash.com/photo-1505253758473-96b7015fcd40?q=80&w=800&auto=format&fit=crop',
+    savingsPercent: '15%',
+  },
   {
     id: 'weekly',
     title: 'Weekly Box',
     price: 89.99,
     description: 'Perfect for meal planning',
     image: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?q=80&w=800&auto=format&fit=crop',
+    savingsPercent: '10%',
   },
   {
     id: 'biweekly',
@@ -17,7 +46,24 @@ const SUBSCRIPTION_TYPES = [
     price: 99.99,
     description: 'Flexible delivery schedule',
     image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?q=80&w=800&auto=format&fit=crop',
+    savingsPercent: '5%',
   },
+];
+
+// Delivery time slots for one-time orders
+const DELIVERY_TIME_SLOTS = [
+  { id: 'today-morning', text: 'Today, 9am - 12pm', availableIn: '30 min' },
+  { id: 'today-afternoon', text: 'Today, 2pm - 5pm', availableIn: '4 hrs' },
+  { id: 'today-evening', text: 'Today, 6pm - 9pm', availableIn: '8 hrs' },
+  { id: 'tomorrow-morning', text: 'Tomorrow, 9am - 12pm', availableIn: '24 hrs' },
+];
+
+// Subscription duration options
+const SUBSCRIPTION_DURATIONS = [
+  { id: '1-month', text: '1 Month', discountPercent: 0 },
+  { id: '3-months', text: '3 Months', discountPercent: 5 },
+  { id: '6-months', text: '6 Months', discountPercent: 10 },
+  { id: '12-months', text: '12 Months', discountPercent: 15 },
 ];
 
 // Blinkit-style product data with images and prices
@@ -136,12 +182,28 @@ const PRODUCT_CATEGORIES = [
 ];
 
 export default function Subscription() {
-  const [selectedType, setSelectedType] = useState('');
+  // State variables
+  const [orderType, setOrderType] = useState('');
+  const [selectedFrequency, setSelectedFrequency] = useState('');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
+  const [selectedDuration, setSelectedDuration] = useState('');
   const [cartItems, setCartItems] = useState({});
   const [location, setLocation] = useState(null);
   const [address, setAddress] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  
+  // Define default styles as a fallback in case the import fails
+  const defaultStyles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#f8fafc',
+    },
+    // Add other default styles here as needed
+  });
+  
+  // Use imported styles with fallback to default styles
+  const styleToUse = styles || defaultStyles;
   
   useEffect(() => {
     (async () => {
@@ -219,6 +281,14 @@ export default function Subscription() {
     }
   };
   
+  // Reset selection state when order type changes
+  useEffect(() => {
+    setSelectedFrequency('');
+    setSelectedTimeSlot('');
+    setSelectedDuration('');
+  }, [orderType]);
+  
+  // Cart functions
   const handleAddToCart = (productId) => {
     setCartItems(prev => ({
       ...prev,
@@ -240,6 +310,69 @@ export default function Subscription() {
 
   const totalItems = Object.values(cartItems).reduce((sum, count) => sum + count, 0);
   
+  // Calculate total price based on selection
+  const calculateTotal = () => {
+    // Sum of all products in cart
+    const productTotal = Object.entries(cartItems).reduce((sum, [productId, quantity]) => {
+      const allProducts = PRODUCT_CATEGORIES.flatMap(cat => cat.products);
+      const product = allProducts.find(p => p.id === productId);
+      return sum + (product ? product.price * quantity : 0);
+    }, 0);
+    
+    // Base total is just product total for one-time orders
+    if (orderType === 'one-time') {
+      return { 
+        subtotal: productTotal.toFixed(2),
+        total: productTotal.toFixed(2),
+        savings: '0.00'
+      };
+    }
+    
+    // For subscriptions, apply discounts based on frequency and duration
+    if (orderType === 'subscription' && selectedFrequency && selectedDuration) {
+      const frequencyOption = SUBSCRIPTION_FREQUENCIES.find(f => f.id === selectedFrequency);
+      const durationOption = SUBSCRIPTION_DURATIONS.find(d => d.id === selectedDuration);
+      
+      if (frequencyOption && durationOption) {
+        const frequencySavingsPercent = parseInt(frequencyOption.savingsPercent) / 100;
+        const durationDiscountPercent = durationOption.discountPercent / 100;
+        
+        const frequencySavings = productTotal * frequencySavingsPercent;
+        const durationSavings = productTotal * durationDiscountPercent;
+        const totalSavings = frequencySavings + durationSavings;
+        
+        const finalTotal = productTotal - totalSavings;
+        
+        return {
+          subtotal: productTotal.toFixed(2),
+          total: finalTotal.toFixed(2),
+          savings: totalSavings.toFixed(2)
+        };
+      }
+    }
+    
+    return { 
+      subtotal: productTotal.toFixed(2),
+      total: productTotal.toFixed(2),
+      savings: '0.00'
+    };
+  };
+  
+  const priceInfo = calculateTotal();
+  
+  // Check if user can proceed to checkout
+  const canProceed = () => {
+    if (totalItems === 0) return false;
+    
+    if (orderType === 'one-time') {
+      return selectedTimeSlot !== '';
+    } else if (orderType === 'subscription') {
+      return selectedFrequency !== '' && selectedDuration !== '';
+    }
+    
+    return false;
+  };
+  
   let locationText = 'Fetching your location...';
   if (errorMsg) {
     locationText = errorMsg;
@@ -247,397 +380,307 @@ export default function Subscription() {
     locationText = address;
   }
 
+  // Get icon component based on icon name
+  const getIcon = (iconName) => {
+    switch (iconName) {
+      case 'Clock':
+        return <Clock size={20} color="#22c55e" />;
+      case 'Calendar':
+        return <Calendar size={20} color="#22c55e" />;
+      default:
+        return null;
+    }
+  };
+
+  // Render product item for horizontal FlatList
+  const renderProductItem = ({ item }) => (
+    <View style={styleToUse.productCard}>
+      <Image source={{ uri: item.image }} style={styleToUse.productImage} />
+      <View style={styleToUse.deliveryBadge}>
+        <Clock size={12} color="#22c55e" />
+        <Text style={styleToUse.deliveryText}>{item.deliveryTime}</Text>
+      </View>
+      
+      <View style={styleToUse.productInfo}>
+        <Text numberOfLines={1} style={styleToUse.productName}>{item.name}</Text>
+        <Text style={styleToUse.weightText}>{item.weight}</Text>
+        
+        <View style={styleToUse.priceContainer}>
+          <Text style={styleToUse.priceText}>${item.price}</Text>
+          
+          {cartItems[item.id] ? (
+            <View style={styleToUse.quantityControl}>
+              <Pressable
+                onPress={() => handleRemoveFromCart(item.id)}
+                style={styleToUse.quantityButton}
+              >
+                <Minus size={16} color="#22c55e" />
+              </Pressable>
+              <Text style={styleToUse.quantityText}>{cartItems[item.id]}</Text>
+              <Pressable
+                onPress={() => handleAddToCart(item.id)}
+                style={styleToUse.quantityButton}
+              >
+                <Plus size={16} color="#22c55e" />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={styleToUse.addButton}
+              onPress={() => handleAddToCart(item.id)}
+            >
+              <Plus size={16} color="#fff" />
+            </Pressable>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styleToUse.container}>
       {/* Real-time Location Header (Swiggy Style) */}
-      <View style={styles.locationContainer}>
-        <View style={styles.locationHeader}>
+      <View style={styleToUse.locationContainer}>
+        <View style={styleToUse.locationHeader}>
           <MapPin size={20} color="#22c55e" />
-          <View style={styles.locationInfo}>
-            <Text style={styles.locationTitle}>
+          <View style={styleToUse.locationInfo}>
+            <Text style={styleToUse.locationTitle}>
               {loading ? 'Detecting location...' : 'Deliver to current location'}
             </Text>
             
             {loading ? (
-              <View style={styles.loadingContainer}>
+              <View style={styleToUse.loadingContainer}>
                 <ActivityIndicator size="small" color="#22c55e" />
-                <Text style={styles.loadingText}>Fetching your location...</Text>
+                <Text style={styleToUse.loadingText}>Fetching your location...</Text>
               </View>
             ) : (
-              <Text numberOfLines={2} style={styles.locationAddress}>
+              <Text numberOfLines={2} style={styleToUse.locationAddress}>
                 {errorMsg ? errorMsg : locationText}
               </Text>
             )}
           </View>
-          <Pressable onPress={refreshLocation} style={styles.refreshButton}>
+          <Pressable onPress={refreshLocation} style={styleToUse.refreshButton}>
             <Navigation size={20} color="#22c55e" />
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.header}>
-        <Text style={styles.title}>Customize Your Box</Text>
-        <Text style={styles.subtitle}>
-          Choose your preferred subscription and add products to your box
+      <View style={styleToUse.header}>
+        <Text style={styleToUse.title}>Customize Your Box</Text>
+        <Text style={styleToUse.subtitle}>
+          Choose items for your box and select delivery options
         </Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Select Your Plan</Text>
-        {SUBSCRIPTION_TYPES.map((type) => (
-          <Pressable
-            key={type.id}
-            style={[
-              styles.planCard,
-              selectedType === type.id && styles.planCardSelected,
-            ]}
-            onPress={() => setSelectedType(type.id)}>
-            <Image source={{ uri: type.image }} style={styles.planImage} />
-            <View style={styles.planContent}>
-              <View style={styles.planHeader}>
-                <Text style={styles.planTitle}>{type.title}</Text>
-                <Text style={styles.planPrice}>${type.price}/box</Text>
-              </View>
-              <Text style={styles.planDescription}>{type.description}</Text>
-            </View>
-            {selectedType === type.id && (
-              <View style={styles.checkmark}>
-                <Check size={24} color="#22c55e" />
-              </View>
-            )}
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Blinkit-style product grid */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Add Items to Your Box</Text>
-        <Text style={styles.itemsSelectedText}>
-          {totalItems} items selected
-        </Text>
+      {/* ITEMS SECTION - MOVED TO TOP */}
+      <View style={styleToUse.section}>
+        <View style={styleToUse.sectionHeaderRow}>
+          <Text style={styleToUse.sectionTitle}>Add Items to Your Box</Text>
+          <Text style={styleToUse.itemsSelectedText}>
+            {totalItems} items selected
+          </Text>
+        </View>
         
         {PRODUCT_CATEGORIES.map((category) => (
-          <View key={category.title} style={styles.categoryContainer}>
-            <Text style={styles.categoryTitle}>{category.title}</Text>
-            <View style={styles.productGrid}>
-              {category.products.map((product) => (
-                <View key={product.id} style={styles.productCard}>
-                  <View style={styles.deliveryBadge}>
-                    <Text style={styles.deliveryText}>
-                      {product.deliveryTime}
-                    </Text>
-                  </View>
-                  <Image source={{ uri: product.image }} style={styles.productImage} />
-                  <View style={styles.productInfo}>
-                    <Text style={styles.priceText}>${product.price}</Text>
-                    <Text style={styles.weightText}>{product.weight}</Text>
-                    <Text numberOfLines={2} style={styles.productName}>{product.name}</Text>
-                  </View>
-                  
-                  {cartItems[product.id] ? (
-                    <View style={styles.quantityControl}>
-                      <Pressable
-                        onPress={() => handleRemoveFromCart(product.id)}
-                        style={styles.quantityButton}
-                      >
-                        <Minus size={18} color="#22c55e" />
-                      </Pressable>
-                      <Text style={styles.quantityText}>{cartItems[product.id]}</Text>
-                      <Pressable
-                        onPress={() => handleAddToCart(product.id)}
-                        style={styles.quantityButton}
-                      >
-                        <Plus size={18} color="#22c55e" />
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <Pressable
-                      style={styles.addButton}
-                      onPress={() => handleAddToCart(product.id)}
-                    >
-                      <Text style={styles.addButtonText}>ADD</Text>
-                    </Pressable>
-                  )}
-                </View>
-              ))}
-            </View>
+          <View key={category.title} style={styleToUse.categoryContainer}>
+            <Text style={styleToUse.categoryTitle}>{category.title}</Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={category.products}
+              renderItem={renderProductItem}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styleToUse.productList}
+            />
           </View>
         ))}
       </View>
 
-      <View style={styles.footer}>
+      {/* Order Type Selection - MOVED AFTER ITEMS */}
+      <View style={styleToUse.section}>
+        <Text style={styleToUse.sectionTitle}>Select Order Type</Text>
+        <View style={styleToUse.orderTypeContainer}>
+          {ORDER_TYPES.map((type) => (
+            <Pressable
+              key={type.id}
+              style={[
+                styleToUse.orderTypeCard,
+                orderType === type.id && styleToUse.orderTypeCardSelected,
+              ]}
+              onPress={() => setOrderType(type.id)}>
+              <View style={styleToUse.orderTypeIconContainer}>
+                {getIcon(type.icon)}
+              </View>
+              <View style={styleToUse.orderTypeContent}>
+                <Text style={styleToUse.orderTypeTitle}>{type.title}</Text>
+                <Text style={styleToUse.orderTypeDescription}>{type.description}</Text>
+              </View>
+              {orderType === type.id && (
+                <View style={styleToUse.orderTypeCheckmark}>
+                  <Check size={20} color="#22c55e" />
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* One-Time Order Selection */}
+      {orderType === 'one-time' && (
+        <View style={styleToUse.section}>
+          <Text style={styleToUse.sectionTitle}>Select Delivery Time</Text>
+          {DELIVERY_TIME_SLOTS.map((slot) => (
+            <Pressable
+              key={slot.id}
+              style={[
+                styleToUse.timeSlotCard,
+                selectedTimeSlot === slot.id && styleToUse.timeSlotCardSelected,
+              ]}
+              onPress={() => setSelectedTimeSlot(slot.id)}>
+              <View style={styleToUse.timeSlotContent}>
+                <Text style={styleToUse.timeSlotText}>{slot.text}</Text>
+                <View style={styleToUse.timeSlotBadge}>
+                  <Text style={styleToUse.timeSlotBadgeText}>
+                    Available in {slot.availableIn}
+                  </Text>
+                </View>
+              </View>
+              {selectedTimeSlot === slot.id && (
+                <View style={styleToUse.checkmark}>
+                  <Check size={20} color="#22c55e" />
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Subscription Plan Selection */}
+      {orderType === 'subscription' && (
+        <>
+          <View style={styleToUse.section}>
+            <Text style={styleToUse.sectionTitle}>Select Delivery Frequency</Text>
+            {SUBSCRIPTION_FREQUENCIES.map((frequency) => (
+              <Pressable
+                key={frequency.id}
+                style={[
+                  styleToUse.planCard,
+                  selectedFrequency === frequency.id && styleToUse.planCardSelected,
+                ]}
+                onPress={() => setSelectedFrequency(frequency.id)}>
+                <Image source={{ uri: frequency.image }} style={styleToUse.planImage} />
+                <View style={styleToUse.savingsBadge}>
+                  <Text style={styleToUse.savingsBadgeText}>Save {frequency.savingsPercent}</Text>
+                </View>
+                <View style={styleToUse.planContent}>
+                  <View style={styleToUse.planHeader}>
+                    <Text style={styleToUse.planTitle}>{frequency.title}</Text>
+                    <Text style={styleToUse.planPrice}>${frequency.price}/box</Text>
+                  </View>
+                  <Text style={styleToUse.planDescription}>{frequency.description}</Text>
+                </View>
+                {selectedFrequency === frequency.id && (
+                  <View style={styleToUse.checkmark}>
+                    <Check size={24} color="#22c55e" />
+                  </View>
+                )}
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styleToUse.section}>
+            <Text style={styleToUse.sectionTitle}>Select Subscription Duration</Text>
+            <View style={styleToUse.durationContainer}>
+              {SUBSCRIPTION_DURATIONS.map((duration) => (
+                <Pressable
+                  key={duration.id}
+                  style={[
+                    styleToUse.durationCard,
+                    selectedDuration === duration.id && styleToUse.durationCardSelected,
+                  ]}
+                  onPress={() => setSelectedDuration(duration.id)}>
+                  <Text style={styleToUse.durationText}>{duration.text}</Text>
+                  {duration.discountPercent > 0 && (
+                    <View style={styleToUse.durationBadge}>
+                      <Text style={styleToUse.durationBadgeText}>
+                        Save {duration.discountPercent}%
+                      </Text>
+                    </View>
+                  )}
+                  {selectedDuration === duration.id && (
+                    <View style={styleToUse.smallCheckmark}>
+                      <Check size={16} color="#22c55e" />
+                    </View>
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </>
+      )}
+
+      {/* Order Summary */}
+      {totalItems > 0 && (
+        <View style={styleToUse.summaryContainer}>
+          <Text style={styleToUse.summaryTitle}>Order Summary</Text>
+          <View style={styleToUse.summaryRow}>
+            <Text style={styleToUse.summaryLabel}>Subtotal ({totalItems} items)</Text>
+            <Text style={styleToUse.summaryValue}>${priceInfo.subtotal}</Text>
+          </View>
+          
+          {parseFloat(priceInfo.savings) > 0 && (
+            <View style={styleToUse.summaryRow}>
+              <Text style={styleToUse.savingsLabel}>Savings</Text>
+              <Text style={styleToUse.savingsValue}>-${priceInfo.savings}</Text>
+            </View>
+          )}
+          
+          <View style={[styleToUse.summaryRow, styleToUse.totalRow]}>
+            <Text style={styleToUse.totalLabel}>Total</Text>
+            <Text style={styleToUse.totalValue}>${priceInfo.total}</Text>
+          </View>
+        </View>
+      )}
+
+      <View style={styleToUse.footer}>
         <Pressable
           style={[
-            styles.button, 
-            (!selectedType || totalItems === 0) && styles.buttonDisabled
+            styleToUse.button, 
+            !canProceed() && styleToUse.buttonDisabled
           ]}
-          disabled={!selectedType || totalItems === 0}>
+          disabled={!canProceed()}
+          onPress={() => {
+            if (canProceed()) {
+              const paymentParams = {
+                orderType,
+                selectedFrequency,
+                selectedTimeSlot,
+                selectedDuration,
+                cartItems: JSON.stringify(cartItems), // Serialize objects
+                address,
+                priceInfo: JSON.stringify(priceInfo), // Serialize objects
+                allProducts: JSON.stringify(PRODUCT_CATEGORIES.flatMap(cat => cat.products)), // Serialize arrays
+                productCategories: JSON.stringify(PRODUCT_CATEGORIES) // Serialize arrays
+              };
+
+              router.push({
+                pathname: '/(onboarding)/payments',
+                params: paymentParams
+              });
+            }
+          }}>
           <Text style={[
-            styles.buttonText, 
-            (!selectedType || totalItems === 0) && styles.buttonTextDisabled
+            styleToUse.buttonText, 
+            !canProceed() && styleToUse.buttonTextDisabled
           ]}>
-            Continue to Payment ({totalItems} items)
+            {orderType === 'subscription' ? 'Subscribe Now' : 'Place Order'} (${priceInfo.total})
           </Text>
           <ChevronRight 
             size={20} 
-            color={selectedType && totalItems > 0 ? '#fff' : '#94a3b8'} 
+            color={canProceed() ? '#fff' : '#94a3b8'} 
           />
         </Pressable>
       </View>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  // Location styles (Swiggy-inspired)
-  locationContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    backgroundColor: '#fff',
-  },
-  locationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 50, // Extra padding for status bar
-  },
-  locationInfo: {
-    flex: 1,
-    marginLeft: 8,
-    marginRight: 8,
-  },
-  locationTitle: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: '#1a1a1a',
-  },
-  locationAddress: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#64748b',
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#64748b',
-    marginLeft: 8,
-  },
-  refreshButton: {
-    padding: 8,
-  },
-  // Original styles
-  header: {
-    padding: 24,
-    backgroundColor: '#f8fafc',
-  },
-  title: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 28,
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#64748b',
-    lineHeight: 24,
-  },
-  section: {
-    padding: 24,
-    paddingBottom: 8,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 20,
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  itemsSelectedText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 16,
-  },
-  planCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    overflow: 'hidden',
-  },
-  planCardSelected: {
-    borderColor: '#22c55e',
-  },
-  planImage: {
-    width: '100%',
-    height: 160,
-    resizeMode: 'cover',
-  },
-  planContent: {
-    padding: 16,
-  },
-  planHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  planTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: '#1a1a1a',
-  },
-  planPrice: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 18,
-    color: '#22c55e',
-  },
-  planDescription: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#64748b',
-  },
-  checkmark: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 4,
-  },
-  // Blinkit-style product grid
-  categoryContainer: {
-    marginBottom: 24,
-  },
-  categoryTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: '#1a1a1a',
-    marginBottom: 12,
-    marginLeft: 4,
-  },
-  productGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  productCard: {
-    width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    position: 'relative',
-  },
-  deliveryBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-    zIndex: 1,
-  },
-  deliveryText: {
-    color: '#fff',
-    fontSize: 10,
-    fontFamily: 'Inter-Medium',
-  },
-  productImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  productInfo: {
-    marginBottom: 8,
-  },
-  priceText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    color: '#1a1a1a',
-  },
-  weightText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 4,
-  },
-  productName: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: '#1a1a1a',
-    height: 40,
-  },
-  addButton: {
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#22c55e',
-    borderRadius: 8,
-    paddingVertical: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#22c55e',
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#22c55e',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  quantityButton: {
-    padding: 4,
-  },
-  quantityText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#22c55e',
-  },
-  footer: {
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    backgroundColor: '#fff',
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#22c55e',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  buttonDisabled: {
-    backgroundColor: '#f1f5f9',
-  },
-  buttonText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: '#fff',
-  },
-  buttonTextDisabled: {
-    color: '#94a3b8',
-  },
-});
