@@ -237,18 +237,22 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     justifyContent: 'space-between', // Distribute space evenly
   },
-  backButtonContainer: {
-    marginTop: 20, // Push the back button down
-    alignItems: 'flex-start',
-  },
+//   backButtonContainer: {
+//     marginTop: 20, // Push the back button down
+//     alignItems: 'flex-start',
+//   },
   backButton: {
-    padding: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 50,
     width: 40,
     height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    marginBottom: 16,
+  },
+  backButtonContainer: {
+    paddingTop: 48,
+    paddingHorizontal: 24,
   },
   contentContainer: {
     flex: 1,
@@ -256,9 +260,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
+    fontFamily:"Inter-Bold",
     fontSize: 28,
     fontWeight: '600',
-    color: '#64748b',
+    color: '#1a1a1a',
     marginBottom: 40,
     textAlign: 'center',
   },
@@ -314,8 +319,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#8cc63f',
-    borderRadius: 30,
+    backgroundColor: '#22c55e',
+    borderRadius: 12,
     paddingVertical: 15,
     paddingHorizontal: 20,
   },

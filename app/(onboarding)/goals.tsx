@@ -308,6 +308,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
+    alignItems:'center',
   },
   button: {
     flexDirection: 'row',
@@ -317,6 +318,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
+    width:'90%',
+    marginBottom:12,
   },
   buttonDisabled: {
     backgroundColor: '#f1f5f9',

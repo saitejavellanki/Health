@@ -58,7 +58,7 @@ export default function DietaryPreferences() {
       <View style={styles.backButtonContainer}>
         <Pressable
           style={styles.backButton}
-          onPress={() => router.push('/dob')}
+          onPress={() => router.push('/doesworkout')}
         >
           <ChevronLeft size={24} color="#1a1a1a" />
         </Pressable>
@@ -145,6 +145,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f1f5f9',
+    marginTop:25,
+    marginLeft:10,
   },
   mainContent: {
     flex: 1,
@@ -202,9 +204,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footer: {
-    padding: 24,
-    borderTopWidth: 1,
+    // padding: 24,
+    // borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
+    alignItems:'center',
   },
   button: {
     flexDirection: 'row',
@@ -214,6 +217,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
+    width:'80%',
+    marginBottom:12,
   },
   buttonDisabled: {
     backgroundColor: '#f1f5f9',

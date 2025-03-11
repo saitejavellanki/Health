@@ -146,12 +146,12 @@ export default function Register() {
           <View style={styles.header}>
             <Image
               source={{
-                uri: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1000&auto=format&fit=crop',
+                uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741589074/lcuvkrqkrbhudbj5kqjr.jpg',
               }}
               style={styles.headerImage}
             />
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>FitFuel</Text>
+              <Text style={styles.logoText}>{'Glad to have you onboard! ❣️'}</Text>
             </View>
           </View>
 
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoText: {
-    fontSize: 42,
+    fontSize: 25,
     fontWeight: 'bold',
     color: '#fff',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',

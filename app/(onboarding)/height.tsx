@@ -222,9 +222,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#8bc34a',
+    backgroundColor: '#22c55e',
     paddingVertical: 16,
-    borderRadius: 50,
+    borderRadius: 12,
     gap: 8,
   },
   buttonDisabled: {

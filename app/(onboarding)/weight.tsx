@@ -44,7 +44,7 @@ export default function Weight() {
       console.log(`Weight saved: ${weight} kgs`);
 
       // Navigate to the next screen
-      router.push('/dob');
+      router.push('/gender');
     } catch (error) {
       console.error('Error saving weight:', error);
       Alert.alert('Error', 'Failed to save your weight. Please try again.');
@@ -176,9 +176,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#8bc34a',
+    backgroundColor: '#22c55e',
     paddingVertical: 16,
-    borderRadius: 50,
+    borderRadius: 12,
     gap: 8,
   },
   buttonDisabled: {
