@@ -759,8 +759,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a202c',
+    fontFamily:'Inter-Bold',
+    // fontWeight: 'bold',
+    color: '#1a1a1a',
     letterSpacing: 0.3,
   },
   subTitle: {

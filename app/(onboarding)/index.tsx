@@ -21,7 +21,7 @@ export default function Welcome() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Hey, there!</Text>
+      <Text style={styles.title}>{'Hey, there!  👋'}</Text>
       <Image
         source={{
           uri: 'https://images.unsplash.com/photo-1543362906-acfc16c67564?q=80&w=1000&auto=format&fit=crop',

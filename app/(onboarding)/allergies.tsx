@@ -139,7 +139,7 @@ export default function Allergies() {
           onPress={handleComplete}
         >
           <Text style={styles.buttonText}>
-            {isLoading ? 'Saving...' : 'Complete Setup'}
+            {isLoading ? 'Saving...' : 'Continue'}
           </Text>
           {!isLoading && <ArrowRight size={20} color="#fff" />}
         </Pressable>

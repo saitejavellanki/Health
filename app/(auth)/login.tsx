@@ -71,17 +71,17 @@ export default function Login() {
         <View style={styles.header}>
           <Image
             source={{
-              uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741589074/lcuvkrqkrbhudbj5kqjr.jpg',
+              uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741692694/064112bb-a31f-4322-95b0-7a0e5bebafad_rsz6az.jpg',
             }}
             style={styles.headerImage}
           />
           <View style={styles.logoContainer}>
-            <Text style={styles.logoText}>FitFuel</Text>
+            {/* <Text style={styles.logoText}>FitFuel</Text> */}
           </View>
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.title}>Welcome back 👋</Text>
           <Text style={styles.subtitle}>Sign in to continue your journey</Text>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
