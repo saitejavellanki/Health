@@ -160,25 +160,28 @@ export default function DateOfBirth() {
         month: selectedMonth,
         year: selectedYear,
         timestamp: date.toISOString(),
-        age: actualAge
+        age: actualAge,
       };
 
       // Get current user
       const currentUser = auth.currentUser;
-      
+
       if (!currentUser) {
-        Alert.alert('Error', 'No authenticated user found. Please log in again.');
+        Alert.alert(
+          'Error',
+          'No authenticated user found. Please log in again.'
+        );
         setIsLoading(false);
         return;
       }
 
       // Save to Firestore
       const userRef = doc(db, 'users', currentUser.uid);
-      
+
       // Update the user document
       await updateDoc(userRef, {
         dateOfBirth: formattedDOB,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       }).catch(async (error) => {
         // If document doesn't exist yet, create it
         if (error.code === 'not-found') {
@@ -187,7 +190,7 @@ export default function DateOfBirth() {
             userId: currentUser.uid,
             email: currentUser.email || '',
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           });
         } else {
           throw error;
@@ -369,7 +372,8 @@ export default function DateOfBirth() {
                       <Text
                         style={[
                           styles.pickerItemText,
-                          year === selectedYear && styles.selectedPickerItemText,
+                          year === selectedYear &&
+                            styles.selectedPickerItemText,
                         ]}
                       >
                         {year}
@@ -425,19 +429,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 15,
   },
-  progressBar: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    width: '60%', // Adjust based on progress
-    height: '100%',
-    backgroundColor: '#8cc63f',
-    borderRadius: 4,
-  },
+  //   progressBar: {
+  //     flex: 1,
+  //     height: 8,
+  //     backgroundColor: '#e2e8f0',
+  //     borderRadius: 4,
+  //     overflow: 'hidden',
+  //   },
+  //   progressFill: {
+  //     width: '60%', // Adjust based on progress
+  //     height: '100%',
+  //     backgroundColor: '#8cc63f',
+  //     borderRadius: 4,
+  //   },
   contentContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -529,7 +533,7 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   footer: {
-    alignItems:'center',
+    alignItems: 'center',
     marginTop: 'auto',
     width: '100%',
     paddingVertical: 20,
@@ -544,7 +548,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
     width: '90%',
-    marginBottom:55,
+    marginBottom: 55,
   },
   buttonLoading: {
     backgroundColor: '#a9d178',

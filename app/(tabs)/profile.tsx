@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
   Image,
   TouchableOpacity,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
-import { Settings, Bell, CreditCard, Heart, CircleHelp, LogOut } from 'lucide-react-native';
+import {
+  Settings,
+  Bell,
+  CreditCard,
+  Heart,
+  CircleHelp,
+  LogOut,
+} from 'lucide-react-native';
 import { router } from 'expo-router';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { getDoc, doc } from 'firebase/firestore';
@@ -34,9 +41,9 @@ export default function Profile() {
         setUser(currentUser);
         // Fetch user profile from Firestore
         try {
-          const userDocRef = doc(db, "users", currentUser.uid);
+          const userDocRef = doc(db, 'users', currentUser.uid);
           const userDoc = await getDoc(userDocRef);
-          
+
           if (userDoc.exists()) {
             setUserProfile(userDoc.data());
           } else {
@@ -50,7 +57,7 @@ export default function Profile() {
             });
           }
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          console.error('Error fetching user profile:', error);
         }
       } else {
         // User is signed out
@@ -97,34 +104,38 @@ export default function Profile() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Image 
-          source={{ uri: displayProfile.avatar }} 
-          style={styles.avatar} 
+        <Image
+          source={{ uri: displayProfile.avatar }}
+          style={styles.avatar}
           // Using a fallback for loading errors
-          onError={({ nativeEvent: { error } }) => console.log('Image load error:', error)}
+          onError={({ nativeEvent: { error } }) =>
+            console.log('Image load error:', error)
+          }
         />
         <Text style={styles.name}>{displayProfile.name}</Text>
         <Text style={styles.email}>{displayProfile.email}</Text>
-        
+
         <View style={styles.stats}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{displayProfile.orders || 0}</Text>
             <Text style={styles.statLabel}>Orders</Text>
           </View>
-          
+
           <View style={styles.divider} />
-          
+
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{displayProfile.activeBoxes || 0}</Text>
+            <Text style={styles.statValue}>
+              {displayProfile.activeBoxes || 0}
+            </Text>
             <Text style={styles.statLabel}>Active Boxes</Text>
           </View>
         </View>
       </View>
-      
+
       <View style={styles.menu}>
         {MENU_ITEMS.map((item, index) => (
-          <TouchableOpacity 
-            key={index} 
+          <TouchableOpacity
+            key={index}
             style={styles.menuItem}
             onPress={() => handleMenuItemPress(item.route)}
           >
@@ -133,7 +144,7 @@ export default function Profile() {
           </TouchableOpacity>
         ))}
       </View>
-      
+
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <LogOut size={24} color="#ef4444" />
         <Text style={styles.logoutText}>Log Out</Text>
