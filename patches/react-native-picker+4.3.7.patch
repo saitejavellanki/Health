@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-picker/android/build.gradle b/node_modules/react-native-picker/android/build.gradle
+index 40f4f26..55ad51f 100644
+--- a/node_modules/react-native-picker/android/build.gradle
++++ b/node_modules/react-native-picker/android/build.gradle
+@@ -22,6 +22,6 @@ android {
+ }
+ 
+ dependencies {
+-    compile fileTree(include: ['*.jar'], dir: 'libs')
+-    compile 'com.facebook.react:react-native:+'
++    implementation fileTree(include: ['*.jar'], dir: 'libs')
++    implementation 'com.facebook.react:react-native:+'
+ }
