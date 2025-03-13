@@ -292,7 +292,7 @@ export const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
-      saveButtonText: {
+  saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
@@ -312,6 +312,82 @@ export const styles = StyleSheet.create({
     color: '#64748b',
     marginLeft: 6,
     fontWeight: '500',
+  },
+  // Adding missing styles used in PaymentScreen.js
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
+    marginTop: 12,
+  },
+  userInfoCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  userGreeting: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  paymentInfoCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  paymentInfoText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  webViewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    height: 56,
+  },
+  webViewBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 4,
+  },
+  webViewBackText: {
+    fontSize: 16,
+    color: '#000000',
+    marginLeft: 4,
+  },
+  webViewTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginRight: 32, // To balance the back button
   }
 });
 

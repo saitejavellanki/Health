@@ -17,45 +17,6 @@ const PAYU_CONFIG = {
   testBaseUrl: 'https://test.payu.in/_payment',
 };
 
-// Modified payment method options with direct URLs
-const PAYMENT_METHODS = [
-  {
-    id: 'google-pay',
-    title: 'Google Pay',
-    icon: 'google',
-    // Direct payment method code for Google Pay
-    directCode: 'GPAY',
-  },
-  {
-    id: 'phonepe',
-    title: 'PhonePe',
-    icon: 'phonepe',
-    // Direct payment method code for PhonePe
-    directCode: 'PHONEPE',
-  },
-  {
-    id: 'upi',
-    title: 'UPI',
-    icon: 'upi',
-    // Direct payment method code for UPI
-    directCode: 'UPI',
-  },
-  {
-    id: 'credit-card',
-    title: 'Credit Card',
-    icon: 'credit-card',
-    // Credit Card requires the standard PayU flow
-    directCode: 'CC',
-  },
-  {
-    id: 'net-banking',
-    title: 'Net Banking',
-    icon: 'bank',
-    // Net Banking requires the standard PayU flow
-    directCode: 'NB',
-  }
-];
-
 // Hash generation function
 const generateHash = async (input) => {
   try {
@@ -88,7 +49,6 @@ export default function PaymentScreen() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  const [paymentMethod, setPaymentMethod] = useState('google-pay');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   
@@ -183,8 +143,8 @@ export default function PaymentScreen() {
     return `TXN_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
   };
   
-  // Modified function to prepare direct payment data
-  const prepareDirectPaymentData = async () => {
+  // Modified function to prepare payment data - removed direct payment method
+  const preparePaymentData = async () => {
     if (!userData) {
       Alert.alert('Error', 'User data not available. Please try again.');
       return null;
@@ -198,10 +158,6 @@ export default function PaymentScreen() {
     const phone = userData.phone || '9999999999';
     const surl = 'https://yourapp.com/success'; // Replace with your success URL
     const furl = 'https://yourapp.com/failure'; // Replace with your failure URL
-    
-    // Get the direct payment method code
-    const selectedMethod = PAYMENT_METHODS.find(m => m.id === paymentMethod);
-    const pg = selectedMethod ? selectedMethod.directCode : '';
     
     // Generate hash string as per PayU format
     const hashString = `${PAYU_CONFIG.key}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${PAYU_CONFIG.salt}`;
@@ -220,7 +176,7 @@ export default function PaymentScreen() {
       surl,
       furl,
       hash,
-      pg, // This is the key parameter for direct payment method
+      // Removed pg parameter to let PayU handle payment method selection
     };
   };
   
@@ -239,8 +195,8 @@ export default function PaymentScreen() {
     setIsProcessing(true);
     
     try {
-      // Prepare payment data with direct payment method
-      const paymentData = await prepareDirectPaymentData();
+      // Prepare payment data without direct payment method
+      const paymentData = await preparePaymentData();
       if (!paymentData) {
         setIsProcessing(false);
         return;
@@ -285,7 +241,7 @@ export default function PaymentScreen() {
         duration: selectedDuration,
         address,
         priceInfo,
-        paymentMethod,
+        paymentMethod: 'PayU Gateway', // Generic payment method since we're letting PayU handle the selection
         status: 'pending',
         createdAt: new Date(),
       };
@@ -355,24 +311,6 @@ export default function PaymentScreen() {
       }
     } catch (error) {
       console.error('Error updating order status:', error);
-    }
-  };
-  
-  // Remaining utility functions
-  const getPaymentIcon = (iconName) => {
-    switch (iconName) {
-      case 'google':
-        return <Text style={styles.iconText}>Google</Text>;
-      case 'phonepe':
-        return <Text style={styles.iconText}>PhonePe</Text>;
-      case 'upi':
-        return <Text style={styles.iconText}>UPI</Text>;
-      case 'credit-card':
-        return <Text style={styles.iconText}>Card</Text>;
-      case 'bank':
-        return <Text style={styles.iconText}>Bank</Text>;
-      default:
-        return null;
     }
   };
   
@@ -466,15 +404,14 @@ export default function PaymentScreen() {
     );
   };
   
-  // Modified: Direct Payment WebView
-  const renderDirectPaymentWebView = () => {
+  // Modified: Standard PayU WebView without direct payment
+  const renderPaymentWebView = () => {
     if (!showPaymentWebView || !paymentFormData) return null;
     
-    // Use direct payment URL for the selected payment method
+    // Use payment URL 
     const paymentUrl = PAYU_CONFIG.testMode ? PAYU_CONFIG.testBaseUrl : PAYU_CONFIG.productionBaseUrl;
     
-    // Create HTML form for direct payment submission
-    // The key parameter here is adding the pg parameter to directly specify the payment method
+    // Create HTML form for payment submission
     const formHtml = `
       <html>
         <head>
@@ -512,10 +449,6 @@ export default function PaymentScreen() {
               color: #374151;
               margin: 10px 0;
             }
-            .method {
-              font-weight: bold;
-              color: #22c55e;
-            }
           </style>
         </head>
         <body onload="document.forms[0].submit()">
@@ -526,7 +459,7 @@ export default function PaymentScreen() {
           </form>
           <div class="container">
             <div class="loader"></div>
-            <p>Redirecting to <span class="method">${PAYMENT_METHODS.find(m => m.id === paymentMethod)?.title || 'payment method'}</span>...</p>
+            <p>Redirecting to payment gateway...</p>
             <p>Please do not close this window</p>
           </div>
         </body>
@@ -605,7 +538,7 @@ export default function PaymentScreen() {
             renderLoading={() => (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#22c55e" />
-                <Text style={styles.loadingText}>Initializing {PAYMENT_METHODS.find(m => m.id === paymentMethod)?.title || 'payment'}...</Text>
+                <Text style={styles.loadingText}>Initializing payment gateway...</Text>
               </View>
             )}
           />
@@ -629,8 +562,8 @@ export default function PaymentScreen() {
       {/* Address Update Modal */}
       {renderAddressModal()}
       
-      {/* Direct Payment WebView Modal */}
-      {renderDirectPaymentWebView()}
+      {/* Payment WebView Modal */}
+      {renderPaymentWebView()}
       
       {/* Header */}
       <View style={styles.header}>
@@ -642,13 +575,13 @@ export default function PaymentScreen() {
       </View>
       
       <ScrollView style={styles.content}>
-        {/* User Info */}
+        {/* User Info
         {userData && (
           <View style={styles.userInfoCard}>
             <Text style={styles.userGreeting}>Hello, {userData.firstName || userData.displayName}</Text>
             <Text style={styles.userEmail}>{userData.email}</Text>
           </View>
-        )}
+        )} */}
         
         {/* Order Summary */}
         <View style={styles.section}>
@@ -666,7 +599,7 @@ export default function PaymentScreen() {
               <View key={item.id} style={styles.orderItemRow}>
                 <Text style={styles.orderItemName}>{item.name}</Text>
                 <Text style={styles.orderItemQuantity}>x{item.quantity}</Text>
-                <Text style={styles.orderItemPrice}>${(item.price * item.quantity).toFixed(2)}</Text>
+                <Text style={styles.orderItemPrice}>₹{(item.price * item.quantity).toFixed(2)}</Text>
               </View>
             ))}
             
@@ -679,19 +612,19 @@ export default function PaymentScreen() {
             <View style={styles.priceSummary}>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Subtotal</Text>
-                <Text style={styles.priceValue}>${priceInfo.subtotal}</Text>
+                <Text style={styles.priceValue}>₹{priceInfo.subtotal}</Text>
               </View>
               
               {parseFloat(priceInfo.savings) > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.savingsLabel}>Savings</Text>
-                  <Text style={styles.savingsValue}>-${priceInfo.savings}</Text>
+                  <Text style={styles.savingsValue}>-₹{priceInfo.savings}</Text>
                 </View>
               )}
               
               <View style={[styles.priceRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>${priceInfo.total}</Text>
+                <Text style={styles.totalValue}>₹{priceInfo.total}</Text>
               </View>
             </View>
           </View>
@@ -716,35 +649,22 @@ export default function PaymentScreen() {
           </View>
         </View>
         
-        {/* Payment Method Selection */}
+        {/* Payment Section - Updated to show PayU info instead of payment methods */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
+          <Text style={styles.sectionTitle}>Payment Information</Text>
           
-          {/* PayU Gateway Indicator with modified text */}
-          <View style={styles.paymentGatewayBadge}>
-            <Lock size={14} color="#64748b" />
-            <Text style={styles.paymentGatewayText}>Secure Payment via PayU</Text>
+          <View style={styles.paymentInfoCard}>
+            <View style={styles.paymentGatewayBadge}>
+              <Lock size={14} color="#64748b" />
+              <Text style={styles.paymentGatewayText}>Secure Payment via PayU</Text>
+            </View>
+            <Text style={styles.paymentInfoText}>
+              You'll be redirected to PayU's secure payment gateway to complete your payment.
+            </Text>
+            <Text style={styles.paymentInfoText}>
+              PayU offers various payment options including credit/debit cards, UPI, net banking, and mobile wallets.
+            </Text>
           </View>
-          
-          {PAYMENT_METHODS.map((method) => (
-            <Pressable
-              key={method.id}
-              style={[
-                styles.paymentMethodCard,
-                paymentMethod === method.id && styles.paymentMethodCardSelected,
-              ]}
-              onPress={() => setPaymentMethod(method.id)}>
-              <View style={styles.paymentMethodIcon}>
-                {getPaymentIcon(method.icon)}
-              </View>
-              <Text style={styles.paymentMethodTitle}>{method.title}</Text>
-              {paymentMethod === method.id && (
-                <View style={styles.checkmark}>
-                  <Check size={20} color="#22c55e" />
-                </View>
-              )}
-            </Pressable>
-          ))}
         </View>
         
         {/* Submit Button */}
@@ -767,7 +687,7 @@ export default function PaymentScreen() {
             ) : (
               <>
                 <Text style={styles.payButtonText}>
-                  Pay with {PAYMENT_METHODS.find(m => m.id === paymentMethod)?.title || 'Selected Method'}
+                  Proceed to Payment Gateway
                 </Text>
                 <Shield size={18} color="#ffffff" />
               </>
@@ -775,7 +695,7 @@ export default function PaymentScreen() {
           </Pressable>
           
           <Text style={styles.securityNote}>
-            Pay securely via {PAYMENT_METHODS.find(m => m.id === paymentMethod)?.title || 'selected method'}
+            Your payment information is securely processed by PayU
           </Text>
         </View>
       </ScrollView>

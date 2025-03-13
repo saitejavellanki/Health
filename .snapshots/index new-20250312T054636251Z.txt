@@ -1,10 +1,9 @@
-import { View, Text, ScrollView, Pressable, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { useState, useEffect } from 'react';
 import { getFirestore, collection, query, where, getDocs, orderBy, Timestamp, updateDoc, doc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { router } from 'expo-router';
-import {styles} from '../Utils/HomePageStyles';
 
 // API configuration for Gemini
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -24,7 +23,6 @@ export default function Home() {
   const [targetCalories, setTargetCalories] = useState(2000); // Default value
   const [calorieProgress, setCalorieProgress] = useState(0);
   const [userPlanDocId, setUserPlanDocId] = useState(null);
-  const [nutritionOnlyMode, setNutritionOnlyMode] = useState(false); // Toggle state for nutrition-only mode
 
   // Function to get personalized calorie recommendations from Gemini AI
   const getPersonalizedCalories = async (userData) => {
@@ -357,10 +355,6 @@ export default function Home() {
     return 'evening';
   };
 
-  const toggleNutritionMode = () => {
-    setNutritionOnlyMode(!nutritionOnlyMode);
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -383,59 +377,44 @@ export default function Home() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Profile Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>Good {getTimeOfDay()}, {userName}!</Text>
-            <View style={styles.goalRow}>
-              <Text style={styles.subtitle}>{nutritionOnlyMode ? 'Nutrition Tracking' : `${todaysPlan.day}'s Plan`}</Text>
-              {!nutritionOnlyMode && (
-                <View style={styles.goalPill}>
-                  <Text style={styles.goalPillText}>{userGoal}</Text>
-                </View>
-              )}
+        <View>
+          <Text style={styles.greeting}>Good {getTimeOfDay()}, {userName}!</Text>
+          <View style={styles.goalRow}>
+            <Text style={styles.subtitle}>{todaysPlan.day}'s Plan</Text>
+            <View style={styles.goalPill}>
+              <Text style={styles.goalPillText}>{userGoal}</Text>
             </View>
-          </View>
-          <View style={styles.toggleContainer}>
-            <Text style={styles.toggleLabel}></Text>
-            <Switch
-              value={nutritionOnlyMode}
-              onValueChange={toggleNutritionMode}
-              trackColor={{ false: '#e5e7eb', true: '#dcfce7' }}
-              thumbColor={nutritionOnlyMode ? '#22c55e' : '#9ca3af'}
-            />
           </View>
         </View>
       </View>
 
-      {/* Current Meal Card - Only show when not in nutrition-only mode */}
-      {!nutritionOnlyMode && (
-        <View style={styles.currentMealContainer}>
-          <View style={styles.currentMealCard}>
-            <View style={styles.mealInfoRow}>
-              <View>
-                <View style={styles.mealTypeContainer}>
-                  <Feather name="clock" size={14} color="#22c55e" />
-                  <Text style={styles.mealType}>{currentMeal.type}</Text>
-                </View>
-                <Text style={styles.mealName}>{currentMeal.name}</Text>
+      {/* Current Meal Card */}
+      <View style={styles.currentMealContainer}>
+        <View style={styles.currentMealCard}>
+          <View style={styles.mealInfoRow}>
+            <View>
+              <View style={styles.mealTypeContainer}>
+                <Feather name="clock" size={14} color="#22c55e" />
+                <Text style={styles.mealType}>{currentMeal.type}</Text>
               </View>
-              <Text style={styles.calories}>{currentMeal.calories} cal</Text>
+              <Text style={styles.mealName}>{currentMeal.name}</Text>
             </View>
-            
-            <Pressable 
-              style={styles.recipeButton} 
-              onPress={navigateToRecipe}
-              android_ripple={{ color: '#e6f7ef' }}
-            >
-              <Text style={styles.recipeButtonText}>View Recipe</Text>
-            </Pressable>
+            <Text style={styles.calories}>{currentMeal.calories} cal</Text>
           </View>
+          
+          <Pressable 
+            style={styles.recipeButton} 
+            onPress={navigateToRecipe}
+            android_ripple={{ color: '#e6f7ef' }}
+          >
+            <Text style={styles.recipeButtonText}>View Recipe</Text>
+          </Pressable>
         </View>
-      )}
+      </View>
 
       {/* Nutrition Stats */}
       <Pressable 
-        style={[styles.statsContainer, nutritionOnlyMode && styles.statsContainerExpanded]} 
+        style={styles.statsContainer} 
         onPress={navigateToTracker}
         android_ripple={{ color: '#f3f4f6' }}
       >
@@ -465,75 +444,69 @@ export default function Home() {
         </Pressable>
       </View>
 
-      {/* Diet & Exercise Section - Only show when not in nutrition-only mode */}
-      {!nutritionOnlyMode && (
-        <>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Today's Plan</Text>
-            
-            {/* Meals Card */}
-            <Pressable 
-              style={styles.actionCard} 
-              onPress={navigateToAllMeals}
-              android_ripple={{ color: '#f3f4f6' }}
-            >
-              <View style={styles.actionCardContent}>
-                <View style={styles.actionIconContainer}>
-                  <Feather name="coffee" size={20} color="#22c55e" />
-                </View>
-                <View style={styles.actionTextContainer}>
-                  <Text style={styles.actionTitle}>All Meals</Text>
-                  <Text style={styles.actionSubtitle}>View your full meal plan</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={18} color="#9ca3af" />
-            </Pressable>
-            
-            {/* Shopping List Card */}
-            <Pressable 
-              style={styles.actionCard} 
-              onPress={navigateToShoppingList}
-              android_ripple={{ color: '#f3f4f6' }}
-            >
-              <View style={styles.actionCardContent}>
-                <View style={styles.actionIconContainer}>
-                  <Feather name="shopping-bag" size={20} color="#22c55e" />
-                </View>
-                <View style={styles.actionTextContainer}>
-                  <Text style={styles.actionTitle}>Shopping List</Text>
-                  <Text style={styles.actionSubtitle}>All ingredients you need</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={18} color="#9ca3af" />
-            </Pressable>
-          </View>
-
-          {/* Exercise Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Exercise</Text>
-            <View style={styles.exerciseCard}>
-              <View style={styles.exerciseHeader}>
-                <Feather name="activity" size={20} color="#22c55e" />
-                <Text style={styles.exerciseHeaderText}>Today's Workout</Text>
-              </View>
-              <Text style={styles.exerciseText}>{todaysPlan.sections.exercise[0]}</Text>
+      {/* Diet & Exercise Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Today's Plan</Text>
+        
+        {/* Meals Card */}
+        <Pressable 
+          style={styles.actionCard} 
+          onPress={navigateToAllMeals}
+          android_ripple={{ color: '#f3f4f6' }}
+        >
+          <View style={styles.actionCardContent}>
+            <View style={styles.actionIconContainer}>
+              <Feather name="coffee" size={20} color="#22c55e" />
+            </View>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitle}>All Meals</Text>
+              <Text style={styles.actionSubtitle}>View your full meal plan</Text>
             </View>
           </View>
-        </>
-      )}
+          <Feather name="chevron-right" size={18} color="#9ca3af" />
+        </Pressable>
+        
+        {/* Shopping List Card */}
+        <Pressable 
+          style={styles.actionCard} 
+          onPress={navigateToShoppingList}
+          android_ripple={{ color: '#f3f4f6' }}
+        >
+          <View style={styles.actionCardContent}>
+            <View style={styles.actionIconContainer}>
+              <Feather name="shopping-bag" size={20} color="#22c55e" />
+            </View>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitle}>Shopping List</Text>
+              <Text style={styles.actionSubtitle}>All ingredients you need</Text>
+            </View>
+          </View>
+          <Feather name="chevron-right" size={18} color="#9ca3af" />
+        </Pressable>
+      </View>
 
-      {/* Tracking Section - Always show regardless of mode */}
+      {/* Exercise Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Exercise</Text>
+        <View style={styles.exerciseCard}>
+          <View style={styles.exerciseHeader}>
+            <Feather name="activity" size={20} color="#22c55e" />
+            <Text style={styles.exerciseHeaderText}>Today's Workout</Text>
+          </View>
+          <Text style={styles.exerciseText}>{todaysPlan.sections.exercise[0]}</Text>
+        </View>
+      </View>
+
+      {/* Tracking Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tracking Focus</Text>
-        {!nutritionOnlyMode && (
-          <View style={styles.trackingCard}>
-            <View style={styles.trackingHeader}>
-              <Feather name="file-text" size={20} color="#22c55e" />
-              <Text style={styles.trackingHeaderText}>Today's Focus</Text>
-            </View>
-            <Text style={styles.trackingText}>{todaysPlan.sections.tracking[0]}</Text>
+        <View style={styles.trackingCard}>
+          <View style={styles.trackingHeader}>
+            <Feather name="file-text" size={20} color="#22c55e" />
+            <Text style={styles.trackingHeaderText}>Today's Focus</Text>
           </View>
-        )}
+          <Text style={styles.trackingText}>{todaysPlan.sections.tracking[0]}</Text>
+        </View>
         <View style={styles.progressContainer}>
           <View style={styles.progressLabelContainer}>
             <Text style={styles.progressLabel}>Calorie goal progress</Text>
@@ -553,3 +526,312 @@ export default function Home() {
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  header: {
+    padding: 24,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 6,
+  },
+  goalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#4b5563',
+    marginRight: 8,
+  },
+  goalPill: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  goalPillText: {
+    color: '#15803d',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  currentMealContainer: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  currentMealCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  mealInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  mealTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  mealType: {
+    fontSize: 14,
+    color: '#22c55e',
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  mealName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    maxWidth: 220,
+  },
+  calories: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#22c55e',
+  },
+  recipeButton: {
+    backgroundColor: '#f0fdf4',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  recipeButtonText: {
+    color: '#22c55e',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  statTarget: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6b7280',
+  },
+  trackButtonContainer: {
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  trackButton: {
+    backgroundColor: '#22c55e',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  trackButtonIcon: {
+    marginRight: 8,
+  },
+  trackButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  section: {
+    padding: 16,
+    paddingTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  actionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  actionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0fdf4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  actionTextContainer: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  actionSubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  exerciseCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  exerciseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  exerciseHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginLeft: 8,
+  },
+  exerciseText: {
+    fontSize: 15,
+    color: '#4b5563',
+    lineHeight: 22,
+  },
+  trackingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  trackingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  trackingHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginLeft: 8,
+  },
+  trackingText: {
+    fontSize: 15,
+    color: '#4b5563',
+    lineHeight: 22,
+  },
+  progressContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  progressLabelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  progressPercentage: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#15803d',
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 12,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#22c55e',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#15803d',
+    textAlign: 'center',
+  },
+  bottomPadding: {
+    height: 30,
+  },
+});

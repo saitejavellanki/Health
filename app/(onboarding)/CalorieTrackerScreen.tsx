@@ -3,9 +3,10 @@ import { Text, TouchableOpacity, View, Image, ActivityIndicator, StatusBar, Scro
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Feather from 'react-native-vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getFirestore, doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import styles from '../Utils/CalorieTrackerScreenStyles';
+import { router } from 'expo-router';
 
 // Gemini API credentials
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -19,14 +20,19 @@ export default function CalorieTrackerScreen() {
   const [result, setResult] = useState(null);
   const [calories, setCalories] = useState(null);
   const [protein, setProtein] = useState(null);
+  const [fat, setFat] = useState(null); // New state for fat grams
   const [foodName, setFoodName] = useState('');
   const [loggedMeal, setLoggedMeal] = useState(false);
+  const [showTickAnimation, setShowTickAnimation] = useState(false);
+  const [isJunkFood, setIsJunkFood] = useState(0); // State for junk food status
   const cameraRef = useRef(null);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const nutritionScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const tickScaleAnim = useRef(new Animated.Value(0)).current;
+  const tickOpacityAnim = useRef(new Animated.Value(0)).current;
   
   // Run animations when results are loaded
   useEffect(() => {
@@ -51,6 +57,44 @@ export default function CalorieTrackerScreen() {
       ]).start();
     }
   }, [calories, analyzing]);
+  
+  // Animation for tick after meal is logged
+  useEffect(() => {
+    if (showTickAnimation) {
+      // Start tick animation
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(tickOpacityAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.spring(tickScaleAnim, {
+            toValue: 1,
+            friction: 4,
+            tension: 40,
+            useNativeDriver: true,
+          })
+        ]),
+        // Delay before navigation
+        Animated.timing(tickOpacityAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        })
+      ]).start(() => {
+        // Navigate to tabs screen after animation completes
+        router.push('/(tabs)');
+      });
+    }
+  }, [showTickAnimation]);
+  
+  // Effect to automatically analyze image after capture
+  useEffect(() => {
+    if (image && !analyzing && !calories) {
+      sendImageToGemini(image);
+    }
+  }, [image]);
   
   if (!permission) {
     // Camera permissions are still loading.
@@ -85,12 +129,17 @@ export default function CalorieTrackerScreen() {
         setResult(null);
         setCalories(null);
         setProtein(null);
+        setFat(null); // Reset fat value
         setFoodName('');
         setLoggedMeal(false);
+        setShowTickAnimation(false);
+        setIsJunkFood(0); // Reset junk food value
         // Reset animation values
         fadeAnim.setValue(0);
         slideAnim.setValue(50);
         nutritionScaleAnim.setValue(0.8);
+        tickScaleAnim.setValue(0);
+        tickOpacityAnim.setValue(0);
       } catch (error) {
         console.error("Error taking picture:", error);
       }
@@ -111,13 +160,13 @@ export default function CalorieTrackerScreen() {
       // Extract just the base64 data without the prefix
       const base64Data = base64Image.split(',')[1];
       
-      // Prepare request for Gemini
+      // Prepare request for Gemini - Updated to include junk food assessment
       const requestBody = {
         contents: [
           {
             parts: [
               {
-                text: "This is an image of food. Analyze this image and tell me what food items are in it. I only need to know: 1) The name of the dish or food items, 2) The total estimated calories, and 3) The estimated grams of protein if you can determine it. Format your response in plain text with only these details."
+                text: "This is an image of food. Analyze this image and tell me what food items are in it. I need to know: 1) The name of the dish or food items, 2) The total estimated calories, 3) The estimated grams of protein, 4) The estimated grams of fat, and 5) Whether this is considered junk food (yes or no). Format your response in plain text with only these details."
               },
               {
                 inline_data: {
@@ -157,9 +206,17 @@ export default function CalorieTrackerScreen() {
           setFoodName(foodNameMatch[1].trim());
         }
         
-        // Extract calories and protein from response
+        // Extract calories, protein, and fat from response
         const calorieMatch = textResponse.match(/(\d+)(?:\s*)(?:to|-)(?:\s*)(\d+)(?:\s*)calories|(\d+)(?:\s*)calories/i);
         const proteinMatch = textResponse.match(/(\d+)(?:\s*)(?:to|-)(?:\s*)(\d+)(?:\s*)(?:g|grams)(?:\s*)(?:of)?(?:\s*)protein|(\d+)(?:\s*)(?:g|grams)(?:\s*)(?:of)?(?:\s*)protein/i);
+        const fatMatch = textResponse.match(/(\d+)(?:\s*)(?:to|-)(?:\s*)(\d+)(?:\s*)(?:g|grams)(?:\s*)(?:of)?(?:\s*)fat|(\d+)(?:\s*)(?:g|grams)(?:\s*)(?:of)?(?:\s*)fat/i);
+        
+        // Check for junk food classification in the response
+        const junkFoodMatch = textResponse.match(/junk food(?:\s*):(?:\s*)(\w+)/i);
+        if (junkFoodMatch && junkFoodMatch[1]) {
+          // Set to 1 if AI responds with "yes", otherwise 0
+          setIsJunkFood(junkFoodMatch[1].toLowerCase() === 'yes' ? 1 : 0);
+        }
         
         if (calorieMatch) {
           if (calorieMatch[3]) {
@@ -180,6 +237,18 @@ export default function CalorieTrackerScreen() {
             // Range match - take the average
             const avgProtein = Math.round((parseInt(proteinMatch[1]) + parseInt(proteinMatch[2])) / 2);
             setProtein(avgProtein.toString());
+          }
+        }
+        
+        // Process fat match
+        if (fatMatch) {
+          if (fatMatch[3]) {
+            // Single value match
+            setFat(fatMatch[3]);
+          } else if (fatMatch[1] && fatMatch[2]) {
+            // Range match - take the average
+            const avgFat = Math.round((parseInt(fatMatch[1]) + parseInt(fatMatch[2])) / 2);
+            setFat(avgFat.toString());
           }
         }
         
@@ -206,7 +275,7 @@ export default function CalorieTrackerScreen() {
     });
   };
   
-  // Function to log the meal in Firebase
+  // Modified function to log the meal with junk flag from AI response
   const logMealToFirebase = async () => {
     try {
       const auth = getAuth();
@@ -218,24 +287,38 @@ export default function CalorieTrackerScreen() {
         return;
       }
       
-      const userRef = doc(db, 'users', userId);
-      
-      // Create meal object
+      // Create meal object with junk flag from AI
       const mealData = {
+        userId: userId,
         foodName: foodName || 'Unknown food',
         calories: parseInt(calories) || 0,
-        protein: protein ? parseInt(protein) : null,
+        protein: protein ? parseInt(protein) : 0,
+        fat: fat ? parseInt(fat) : 0,
+        junk: isJunkFood, // Set junk flag from AI's assessment
         image: image,
         timestamp: serverTimestamp()
       };
       
-      // Update user document with new meal
+      // Add the meal to a separate meals collection
+      const mealsCollection = collection(db, 'meals');
+      await addDoc(mealsCollection, mealData);
+      
+      // Update user totals in the user document
+      const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, {
-        meals: arrayUnion(mealData)
+        totalCalories: increment(parseInt(calories) || 0),
+        totalProtein: increment(protein ? parseInt(protein) : 0),
+        totalFat: increment(fat ? parseInt(fat) : 0),
+        lastUpdated: serverTimestamp()
       });
       
       console.log('Meal logged successfully');
       setLoggedMeal(true);
+      
+      // Show tick animation before redirecting
+      setShowTickAnimation(true);
+      
+      // Navigation will happen after animation completes in the useEffect hook
     } catch (error) {
       console.error('Error logging meal to Firebase:', error);
     }
@@ -247,12 +330,13 @@ export default function CalorieTrackerScreen() {
       
       {!image ? (
         <View style={styles.cameraContainer}>
-          {/* Header */}
+          {/* Header - Changed from NutriLens to Powered by Gemini */}
           <View style={styles.cameraHeader}>
-            <Text style={styles.cameraTitle}>NutriLens</Text>
+            <Text style={styles.cameraTitle}>Powered by Gemini</Text>
             
+            {/* Fixed the camera flip icon by explicitly using Feather icon */}
             <TouchableOpacity style={styles.flipButton} onPress={toggleCameraFacing}>
-              <Feather name="camera-reverse" size={20} color="#FFFFFF" />
+              <Feather name="refresh-cw" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
           
@@ -294,6 +378,49 @@ export default function CalorieTrackerScreen() {
                 </TouchableOpacity>
               </LinearGradient>
             </View>
+            
+            {/* Tick Animation Overlay - shows when meal is logged */}
+            {showTickAnimation && (
+              <Animated.View 
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  zIndex: 999,
+                  opacity: tickOpacityAnim
+                }}
+              >
+                <Animated.View
+                  style={{
+                    transform: [{ scale: tickScaleAnim }],
+                    backgroundColor: '#22c55e',
+                    borderRadius: 50,
+                    width: 100,
+                    height: 100,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Feather name="check" size={60} color="#ffffff" />
+                </Animated.View>
+                <Animated.Text
+                  style={{
+                    color: '#ffffff',
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    marginTop: 16,
+                    opacity: tickOpacityAnim
+                  }}
+                >
+                  Meal Logged!
+                </Animated.Text>
+              </Animated.View>
+            )}
             
             {!analyzing && calories && (
               <Animated.View 
@@ -339,6 +466,22 @@ export default function CalorieTrackerScreen() {
                       </View>
                       <Text style={styles.nutritionValue}>{protein}<Text style={styles.nutritionUnit}>g</Text></Text>
                       <Text style={styles.nutritionLabel}>protein</Text>
+                    </Animated.View>
+                  )}
+                  
+                  {/* New fat display card */}
+                  {fat && (
+                    <Animated.View 
+                      style={[
+                        styles.nutritionItem,
+                        { transform: [{ scale: nutritionScaleAnim }] }
+                      ]}
+                    >
+                      <View style={styles.nutritionIconCircle}>
+                        <Feather name="droplet" size={20} color="#22c55e" />
+                      </View>
+                      <Text style={styles.nutritionValue}>{fat}<Text style={styles.nutritionUnit}>g</Text></Text>
+                      <Text style={styles.nutritionLabel}>fat</Text>
                     </Animated.View>
                   )}
                 </View>

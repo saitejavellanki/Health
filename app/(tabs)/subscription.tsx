@@ -1,197 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert, ActivityIndicator, FlatList } from 'react-native';
-import { Check, ChevronRight, MapPin, Navigation, Plus, Minus, Clock, Calendar } from 'lucide-react-native';
+import { ChevronRight, MapPin, Navigation, Plus, Minus, Clock } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 // Correct import for styles
 import {styles} from "../Utils/SubscriptionStyles";
+// Import Firebase
+import { collection, getDocs, query } from 'firebase/firestore';
+import { db } from '../../components/firebase/Firebase'; // Make sure this points to your Firebase config file
 
-// Define order types
-const ORDER_TYPES = [
-  {
-    id: 'one-time',
-    title: 'One-Time Order',
-    description: 'Single delivery at your convenience',
-    icon: 'Clock',
-  },
-  {
-    id: 'subscription',
-    title: 'Subscription',
-    description: 'Regular deliveries on your schedule',
-    icon: 'Calendar',
-  }
-];
-
-// Subscription frequency options
-const SUBSCRIPTION_FREQUENCIES = [
-  {
-    id: 'daily',
-    title: 'Daily Box',
-    price: 79.99,
-    description: 'Fresh ingredients every day',
-    image: 'https://images.unsplash.com/photo-1505253758473-96b7015fcd40?q=80&w=800&auto=format&fit=crop',
-    savingsPercent: '15%',
-  },
-  {
-    id: 'weekly',
-    title: 'Weekly Box',
-    price: 89.99,
-    description: 'Perfect for meal planning',
-    image: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?q=80&w=800&auto=format&fit=crop',
-    savingsPercent: '10%',
-  },
-  {
-    id: 'biweekly',
-    title: 'Bi-Weekly Box',
-    price: 99.99,
-    description: 'Flexible delivery schedule',
-    image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?q=80&w=800&auto=format&fit=crop',
-    savingsPercent: '5%',
-  },
-];
-
-// Delivery time slots for one-time orders
-const DELIVERY_TIME_SLOTS = [
-  { id: 'today-morning', text: 'Today, 9am - 12pm', availableIn: '30 min' },
-  { id: 'today-afternoon', text: 'Today, 2pm - 5pm', availableIn: '4 hrs' },
-  { id: 'today-evening', text: 'Today, 6pm - 9pm', availableIn: '8 hrs' },
-  { id: 'tomorrow-morning', text: 'Tomorrow, 9am - 12pm', availableIn: '24 hrs' },
-];
-
-// Subscription duration options
-const SUBSCRIPTION_DURATIONS = [
-  { id: '1-month', text: '1 Month', discountPercent: 0 },
-  { id: '3-months', text: '3 Months', discountPercent: 5 },
-  { id: '6-months', text: '6 Months', discountPercent: 10 },
-  { id: '12-months', text: '12 Months', discountPercent: 15 },
-];
-
-// Blinkit-style product data with images and prices
-const PRODUCT_CATEGORIES = [
-  {
-    title: 'Fresh Vegetables',
-    products: [
-      {
-        id: 'veg1',
-        name: 'Organic Spinach',
-        price: 2.99,
-        weight: '250g',
-        image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '10 min'
-      },
-      {
-        id: 'veg2',
-        name: 'Bell Peppers Mix',
-        price: 3.49,
-        weight: '500g',
-        image: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '10 min'
-      },
-      {
-        id: 'veg3',
-        name: 'Broccoli',
-        price: 2.79,
-        weight: '400g',
-        image: 'https://images.unsplash.com/photo-1583663848850-46af132dc08e?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '10 min'
-      },
-      {
-        id: 'veg4',
-        name: 'Cherry Tomatoes',
-        price: 3.99,
-        weight: '300g',
-        image: 'https://images.unsplash.com/photo-1546094096-0df4bcabd31c?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '10 min'
-      },
-    ]
-  },
-  {
-    title: 'Protein Options',
-    products: [
-      {
-        id: 'protein1',
-        name: 'Chicken Breast',
-        price: 7.99,
-        weight: '500g',
-        image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '15 min'
-      },
-      {
-        id: 'protein2',
-        name: 'Salmon Fillet',
-        price: 9.99,
-        weight: '400g',
-        image: 'https://images.unsplash.com/photo-1499125562588-29fb8a56b5d5?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '15 min'
-      },
-      {
-        id: 'protein3',
-        name: 'Tofu',
-        price: 3.99,
-        weight: '350g',
-        image: 'https://images.unsplash.com/photo-1583874044705-d37fc6708960?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '15 min'
-      },
-      {
-        id: 'protein4',
-        name: 'Free-Range Eggs',
-        price: 4.49,
-        weight: '12 pcs',
-        image: 'https://images.unsplash.com/photo-1511994714008-b6d68a8b32a2?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '15 min'
-      },
-    ]
-  },
-  {
-    title: 'Healthy Snacks',
-    products: [
-      {
-        id: 'snack1',
-        name: 'Mixed Nuts',
-        price: 6.99,
-        weight: '200g',
-        image: 'https://images.unsplash.com/photo-1606937921474-3a7cd8a851ed?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '10 min'
-      },
-      {
-        id: 'snack2',
-        name: 'Greek Yogurt',
-        price: 4.49,
-        weight: '500g',
-        image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '10 min'
-      },
-      {
-        id: 'snack3',
-        name: 'Granola Bars',
-        price: 5.99,
-        weight: '6 pcs',
-        image: 'https://images.unsplash.com/photo-1578027458176-05cd379b662c?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '10 min'
-      },
-      {
-        id: 'snack4',
-        name: 'Dried Fruits Mix',
-        price: 4.29,
-        weight: '150g',
-        image: 'https://images.unsplash.com/photo-1596810574821-9a71e38cb27d?q=80&w=400&auto=format&fit=crop',
-        deliveryTime: '10 min'
-      },
-    ]
-  },
-];
-
-export default function Subscription() {
-  // State variables
-  const [orderType, setOrderType] = useState('');
-  const [selectedFrequency, setSelectedFrequency] = useState('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
-  const [selectedDuration, setSelectedDuration] = useState('');
+export default function OrderComponent() {
+  // State variables - setting one-time order as default
+  const [orderType] = useState('one-time');
   const [cartItems, setCartItems] = useState({});
   const [location, setLocation] = useState(null);
   const [address, setAddress] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [productCategories, setProductCategories] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   
   // Define default styles as a fallback in case the import fails
   const defaultStyles = StyleSheet.create({
@@ -205,6 +32,50 @@ export default function Subscription() {
   // Use imported styles with fallback to default styles
   const styleToUse = styles || defaultStyles;
   
+  // Fetch products from Firebase
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        // Get all product categories
+        const categoriesCollection = collection(db, 'productCategories');
+        const categoriesSnapshot = await getDocs(categoriesCollection);
+        
+        const categoriesData = [];
+        
+        // Loop through each category
+        for (const categoryDoc of categoriesSnapshot.docs) {
+          const categoryData = categoryDoc.data();
+          
+          // Get products for this category
+          const productsCollection = collection(db, `productCategories/${categoryDoc.id}/products`);
+          const productsSnapshot = await getDocs(productsCollection);
+          
+          const productsData = productsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          // Add category with its products
+          categoriesData.push({
+            id: categoryDoc.id,
+            title: categoryData.title,
+            products: productsData
+          });
+        }
+        
+        setProductCategories(categoriesData);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        Alert.alert("Error", "Failed to load products. Please try again.");
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    
+    fetchProducts();
+  }, []);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -281,13 +152,6 @@ export default function Subscription() {
     }
   };
   
-  // Reset selection state when order type changes
-  useEffect(() => {
-    setSelectedFrequency('');
-    setSelectedTimeSlot('');
-    setSelectedDuration('');
-  }, [orderType]);
-  
   // Cart functions
   const handleAddToCart = (productId) => {
     setCartItems(prev => ({
@@ -314,42 +178,10 @@ export default function Subscription() {
   const calculateTotal = () => {
     // Sum of all products in cart
     const productTotal = Object.entries(cartItems).reduce((sum, [productId, quantity]) => {
-      const allProducts = PRODUCT_CATEGORIES.flatMap(cat => cat.products);
+      const allProducts = productCategories.flatMap(cat => cat.products);
       const product = allProducts.find(p => p.id === productId);
       return sum + (product ? product.price * quantity : 0);
     }, 0);
-    
-    // Base total is just product total for one-time orders
-    if (orderType === 'one-time') {
-      return { 
-        subtotal: productTotal.toFixed(2),
-        total: productTotal.toFixed(2),
-        savings: '0.00'
-      };
-    }
-    
-    // For subscriptions, apply discounts based on frequency and duration
-    if (orderType === 'subscription' && selectedFrequency && selectedDuration) {
-      const frequencyOption = SUBSCRIPTION_FREQUENCIES.find(f => f.id === selectedFrequency);
-      const durationOption = SUBSCRIPTION_DURATIONS.find(d => d.id === selectedDuration);
-      
-      if (frequencyOption && durationOption) {
-        const frequencySavingsPercent = parseInt(frequencyOption.savingsPercent) / 100;
-        const durationDiscountPercent = durationOption.discountPercent / 100;
-        
-        const frequencySavings = productTotal * frequencySavingsPercent;
-        const durationSavings = productTotal * durationDiscountPercent;
-        const totalSavings = frequencySavings + durationSavings;
-        
-        const finalTotal = productTotal - totalSavings;
-        
-        return {
-          subtotal: productTotal.toFixed(2),
-          total: finalTotal.toFixed(2),
-          savings: totalSavings.toFixed(2)
-        };
-      }
-    }
     
     return { 
       subtotal: productTotal.toFixed(2),
@@ -361,17 +193,7 @@ export default function Subscription() {
   const priceInfo = calculateTotal();
   
   // Check if user can proceed to checkout
-  const canProceed = () => {
-    if (totalItems === 0) return false;
-    
-    if (orderType === 'one-time') {
-      return selectedTimeSlot !== '';
-    } else if (orderType === 'subscription') {
-      return selectedFrequency !== '' && selectedDuration !== '';
-    }
-    
-    return false;
-  };
+  const canProceed = totalItems > 0;
   
   let locationText = 'Fetching your location...';
   if (errorMsg) {
@@ -379,18 +201,6 @@ export default function Subscription() {
   } else if (address) {
     locationText = address;
   }
-
-  // Get icon component based on icon name
-  const getIcon = (iconName) => {
-    switch (iconName) {
-      case 'Clock':
-        return <Clock size={20} color="#22c55e" />;
-      case 'Calendar':
-        return <Calendar size={20} color="#22c55e" />;
-      default:
-        return null;
-    }
-  };
 
   // Render product item for horizontal FlatList
   const renderProductItem = ({ item }) => (
@@ -406,7 +216,7 @@ export default function Subscription() {
         <Text style={styleToUse.weightText}>{item.weight}</Text>
         
         <View style={styleToUse.priceContainer}>
-          <Text style={styleToUse.priceText}>${item.price}</Text>
+          <Text style={styleToUse.priceText}>₹{item.price}</Text>
           
           {cartItems[item.id] ? (
             <View style={styleToUse.quantityControl}>
@@ -439,7 +249,7 @@ export default function Subscription() {
 
   return (
     <ScrollView style={styleToUse.container}>
-      {/* Real-time Location Header (Swiggy Style) */}
+      {/* Real-time Location Header */}
       <View style={styleToUse.locationContainer}>
         <View style={styleToUse.locationHeader}>
           <MapPin size={20} color="#22c55e" />
@@ -466,178 +276,62 @@ export default function Subscription() {
       </View>
 
       <View style={styleToUse.header}>
-        <Text style={styleToUse.title}>Customize Your Box</Text>
+        <Text style={styleToUse.title}>Order from FitFuel Approved</Text>
         <Text style={styleToUse.subtitle}>
-          Choose items for your box and select delivery options
+          We don't offer food from third-party vendors. All items are 100% FitFuel approved and made in-house.
         </Text>
       </View>
-
-      {/* ITEMS SECTION - MOVED TO TOP */}
+      
+      {/* ITEMS SECTION */}
       <View style={styleToUse.section}>
         <View style={styleToUse.sectionHeaderRow}>
-          <Text style={styleToUse.sectionTitle}>Add Items to Your Box</Text>
+          <Text style={styleToUse.sectionTitle}>Items</Text>
           <Text style={styleToUse.itemsSelectedText}>
             {totalItems} items selected
           </Text>
         </View>
         
-        {PRODUCT_CATEGORIES.map((category) => (
-          <View key={category.title} style={styleToUse.categoryContainer}>
-            <Text style={styleToUse.categoryTitle}>{category.title}</Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={category.products}
-              renderItem={renderProductItem}
-              keyExtractor={item => item.id}
-              contentContainerStyle={styleToUse.productList}
-            />
+        {loadingProducts ? (
+          <View style={styleToUse.loadingProductsContainer}>
+            <ActivityIndicator size="large" color="#22c55e" />
+            <Text style={styleToUse.loadingText}>Loading products...</Text>
           </View>
-        ))}
-      </View>
-
-      {/* Order Type Selection - MOVED AFTER ITEMS */}
-      <View style={styleToUse.section}>
-        <Text style={styleToUse.sectionTitle}>Select Order Type</Text>
-        <View style={styleToUse.orderTypeContainer}>
-          {ORDER_TYPES.map((type) => (
-            <Pressable
-              key={type.id}
-              style={[
-                styleToUse.orderTypeCard,
-                orderType === type.id && styleToUse.orderTypeCardSelected,
-              ]}
-              onPress={() => setOrderType(type.id)}>
-              <View style={styleToUse.orderTypeIconContainer}>
-                {getIcon(type.icon)}
-              </View>
-              <View style={styleToUse.orderTypeContent}>
-                <Text style={styleToUse.orderTypeTitle}>{type.title}</Text>
-                <Text style={styleToUse.orderTypeDescription}>{type.description}</Text>
-              </View>
-              {orderType === type.id && (
-                <View style={styleToUse.orderTypeCheckmark}>
-                  <Check size={20} color="#22c55e" />
-                </View>
-              )}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* One-Time Order Selection */}
-      {orderType === 'one-time' && (
-        <View style={styleToUse.section}>
-          <Text style={styleToUse.sectionTitle}>Select Delivery Time</Text>
-          {DELIVERY_TIME_SLOTS.map((slot) => (
-            <Pressable
-              key={slot.id}
-              style={[
-                styleToUse.timeSlotCard,
-                selectedTimeSlot === slot.id && styleToUse.timeSlotCardSelected,
-              ]}
-              onPress={() => setSelectedTimeSlot(slot.id)}>
-              <View style={styleToUse.timeSlotContent}>
-                <Text style={styleToUse.timeSlotText}>{slot.text}</Text>
-                <View style={styleToUse.timeSlotBadge}>
-                  <Text style={styleToUse.timeSlotBadgeText}>
-                    Available in {slot.availableIn}
-                  </Text>
-                </View>
-              </View>
-              {selectedTimeSlot === slot.id && (
-                <View style={styleToUse.checkmark}>
-                  <Check size={20} color="#22c55e" />
-                </View>
-              )}
-            </Pressable>
-          ))}
-        </View>
-      )}
-
-      {/* Subscription Plan Selection */}
-      {orderType === 'subscription' && (
-        <>
-          <View style={styleToUse.section}>
-            <Text style={styleToUse.sectionTitle}>Select Delivery Frequency</Text>
-            {SUBSCRIPTION_FREQUENCIES.map((frequency) => (
-              <Pressable
-                key={frequency.id}
-                style={[
-                  styleToUse.planCard,
-                  selectedFrequency === frequency.id && styleToUse.planCardSelected,
-                ]}
-                onPress={() => setSelectedFrequency(frequency.id)}>
-                <Image source={{ uri: frequency.image }} style={styleToUse.planImage} />
-                <View style={styleToUse.savingsBadge}>
-                  <Text style={styleToUse.savingsBadgeText}>Save {frequency.savingsPercent}</Text>
-                </View>
-                <View style={styleToUse.planContent}>
-                  <View style={styleToUse.planHeader}>
-                    <Text style={styleToUse.planTitle}>{frequency.title}</Text>
-                    <Text style={styleToUse.planPrice}>${frequency.price}/box</Text>
-                  </View>
-                  <Text style={styleToUse.planDescription}>{frequency.description}</Text>
-                </View>
-                {selectedFrequency === frequency.id && (
-                  <View style={styleToUse.checkmark}>
-                    <Check size={24} color="#22c55e" />
-                  </View>
-                )}
-              </Pressable>
-            ))}
-          </View>
-
-          <View style={styleToUse.section}>
-            <Text style={styleToUse.sectionTitle}>Select Subscription Duration</Text>
-            <View style={styleToUse.durationContainer}>
-              {SUBSCRIPTION_DURATIONS.map((duration) => (
-                <Pressable
-                  key={duration.id}
-                  style={[
-                    styleToUse.durationCard,
-                    selectedDuration === duration.id && styleToUse.durationCardSelected,
-                  ]}
-                  onPress={() => setSelectedDuration(duration.id)}>
-                  <Text style={styleToUse.durationText}>{duration.text}</Text>
-                  {duration.discountPercent > 0 && (
-                    <View style={styleToUse.durationBadge}>
-                      <Text style={styleToUse.durationBadgeText}>
-                        Save {duration.discountPercent}%
-                      </Text>
-                    </View>
-                  )}
-                  {selectedDuration === duration.id && (
-                    <View style={styleToUse.smallCheckmark}>
-                      <Check size={16} color="#22c55e" />
-                    </View>
-                  )}
-                </Pressable>
-              ))}
+        ) : (
+          productCategories.map((category) => (
+            <View key={category.id} style={styleToUse.categoryContainer}>
+              <Text style={styleToUse.categoryTitle}>{category.title}</Text>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={category.products}
+                renderItem={renderProductItem}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styleToUse.productList}
+              />
             </View>
-          </View>
-        </>
-      )}
+          ))
+        )}
+      </View>
 
-      {/* Order Summary */}
+      {/* Order Summary - Only show if items in cart */}
       {totalItems > 0 && (
         <View style={styleToUse.summaryContainer}>
           <Text style={styleToUse.summaryTitle}>Order Summary</Text>
           <View style={styleToUse.summaryRow}>
             <Text style={styleToUse.summaryLabel}>Subtotal ({totalItems} items)</Text>
-            <Text style={styleToUse.summaryValue}>${priceInfo.subtotal}</Text>
+            <Text style={styleToUse.summaryValue}>₹{priceInfo.subtotal}</Text>
           </View>
           
           {parseFloat(priceInfo.savings) > 0 && (
             <View style={styleToUse.summaryRow}>
               <Text style={styleToUse.savingsLabel}>Savings</Text>
-              <Text style={styleToUse.savingsValue}>-${priceInfo.savings}</Text>
+              <Text style={styleToUse.savingsValue}>-₹{priceInfo.savings}</Text>
             </View>
           )}
           
           <View style={[styleToUse.summaryRow, styleToUse.totalRow]}>
             <Text style={styleToUse.totalLabel}>Total</Text>
-            <Text style={styleToUse.totalValue}>${priceInfo.total}</Text>
+            <Text style={styleToUse.totalValue}>₹{priceInfo.total}</Text>
           </View>
         </View>
       )}
@@ -646,21 +340,17 @@ export default function Subscription() {
         <Pressable
           style={[
             styleToUse.button, 
-            !canProceed() && styleToUse.buttonDisabled
+            !canProceed && styleToUse.buttonDisabled
           ]}
-          disabled={!canProceed()}
+          disabled={!canProceed}
           onPress={() => {
-            if (canProceed()) {
+            if (canProceed) {
               const paymentParams = {
                 orderType,
-                selectedFrequency,
-                selectedTimeSlot,
-                selectedDuration,
-                cartItems: JSON.stringify(cartItems), // Serialize objects
+                cartItems: JSON.stringify(cartItems),
                 address,
-                priceInfo: JSON.stringify(priceInfo), // Serialize objects
-                allProducts: JSON.stringify(PRODUCT_CATEGORIES.flatMap(cat => cat.products)), // Serialize arrays
-                productCategories: JSON.stringify(PRODUCT_CATEGORIES) // Serialize arrays
+                priceInfo: JSON.stringify(priceInfo),
+                allProducts: JSON.stringify(productCategories.flatMap(cat => cat.products)),
               };
 
               router.push({
@@ -671,13 +361,13 @@ export default function Subscription() {
           }}>
           <Text style={[
             styleToUse.buttonText, 
-            !canProceed() && styleToUse.buttonTextDisabled
+            !canProceed && styleToUse.buttonTextDisabled
           ]}>
-            {orderType === 'subscription' ? 'Subscribe Now' : 'Place Order'} (${priceInfo.total})
+            Order Now (₹{priceInfo.total})
           </Text>
           <ChevronRight 
             size={20} 
-            color={canProceed() ? '#fff' : '#94a3b8'} 
+            color={canProceed ? '#fff' : '#94a3b8'} 
           />
         </Pressable>
       </View>
