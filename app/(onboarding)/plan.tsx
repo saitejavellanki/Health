@@ -29,6 +29,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../../components/firebase/Firebase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import Gender from './gender';
 
 // Same API configuration
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -171,26 +172,63 @@ const parseDailyPlan = (planText) => {
 // Modified prompt (unchanged)
 // Modified prompt to use the new database structure
 const createPrompt = (userData) => {
-  const goal = userData.goals && userData.goals.length > 0
-    ? userData.goals[0]?.title
-    : 'health improvement';
-  
-  const targetWeight = userData.goals && userData.goals.length > 0 && userData.goals[0]?.targetWeight
-    ? userData.goals[0]?.targetWeight
-    : null;
-  
-  const weightGoalText = targetWeight 
-    ? `with a target weight of ${targetWeight}kg` 
+  console.log(userData);
+  const goal =
+    userData.goals && userData.goals.length > 0
+      ? userData.goals[0]?.title
+      : 'health improvement';
+
+  const targetWeight =
+    userData.goals &&
+    userData.goals.length > 0 &&
+    userData.goals[0]?.targetWeight
+      ? userData.goals[0]?.targetWeight
+      : null;
+
+  const weightGoalText = targetWeight
+    ? `with a target weight of ${targetWeight}kg`
     : '';
-  
+
   const diet = userData.preferences?.diet || 'balanced';
   const allergies = userData.preferences?.allergies?.join(',') || 'none';
   const state = userData.preferences?.state || 'general South Indian';
   const currentWeight = userData.weight || null;
-  
-  const weightContext = currentWeight && targetWeight
-    ? `Current weight: ${currentWeight}kg, target: ${targetWeight}kg. `
-    : '';
+
+  const weightContext =
+    currentWeight && targetWeight
+      ? `Current weight: ${currentWeight}kg, target: ${targetWeight}kg. `
+      : '';
+
+  let bmr = 0;
+  if (userData.gender === 'female') {
+    bmr =
+      655.1 +
+      9.563 * userData.weight +
+      1.85 * userData.height['totalInches'] * 2.54 -
+      4.676 * userData.dateOfBirth['age'];
+  } else {
+    bmr =
+      66.47 +
+      13.75 * userData.weight +
+      5.003 * userData.height['totalInches'] * 2.54 -
+      6.755 * userData.dateOfBirth['age'];
+  }
+  console.log(`BMR ${bmr}`);
+  let act_fac = 0;
+  if (userData.workoutFrequency === 'none') {
+    act_fac += 1.2;
+  } else if (userData.workoutFrequency === 'light') {
+    act_fac = 1.375;
+  } else if (userData.workoutFrequency === 'moderate') {
+    act_fac = 1.55;
+  } else if (userData.workoutFrequency === 'active') {
+    act_fac = 1.725;
+  } else if (userData.workoutFrequency === 'intense') {
+    act_fac = 1.9;
+  }
+  console.log(`Activity factor ${act_fac}`);
+  let tdde = bmr * act_fac;
+  console.log(`TDDE ${tdde}`);
 
   return `Create a 7-day wellness plan for ${goal} ${weightGoalText}. ${weightContext}Diet preference: ${diet} with Indian food specific to ${state} region. Allergies: ${allergies}.
 
@@ -759,7 +797,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontFamily:'Inter-Bold',
+    fontFamily: 'Inter-Bold',
     // fontWeight: 'bold',
     color: '#1a1a1a',
     letterSpacing: 0.3,
