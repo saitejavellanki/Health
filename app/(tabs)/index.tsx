@@ -6,6 +6,7 @@ import { getAuth } from 'firebase/auth';
 import { router } from 'expo-router';
 import {styles} from '../Utils/HomePageStyles';
 
+
 // API configuration for Gemini
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -525,6 +526,7 @@ export default function Home() {
       {/* Tracking Section - Always show regardless of mode */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tracking Focus</Text>
+        
         {!nutritionOnlyMode && (
           <View style={styles.trackingCard}>
             <View style={styles.trackingHeader}>

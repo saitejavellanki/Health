@@ -3,7 +3,7 @@ import { Text, TouchableOpacity, View, Image, ActivityIndicator, StatusBar, Scro
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Feather from 'react-native-vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, increment, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import styles from '../Utils/CalorieTrackerScreenStyles';
 import { router } from 'expo-router';
@@ -294,7 +294,7 @@ export default function CalorieTrackerScreen() {
         calories: parseInt(calories) || 0,
         protein: protein ? parseInt(protein) : 0,
         fat: fat ? parseInt(fat) : 0,
-        junk: isJunkFood, // Set junk flag from AI's assessment
+        junk: isJunkFood,
         image: image,
         timestamp: serverTimestamp()
       };
@@ -305,14 +305,71 @@ export default function CalorieTrackerScreen() {
       
       // Update user totals in the user document
       const userRef = doc(db, 'users', userId);
+      
+      // Get today's date at midnight
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Check if the user has a lastTrackingDate field and if it's today
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+      let lastTrackingDate = userData?.lastTrackingDate?.toDate();
+      let mealsTrackedToday = userData?.mealsTrackedToday || 0;
+      let currentStreak = userData?.streak || 0;
+      let lastStreakDate = userData?.lastStreakDate?.toDate();
+      
+      if (lastTrackingDate) {
+        lastTrackingDate.setHours(0, 0, 0, 0);
+        
+        // If last tracking date is not today, reset counter
+        if (lastTrackingDate.getTime() !== today.getTime()) {
+          mealsTrackedToday = 1;
+          
+          // Check if lastStreakDate was yesterday to maintain streak
+          if (lastStreakDate) {
+            lastStreakDate.setHours(0, 0, 0, 0);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            if (lastStreakDate.getTime() === yesterday.getTime()) {
+              // Last streak was yesterday, continue the streak
+              // But only increment if this is their first log of today
+              currentStreak = currentStreak;
+            } else {
+              // Streak broken, reset to 0
+              currentStreak = 0;
+            }
+          }
+        } else {
+          // Increment counter if already tracking today
+          mealsTrackedToday += 1;
+          
+          // Check if they've now reached 2 meals today to increment streak
+          if (mealsTrackedToday >= 2 && lastStreakDate?.getTime() !== today.getTime()) {
+            currentStreak += 1;
+            // Update lastStreakDate to today since they've hit the goal
+            lastStreakDate = today;
+          }
+        }
+      } else {
+        mealsTrackedToday = 1;
+        // First ever tracking, streak remains at 0
+      }
+      
+      // Update user document with tracking data and streak info
       await updateDoc(userRef, {
         totalCalories: increment(parseInt(calories) || 0),
         totalProtein: increment(protein ? parseInt(protein) : 0),
         totalFat: increment(fat ? parseInt(fat) : 0),
-        lastUpdated: serverTimestamp()
+        lastUpdated: serverTimestamp(),
+        lastTrackingDate: today,
+        mealsTrackedToday: mealsTrackedToday,
+        streak: currentStreak,
+        lastStreakDate: mealsTrackedToday >= 2 ? today : (lastStreakDate || null)
       });
       
       console.log('Meal logged successfully');
+      console.log('Current streak:', currentStreak);
       setLoggedMeal(true);
       
       // Show tick animation before redirecting

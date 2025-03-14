@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,6 +12,7 @@ import {
   Alert,
   Pressable,
   StatusBar,
+  ScrollView,
 } from 'react-native';
 
 // Import Expo Font Loader
@@ -23,9 +24,22 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 
 import { Link, router } from 'expo-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { 
+  signInWithEmailAndPassword, 
+  GoogleAuthProvider, 
+  signInWithCredential,
+  OAuthProvider,
+} from 'firebase/auth';
 import { auth } from '../../components/firebase/Firebase';
 import { Mail, Lock, ArrowRight } from 'lucide-react-native';
+
+// Import Google Sign In
+import * as Google from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { maybeCompleteAuthSession } from 'expo-web-browser';
+
+// Ensure auth session is completed
+maybeCompleteAuthSession();
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -33,10 +47,26 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Configure Google Sign In
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    // Get these values from your Firebase project settings
+    expoClientId: 'YOUR_EXPO_CLIENT_ID',
+    iosClientId: 'YOUR_IOS_CLIENT_ID',
+    androidClientId: 'YOUR_ANDROID_CLIENT_ID',
+    webClientId: 'YOUR_WEB_CLIENT_ID',
+  });
+
   const [fontsLoaded] = useFonts({
     Poppins_Regular: Poppins_400Regular,
     Poppins_Bold: Poppins_700Bold,
   });
+
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { id_token } = googleResponse.params;
+      handleGoogleCredential(id_token);
+    }
+  }, [googleResponse]);
 
   if (!fontsLoaded) {
     return null; // Prevent rendering until fonts are loaded
@@ -61,26 +91,88 @@ export default function Login() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true);
+      await googlePromptAsync();
+    } catch (error) {
+      Alert.alert('Google Sign In Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (idToken) => {
+    try {
+      setLoading(true);
+      // Create a Google credential with the token
+      const googleCredential = GoogleAuthProvider.credential(idToken);
+      
+      // Sign in with credential from the Google user
+      const userCredential = await signInWithCredential(auth, googleCredential);
+      
+      // Success, navigate to home screen
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Authentication Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      setLoading(true);
+      const appleCredential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      
+      // Create an OAuthProvider credential
+      const provider = new OAuthProvider('apple.com');
+      const credential = provider.credential({
+        idToken: appleCredential.identityToken,
+      });
+      
+      // Sign in with credential
+      const userCredential = await signInWithCredential(auth, credential);
+      
+      // Success, navigate to home screen
+      router.replace('/(tabs)');
+    } catch (error) {
+      // Ignore cancel errors
+      if (error.code !== 'ERR_CANCELED') {
+        Alert.alert('Apple Sign In Error', error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+      
+      <View style={styles.header}>
+        <Image
+          source={{
+            uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741692694/064112bb-a31f-4322-95b0-7a0e5bebafad_rsz6az.jpg',
+          }}
+          style={styles.headerImage}
+        />
+      </View>
+
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <View style={styles.header}>
-          <Image
-            source={{
-              uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741692694/064112bb-a31f-4322-95b0-7a0e5bebafad_rsz6az.jpg',
-            }}
-            style={styles.headerImage}
-          />
-          <View style={styles.logoContainer}>
-            {/* <Text style={styles.logoText}>FitFuel</Text> */}
-          </View>
-        </View>
-
-        <View style={styles.formContainer}>
+        <ScrollView 
+          style={styles.formContainer}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.title}>Welcome back 👋</Text>
           <Text style={styles.subtitle}>Sign in to continue your journey</Text>
 
@@ -132,6 +224,40 @@ export default function Login() {
             )}
           </Pressable>
 
+          <View style={styles.dividerContainer}>
+            <View style={styles.divider} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.divider} />
+          </View>
+
+          <View style={styles.socialButtonsContainer}>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={handleGoogleSignIn}
+              disabled={loading}
+            >
+              <Image
+                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }}
+                style={styles.socialIcon}
+              />
+              <Text style={styles.socialButtonText}>Google</Text>
+            </TouchableOpacity>
+
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={styles.socialButton}
+                onPress={handleAppleSignIn}
+                disabled={loading}
+              >
+                <Image
+                  source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg' }}
+                  style={styles.socialIcon}
+                />
+                <Text style={styles.socialButtonText}>Apple</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Don't have an account? </Text>
             <Link href="/(auth)/register" asChild>
@@ -140,7 +266,7 @@ export default function Login() {
               </TouchableOpacity>
             </Link>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -150,59 +276,43 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    // backgroundColor:'black',
-    // marginBottom:-20,
   },
   keyboardView: {
     flex: 1,
-    // flexGrow: 1,
-    // justifyContent: 'center',
+    marginTop: -30,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    backgroundColor: '#fff',
   },
   header: {
-    height: '40%',
-    position: 'relative',
+    height: '35%', // Reduced height to allow more space for form
   },
   headerImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
-  logoContainer: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  logoText: {
-    fontFamily: 'Poppins_Regular',
-    fontSize: 30,
-    // fontWeight: 'bold',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 10,
-  },
   formContainer: {
-    padding: 24,
-    backgroundColor: '#fff',
-    // backgroundColor:'rgba(0, 0, 0, 0.5)',
-    flex: 1,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    marginTop: -30,
-    // paddingBottom:100,
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 40, // Extra padding at bottom to ensure visibility
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#1a1a1a',
+    fontFamily: 'Poppins_Bold',
   },
   subtitle: {
     fontSize: 16,
-    marginBottom: 32,
+    marginBottom: 24, // Reduced spacing
     color: '#666',
+    fontFamily: 'Poppins_Regular',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -220,6 +330,7 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: '#333',
+    fontFamily: 'Poppins_Regular',
   },
   button: {
     flexDirection: 'row',
@@ -235,11 +346,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+    fontFamily: 'Poppins_Bold',
   },
   errorText: {
     color: '#ef4444',
     marginBottom: 16,
     fontSize: 14,
+    fontFamily: 'Poppins_Regular',
   },
   forgotPassword: {
     alignSelf: 'flex-end',
@@ -248,19 +361,65 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: '#22c55e',
     fontSize: 14,
+    fontFamily: 'Poppins_Regular',
   },
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 32,
+    marginTop: 24,
   },
   registerText: {
     color: '#666',
     fontSize: 16,
+    fontFamily: 'Poppins_Regular',
   },
   registerLink: {
     color: '#22c55e',
     fontWeight: '600',
     fontSize: 16,
+    fontFamily: 'Poppins_Bold',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dividerText: {
+    paddingHorizontal: 10,
+    color: '#666',
+    fontFamily: 'Poppins_Regular',
+  },
+  socialButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+  },
+  socialIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
+  socialButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: 'Poppins_Regular',
   },
 });
