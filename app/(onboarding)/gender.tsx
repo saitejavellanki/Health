@@ -6,18 +6,45 @@ import {
   Pressable,
   SafeAreaView,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
+import { doc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../../components/firebase/Firebase'; // Update this path to point to your firebase config file
 
 export default function Gender() {
   const [selectedGender, setSelectedGender] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
-    setIsLoading(true);
-    // Here will be the logic of saving the gender into Firebase
-    router.push('/dob');
+  const handleContinue = async () => {
+    try {
+      setIsLoading(true);
+
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        Alert.alert('Error', 'You must be logged in to save your gender.');
+        return;
+      }
+
+      // Update the user document in the users collection
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        gender: selectedGender, // This should be one of: "male", "female", or "prefer_not_say"
+        updatedAt: new Date(),
+      });
+
+      console.log(`Gender saved: ${selectedGender}`);
+
+      // Navigate to the next screen
+      router.push('/dob');
+    } catch (error) {
+      console.error('Error saving gender:', error);
+      Alert.alert('Error', 'Failed to save your gender. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
