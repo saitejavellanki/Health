@@ -34,44 +34,57 @@ export default function OrderComponent() {
   
   // Fetch products from Firebase
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoadingProducts(true);
-      try {
-        // Get all product categories
-        const categoriesCollection = collection(db, 'productCategories');
-        const categoriesSnapshot = await getDocs(categoriesCollection);
-        
-        const categoriesData = [];
-        
-        // Loop through each category
-        for (const categoryDoc of categoriesSnapshot.docs) {
-          const categoryData = categoryDoc.data();
-          
-          // Get products for this category
-          const productsCollection = collection(db, `productCategories/${categoryDoc.id}/products`);
-          const productsSnapshot = await getDocs(productsCollection);
-          
-          const productsData = productsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          
-          // Add category with its products
-          categoriesData.push({
-            id: categoryDoc.id,
-            title: categoryData.title,
-            products: productsData
-          });
-        }
-        
-        setProductCategories(categoriesData);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        Alert.alert("Error", "Failed to load products. Please try again.");
-      } finally {
-        setLoadingProducts(false);
-      }
+    // Fixed fetchProducts function for your exact Firebase structure
+const fetchProducts = async () => {
+  setLoadingProducts(true);
+  try {
+    console.log("Starting product fetch for exact Firebase structure...");
+    
+    // Get the single productCategories document with ID "zLQ1DRXaIDvagLGCNJvc"
+    const categoryId = "zLQ1DRXaIDvagLGCNJvc";
+    const categoryTitle = "Fruits"; // You might want to adjust this based on your preferred title
+    
+    console.log(`Fetching products for category ID: ${categoryId}`);
+    
+    // Get the "products" subcollection directly
+    const productsCollection = collection(db, `productCategories/${categoryId}/products`);
+    const productsSnapshot = await getDocs(productsCollection);
+    
+    console.log(`Found ${productsSnapshot.docs.length} products in the products subcollection`);
+    
+    // Process products data
+    const productsData = productsSnapshot.docs.map(doc => {
+      const productData = doc.data();
+      console.log(`Product ${doc.id}: ${productData.name}, Price: ${productData.price}`);
+      return {
+        id: doc.id,
+        ...productData
+      };
+    });
+    
+    // Create a category object with the products
+    const categoryData = {
+      id: categoryId,
+      title: categoryTitle,
+      products: productsData
     };
+    
+    console.log(`Processed category with ${productsData.length} products`);
+    console.log("Category data:", JSON.stringify(categoryData, null, 2));
+    
+    // Set state with an array containing this single category
+    setProductCategories([categoryData]);
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    console.error("Error stack:", error.stack);
+    Alert.alert(
+      "Error Loading Products", 
+      "Please check your internet connection and try again. Error: " + error.message
+    );
+  } finally {
+    setLoadingProducts(false);
+  }
+};
     
     fetchProducts();
   }, []);

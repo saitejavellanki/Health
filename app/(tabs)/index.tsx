@@ -5,6 +5,7 @@ import { getFirestore, collection, query, where, getDocs, orderBy, Timestamp, up
 import { getAuth } from 'firebase/auth';
 import { router } from 'expo-router';
 import {styles} from '../Utils/HomePageStyles';
+import StreakComp from '@/components/UserStats/StreakComp';
 
 
 // API configuration for Gemini
@@ -464,8 +465,9 @@ export default function Home() {
           <Feather name="bar-chart-2" size={18} color="#ffffff" style={styles.trackButtonIcon} />
           <Text style={styles.trackButtonText}>Track Nutrition</Text>
         </Pressable>
+        <StreakComp/>
       </View>
-
+      
       {/* Diet & Exercise Section - Only show when not in nutrition-only mode */}
       {!nutritionOnlyMode && (
         <>

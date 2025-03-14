@@ -724,7 +724,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         <View style={styles.header}>
           <Pressable
             style={styles.backButton}
-            onPress={() => router.push('/allergies')}
+            onPress={() => router.push('/(tabs)')}
           >
             <ChevronLeft size={24} color="#22c55e" />
           </Pressable>

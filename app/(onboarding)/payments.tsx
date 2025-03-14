@@ -7,6 +7,7 @@ import { auth, db } from '../../components/firebase/Firebase.js';
 import { collection, doc, getDoc, updateDoc, getDocs, query, where, setDoc } from 'firebase/firestore';
 import * as Crypto from 'expo-crypto';
 import WebView from 'react-native-webview';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // PayU configuration remains the same
 const PAYU_CONFIG = {
@@ -16,6 +17,7 @@ const PAYU_CONFIG = {
   productionBaseUrl: 'https://secure.payu.in/_payment',
   testBaseUrl: 'https://test.payu.in/_payment',
 };
+
 
 // Hash generation function
 const generateHash = async (input) => {
@@ -555,6 +557,7 @@ export default function PaymentScreen() {
       </View>
     );
   }
+  const insets = useSafeAreaInsets();
   
   // Main UI render
   return (
@@ -566,13 +569,15 @@ export default function PaymentScreen() {
       {renderPaymentWebView()}
       
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft size={24} color="#000" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Payment</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+  <Pressable 
+    onPress={() => router.replace('/(tabs)/subscription')} 
+    style={styles.backButton}>
+    <ChevronLeft size={24} color="#000" />
+  </Pressable>
+  <Text style={styles.headerTitle}>Payment</Text>
+  <View style={styles.headerPlaceholder} />
+</View>
       
       <ScrollView style={styles.content}>
         {/* User Info
