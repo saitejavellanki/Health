@@ -389,7 +389,12 @@ export default function CalorieTrackerScreen() {
         <View style={styles.cameraContainer}>
           {/* Header - Changed from NutriLens to Powered by Gemini */}
           <View style={styles.cameraHeader}>
-            <Text style={styles.cameraTitle}>Powered by Gemini</Text>
+          <View style={styles.headerTitleContainer}>
+  <Text style={styles.headerTitle}>
+      Crunch<Text style={styles.redX}>X</Text>
+    </Text>
+  <Text style={styles.sublineText}>Powered by Gemini</Text>
+</View>
             
             {/* Fixed the camera flip icon by explicitly using Feather icon */}
             <TouchableOpacity style={styles.flipButton} onPress={toggleCameraFacing}>

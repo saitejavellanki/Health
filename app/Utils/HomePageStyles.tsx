@@ -157,6 +157,16 @@ export const styles = StyleSheet.create({
   trackButtonContainer: {
     paddingHorizontal: 16,
     marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  StreakContainer: {
+    paddingHorizontal: 16,
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   trackButton: {
     backgroundColor: '#22c55e',
@@ -174,6 +184,14 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+//   trackButtonIcon: {
+//     marginRight: 8,
+//   },
+//   trackButtonText: {
+//     color: '#ffffff',
+//     fontSize: 15,
+//     fontWeight: '600',
+//   },
   section: {
     padding: 16,
     paddingTop: 24,

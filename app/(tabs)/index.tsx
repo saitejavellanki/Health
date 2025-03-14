@@ -457,16 +457,27 @@ export default function Home() {
       
       {/* Track Button */}
       <View style={styles.trackButtonContainer}>
-        <Pressable 
-          style={styles.trackButton} 
-          onPress={navigateToTracker}
-          android_ripple={{ color: '#e6f7ef' }}
-        >
-          <Feather name="bar-chart-2" size={18} color="#ffffff" style={styles.trackButtonIcon} />
-          <Text style={styles.trackButtonText}>Track Nutrition</Text>
-        </Pressable>
-        <StreakComp/>
-      </View>
+  <Pressable 
+    style={[styles.trackButton, { width: '75%' }]}  // Add width: '75%' here
+    onPress={navigateToTracker}
+    android_ripple={{ color: '#e6f7ef' }}
+  >
+    <Feather name="bar-chart-2" size={18} color="#ffffff" style={styles.trackButtonIcon} />
+    <Text style={styles.trackButtonText}>Track Nutrition</Text>
+  </Pressable>
+  
+  <Pressable 
+    style={[styles.trackButton, { width: '22%' }]}  // Create memory button with remaining space
+    onPress={() => router.push('/(onboarding)/MemoryGalleryScreen')}
+    android_ripple={{ color: '#e6f7ef' }}
+  >
+    <Feather name="image" size={18} color="#ffffff" />
+  </Pressable>
+  
+</View>
+<View style={styles.StreakContainer}>
+  <StreakComp/>
+  </View>
       
       {/* Diet & Exercise Section - Only show when not in nutrition-only mode */}
       {!nutritionOnlyMode && (

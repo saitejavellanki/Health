@@ -264,9 +264,11 @@ const MemoryGalleryScreen = () => {
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          Crunchx
-        </Text>
+      <View style={styles.headerTitleContainer}>
+  <Text style={styles.headerTitle}>
+    Crunch<Text style={styles.redX}>X</Text>
+  </Text>
+</View>
         
         <TouchableOpacity
           style={styles.cameraButton}
@@ -352,6 +354,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  redX: {
+    color: '#ef4444', // Red color for the X
+    fontFamily: 'Inter-Bold',
+    includeFontPadding: false, // Helps with text alignment issues
+  },
   header: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -361,10 +368,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
   },
+  
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
+    fontSize: 24,
+    fontFamily: 'Inter-Bold',
+    color: '#FFFFFF', // White color for dark background
+    textAlign: 'center',
+    lineHeight: 28, // Adding lineHeight to ensure consistent baseline
   },
   cameraButton: {
     width: 42,

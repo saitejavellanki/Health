@@ -45,6 +45,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  headerTitleContainer: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+  },
   cameraHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -60,9 +64,21 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   cameraTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontFamily: 'Inter-Bold',
+    color: '#FFFFFF', // White color for dark background
+    textAlign: 'center',
+    lineHeight: 28, // Adding lineHeight to ensure consistent baseline
+  },
+  redX: {
+    color: '#ef4444', // Red color for the X
+    fontFamily: 'Inter-Bold',
+    includeFontPadding: false, // Helps with text alignment issues
   },
   camera: {
     flex: 1,
@@ -326,6 +342,11 @@ const styles = StyleSheet.create({
     color: '#22c55e',
     fontSize: 16,
     fontWeight: '600',
+  },
+  sublineText: {
+    fontSize: 12,
+    color: '#a3a3a3',
+    marginTop: 2,
   },
 });
 
