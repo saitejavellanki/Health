@@ -381,9 +381,11 @@ export default function Home() {
   
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      
       {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
+          
           <View>
             <Text style={styles.greeting}>Good {getTimeOfDay()}, {userName}!</Text>
             <View style={styles.goalRow}>
@@ -395,7 +397,9 @@ export default function Home() {
               )}
             </View>
           </View>
+          
           <View style={styles.toggleContainer}>
+            
             <Text style={styles.toggleLabel}></Text>
             <Switch
               value={nutritionOnlyMode}
@@ -405,8 +409,9 @@ export default function Home() {
             />
           </View>
         </View>
+        <StreakComp/>
       </View>
-
+      
       {/* Current Meal Card - Only show when not in nutrition-only mode */}
       {!nutritionOnlyMode && (
         <View style={styles.currentMealContainer}>
@@ -474,7 +479,7 @@ export default function Home() {
   
 </View>
 <View style={styles.StreakContainer}>
-  <StreakComp/>
+  
   </View>
       
       {/* Diet & Exercise Section - Only show when not in nutrition-only mode */}
@@ -484,7 +489,7 @@ export default function Home() {
             <Text style={styles.sectionTitle}>Today's Plan</Text>
             
             {/* Meals Card */}
-            <Pressable 
+            {/* <Pressable 
               style={styles.actionCard} 
               onPress={navigateToAllMeals}
               android_ripple={{ color: '#f3f4f6' }}
@@ -499,7 +504,7 @@ export default function Home() {
                 </View>
               </View>
               <Feather name="chevron-right" size={18} color="#9ca3af" />
-            </Pressable>
+            </Pressable> */}
             
             {/* Shopping List Card */}
             <Pressable 
