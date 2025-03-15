@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "CrunchX",
-    "slug": "CrunchX",
+    "slug": "bolt-expo-nativewind",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -31,7 +31,14 @@
       }
     },
     "android": {
-      "package": "com.tejvellank.boltexponativewind"
+      "package": "com.tejvellank.boltexponativewind",
+      "versionCode": 2,
+      "versionName": "1.0.1",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": []
     }
   }
 }

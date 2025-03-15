@@ -369,7 +369,7 @@ const fetchProducts = async () => {
               };
 
               router.push({
-                pathname: '/(onboarding)/payments',
+                pathname: '/Screens/payments',
                 params: paymentParams
               });
             }
