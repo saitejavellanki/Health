@@ -24,19 +24,19 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 
 import { Link, router } from 'expo-router';
-import { 
-  signInWithEmailAndPassword, 
-  GoogleAuthProvider, 
+import {
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
   signInWithCredential,
   OAuthProvider,
 } from 'firebase/auth';
 import { auth } from '../../components/firebase/Firebase';
-import { 
-  Mail, 
-  Lock, 
-  ArrowRight, 
+import {
+  Mail,
+  Lock,
+  ArrowRight,
   Laptop, // Using Laptop icon for Apple (you can replace with more appropriate icon)
-  Globe // Using Globe icon for Google (you can replace with more appropriate icon)
+  Globe, // Using Globe icon for Google (you can replace with more appropriate icon)
 } from 'lucide-react-native';
 
 // Import Google Sign In
@@ -54,13 +54,14 @@ export default function Login() {
   const [error, setError] = useState('');
 
   // Configure Google Sign In
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    // Get these values from your Firebase project settings
-    expoClientId: 'YOUR_EXPO_CLIENT_ID',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID',
-    webClientId: 'YOUR_WEB_CLIENT_ID',
-  });
+  const [googleRequest, googleResponse, googlePromptAsync] =
+    Google.useAuthRequest({
+      // Get these values from your Firebase project settings
+      expoClientId: 'YOUR_EXPO_CLIENT_ID',
+      iosClientId: 'YOUR_IOS_CLIENT_ID',
+      androidClientId: 'YOUR_ANDROID_CLIENT_ID',
+      webClientId: 'YOUR_WEB_CLIENT_ID',
+    });
 
   const [fontsLoaded] = useFonts({
     Poppins_Regular: Poppins_400Regular,
@@ -113,10 +114,10 @@ export default function Login() {
       setLoading(true);
       // Create a Google credential with the token
       const googleCredential = GoogleAuthProvider.credential(idToken);
-      
+
       // Sign in with credential from the Google user
       const userCredential = await signInWithCredential(auth, googleCredential);
-      
+
       // Success, navigate to home screen
       router.replace('/(tabs)');
     } catch (error) {
@@ -135,16 +136,16 @@ export default function Login() {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
-      
+
       // Create an OAuthProvider credential
       const provider = new OAuthProvider('apple.com');
       const credential = provider.credential({
         idToken: appleCredential.identityToken,
       });
-      
+
       // Sign in with credential
       const userCredential = await signInWithCredential(auth, credential);
-      
+
       // Success, navigate to home screen
       router.replace('/(tabs)');
     } catch (error) {
@@ -160,11 +161,11 @@ export default function Login() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={styles.header}>
         <Image
           source={{
-            uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741692694/064112bb-a31f-4322-95b0-7a0e5bebafad_rsz6az.jpg',
+            uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741947741/IMG_1539_kehx9d.jpg',
           }}
           style={styles.headerImage}
         />
@@ -174,7 +175,7 @@ export default function Login() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <ScrollView 
+        <ScrollView
           style={styles.formContainer}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -242,7 +243,10 @@ export default function Login() {
               onPress={handleGoogleSignIn}
               disabled={loading}
             >
-              <Globe size={24} color="#DB4437" style={styles.socialIcon} />
+              <Image
+                source={require('../../assets/images/google-logo.png')}
+                style={styles.socialIcon}
+              />
             </TouchableOpacity>
 
             {Platform.OS === 'ios' && (
@@ -251,7 +255,10 @@ export default function Login() {
                 onPress={handleAppleSignIn}
                 disabled={loading}
               >
-                <Laptop size={24} color="#000" style={styles.socialIcon} />
+                <Image
+                  source={require('../../assets/images/apple-logo.png')}
+                  style={styles.socialIcon}
+                />
               </TouchableOpacity>
             )}
           </View>
@@ -409,7 +416,8 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   socialIcon: {
-    // No need for width and height as the icon component manages this
-    resizeMode: 'contain',
-  },
+  width: 24,
+  height: 24,
+  resizeMode: 'contain',
+},
 });

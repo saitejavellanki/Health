@@ -36,7 +36,7 @@ export default function DateOfBirth() {
 
   // State for selected values
   const [selectedDay, setSelectedDay] = useState(29);
-  const [selectedMonth, setSelectedMonth] = useState('July');
+  const [selectedMonth, setSelectedMonth] = useState('September');
   const [selectedYear, setSelectedYear] = useState(2003);
   const [isLoading, setIsLoading] = useState(false);
 
