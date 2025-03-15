@@ -63,13 +63,17 @@ export default function ForgotPassword() {
     } catch (err) {
       // Handle different Firebase error codes
       if (err.code === 'auth/user-not-found') {
-        setError('No account exists with this email. Please check your email address.');
+        setError(
+          'No account exists with this email. Please check your email address.'
+        );
       } else if (err.code === 'auth/too-many-requests') {
         setError('Too many attempts. Please try again later.');
       } else if (err.code === 'auth/invalid-email') {
         setError('The email address is not valid.');
       } else {
-        setError(err.message || 'Failed to send reset email. Please try again.');
+        setError(
+          err.message || 'Failed to send reset email. Please try again.'
+        );
         Alert.alert('Reset Error', err.message);
       }
     } finally {
@@ -84,11 +88,11 @@ export default function ForgotPassword() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={styles.header}>
         <Image
           source={{
-            uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741692694/064112bb-a31f-4322-95b0-7a0e5bebafad_rsz6az.jpg',
+            uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741947741/IMG_1539_kehx9d.jpg',
           }}
           style={styles.headerImage}
         />
@@ -98,13 +102,13 @@ export default function ForgotPassword() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <ScrollView 
+        <ScrollView
           style={styles.formContainer}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity 
-            onPress={handleBackToLogin} 
+          <TouchableOpacity
+            onPress={handleBackToLogin}
             style={styles.backButton}
           >
             <ArrowLeft size={20} color="#333" />
@@ -113,11 +117,12 @@ export default function ForgotPassword() {
 
           <Text style={styles.title}>Reset Password</Text>
           <Text style={styles.subtitle}>
-            Enter your email address and we'll send you instructions to reset your password.
+            Enter your email address and we'll send you instructions to reset
+            your password.
           </Text>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          
+
           {success ? (
             <View style={styles.successContainer}>
               <Text style={styles.successTitle}>Check Your Email</Text>
@@ -126,9 +131,10 @@ export default function ForgotPassword() {
               </Text>
               <Text style={styles.emailText}>{email}</Text>
               <Text style={styles.successText}>
-                Please check your inbox and follow the link to reset your password.
+                Please check your inbox and follow the link to reset your
+                password.
               </Text>
-              
+
               <Pressable
                 style={[styles.button, styles.successButton]}
                 onPress={handleBackToLogin}

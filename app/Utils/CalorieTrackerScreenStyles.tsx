@@ -5,6 +5,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  backButtonContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 999,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -39,13 +55,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  
+
   // Camera screen styles
   cameraContainer: {
     flex: 1,
     backgroundColor: '#000000',
   },
   headerTitleContainer: {
+    marginLeft:45,
     flexDirection: 'column',
     justifyContent: 'center',
   },
@@ -85,7 +102,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontWeight: '500',
     marginTop: 16,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   camera: {
     flex: 1,
@@ -175,7 +192,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     backgroundColor: '#FFFFFF',
   },
-  
+
   // Image review screen - updated with black theme
   imageContainer: {
     flex: 1,
@@ -190,7 +207,7 @@ const styles = StyleSheet.create({
   },
   previewImage: {
     width: '100%',
-    aspectRatio: 4/3,
+    aspectRatio: 4 / 3,
     backgroundColor: '#111111',
   },
   imageGradient: {
