@@ -74,7 +74,7 @@ const ProfileScreen: React.FC = () => {
     // Navigate to settings screen with userData as params
     if (userData) {
       router.push({
-        pathname: '/(onboarding)/MemoryGalleryScreen',
+        pathname: '/Utils/SettingsScreen',
         params: { userData: JSON.stringify(userData) }
       });
     }

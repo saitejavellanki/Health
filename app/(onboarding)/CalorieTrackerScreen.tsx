@@ -7,6 +7,7 @@ import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, incr
 import { getAuth } from 'firebase/auth';
 import styles from '../Utils/CalorieTrackerScreenStyles';
 import { router } from 'expo-router';
+import CrunchXFacts from '@/components/Loaders/CrunchXFacts';
 
 // Gemini API credentials
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -573,12 +574,13 @@ export default function CalorieTrackerScreen() {
             )}
             
             {analyzing && (
-              <View style={styles.loadingContainer}>
-                <View style={styles.loadingCard}>
-                  <ActivityIndicator size="large" color="#22c55e" />
-                  <Text style={styles.loadingText}>Analyzing your meal...</Text>
-                </View>
+              <View >
+              <CrunchXFacts />
+              <View style={styles.analyzerStatus}>
+                <ActivityIndicator size="small" color="#22c55e" />
+                <Text style={styles.analyzingText}>Analyzing your meal...</Text>
               </View>
+            </View>
             )}
             
             {!calories && !protein && !analyzing && (

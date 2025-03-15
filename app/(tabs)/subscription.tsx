@@ -289,9 +289,11 @@ const fetchProducts = async () => {
       </View>
 
       <View style={styleToUse.header}>
-        <Text style={styleToUse.title}>Order from FitFuel Approved</Text>
+        <Text style={styleToUse.title}>
+          Order from Crunch<Text style={{color: 'red'}}>X</Text> Approved
+        </Text>
         <Text style={styleToUse.subtitle}>
-          We don't offer food from third-party vendors. All items are 100% FitFuel approved and made in-house.
+          We don't offer food from third-party vendors. All items are 100% Crunch<Text style={{color: 'red'}}>X</Text> approved and made in-house.
         </Text>
       </View>
       

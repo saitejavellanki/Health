@@ -31,7 +31,13 @@ import {
   OAuthProvider,
 } from 'firebase/auth';
 import { auth } from '../../components/firebase/Firebase';
-import { Mail, Lock, ArrowRight } from 'lucide-react-native';
+import { 
+  Mail, 
+  Lock, 
+  ArrowRight, 
+  Laptop, // Using Laptop icon for Apple (you can replace with more appropriate icon)
+  Globe // Using Globe icon for Google (you can replace with more appropriate icon)
+} from 'lucide-react-native';
 
 // Import Google Sign In
 import * as Google from 'expo-auth-session/providers/google';
@@ -236,11 +242,7 @@ export default function Login() {
               onPress={handleGoogleSignIn}
               disabled={loading}
             >
-              <Image
-                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }}
-                style={styles.socialIcon}
-              />
-              <Text style={styles.socialButtonText}>Google</Text>
+              <Globe size={24} color="#DB4437" style={styles.socialIcon} />
             </TouchableOpacity>
 
             {Platform.OS === 'ios' && (
@@ -249,11 +251,7 @@ export default function Login() {
                 onPress={handleAppleSignIn}
                 disabled={loading}
               >
-                <Image
-                  source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg' }}
-                  style={styles.socialIcon}
-                />
-                <Text style={styles.socialButtonText}>Apple</Text>
+                <Laptop size={24} color="#000" style={styles.socialIcon} />
               </TouchableOpacity>
             )}
           </View>
@@ -396,12 +394,12 @@ const styles = StyleSheet.create({
   },
   socialButtonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 24,
   },
   socialButton: {
-    flex: 1,
-    flexDirection: 'row',
+    width: 52,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
@@ -409,17 +407,9 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 12,
     padding: 14,
-    gap: 8,
   },
   socialIcon: {
-    width: 20,
-    height: 20,
+    // No need for width and height as the icon component manages this
     resizeMode: 'contain',
-  },
-  socialButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Poppins_Regular',
   },
 });

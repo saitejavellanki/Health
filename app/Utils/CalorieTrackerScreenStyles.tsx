@@ -80,6 +80,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     includeFontPadding: false, // Helps with text alignment issues
   },
+  analyzingText: {
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: '500',
+    marginTop: 16,
+    textAlign: 'center'
+  },
   camera: {
     flex: 1,
   },

@@ -6,6 +6,8 @@ import { getAuth } from 'firebase/auth';
 import { router } from 'expo-router';
 import {styles} from '../Utils/HomePageStyles';
 import StreakComp from '@/components/UserStats/StreakComp';
+import NoPlanScreen from '../Utils/NoPlanScreen';
+import CrunchXLogo from '../Utils/Logo';
 
 
 // API configuration for Gemini
@@ -372,11 +374,7 @@ export default function Home() {
   }
 
   if (!todaysPlan) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>No plan available for today. Please create a plan first.</Text>
-      </View>
-    );
+    return <NoPlanScreen />;
   }
 
   const currentMeal = getCurrentMeal();
@@ -562,7 +560,8 @@ export default function Home() {
           </Text>
         </View>
       </View>
-
+ 
+      <CrunchXLogo/>
       {/* Bottom padding */}
       <View style={styles.bottomPadding} />
     </ScrollView>
