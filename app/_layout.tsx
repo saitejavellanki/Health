@@ -1,6 +1,5 @@
-// app/_layout.tsx
 import { useEffect, useState } from 'react';
-import { Stack, SplashScreen } from 'expo-router';
+import { Stack, SplashScreen, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   useFonts,
@@ -72,21 +71,40 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError, authInitialized]);
 
-  // Always return the Stack navigator
+  // If fonts or auth aren't loaded yet, return null to keep splash screen
+  if (!fontsLoaded || !authInitialized) {
+    return null;
+  }
+
+  // Redirect based on authentication state
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen
-          name="(auth)"
-          options={{ animation: 'slide_from_right' }}
-        />
-        <Stack.Screen
-          name="(onboarding)"
-          options={{ animation: 'slide_from_bottom' }}
-        />
-        <Stack.Screen name="(tabs)" options={{ animation: 'flip' }} />
+        {/* If user is not authenticated, show auth screens */}
+        {!user ? (
+          <Stack.Screen
+            name="(auth)"
+            options={{ animation: 'slide_from_right' }}
+          />
+        ) : isNewUser ? (
+          // If new user, show onboarding
+          <Stack.Screen 
+            name="(onboarding)" 
+            options={{ animation: 'slide_from_bottom' }}
+          />
+        ) : (
+          // If existing user, show tabs
+          <Stack.Screen 
+            name="(tabs)" 
+            options={{ animation: 'flip' }} 
+          />
+        )}
         <Stack.Screen name="+not-found" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="index" 
+          options={{ headerShown: false }} 
+          redirect={user ? true : false} 
+        />
       </Stack>
       <StatusBar style="auto" />
     </>

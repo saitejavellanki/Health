@@ -95,7 +95,7 @@ export default function TabLayout() {
       
       {/* 3. Calorie Tracker (Center Button) */}
       <Tabs.Screen
-        name="CalorieTrackerScreen"
+        name="NavigateToCalorie"
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={{

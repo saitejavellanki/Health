@@ -370,34 +370,15 @@ export default function Home() {
     return { type: 'Snack', name: todaysPlan.sections.snack[0], calories: 200 };
   };
 
-  const navigateToAllMeals = () => {
-    if (todaysPlan && todaysPlan.sections) {
-      router.push({
-        pathname: '/(onboarding)/AllMeals',
-        params: {
-          meals: JSON.stringify(todaysPlan.sections),
-          day: todaysPlan.day,
-        },
-      });
-    }
-  };
+  
 
-  const navigateToShoppingList = () => {
-    if (fullPlanData) {
-      router.push({
-        pathname: '/(onboarding)/ShoppingList',
-        params: {
-          fullPlan: JSON.stringify(fullPlanData),
-        },
-      });
-    }
-  };
+  
 
   const navigateToRecipe = () => {
     const currentMeal = getCurrentMeal();
     if (currentMeal && currentMeal.name && todaysPlan) {
       router.push({
-        pathname: '/(onboarding)/Recipe',
+        pathname: '/Screens/Recipe',
         params: {
           mealType: currentMeal.type.toLowerCase(),
           mealName: currentMeal.name,
@@ -409,7 +390,7 @@ export default function Home() {
 
   const navigateToTracker = () => {
     router.push({
-      pathname: '/(onboarding)/CalorieTrackerScreen',
+      pathname: '/Screens/CalorieTrackerScreen',
       params: {
         calories: nutritionData.calories.toString(),
         protein: nutritionData.protein.toString(),
@@ -559,7 +540,7 @@ export default function Home() {
 
         <Pressable
           style={[styles.trackButton, { width: '22%' }]} // Create memory button with remaining space
-          onPress={() => router.push('/(onboarding)/MemoryGalleryScreen')}
+          onPress={() => router.push('/Screens/MemoryGalleryScreen')}
           android_ripple={{ color: '#e6f7ef' }}
         >
           <Feather name="image" size={18} color="#ffffff" />

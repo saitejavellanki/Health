@@ -250,7 +250,7 @@ const MemoryGalleryScreen = () => {
       </Text>
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => router.push('/onboarding/calorie-tracker')}
+        onPress={() => router.push('/Screens/CalorieTrackerScreen')}
       >
         <Feather name="camera" size={16} color="#ffffff" style={{ marginRight: 8 }} />
         <Text style={styles.addButtonText}>Track a Meal</Text>
@@ -272,7 +272,7 @@ const MemoryGalleryScreen = () => {
         
         <TouchableOpacity
           style={styles.cameraButton}
-          onPress={() => router.push('/(onboarding)/CalorieTrackerScreen')}
+          onPress={() => router.push('/Screens/CalorieTrackerScreen')}
         >
           <Feather name="camera" size={20} color="#ffffff" />
         </TouchableOpacity>

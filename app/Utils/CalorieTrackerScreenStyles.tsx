@@ -240,14 +240,15 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   nutritionGrid: {
-    flexDirection: 'row',
+    flexDirection: 'column',  // Change from 'row' to 'column'
     marginBottom: 30,
-    justifyContent: 'flex-start',
+    alignItems: 'flex-start',  // Replace justifyContent with alignItems
   },
   nutritionItem: {
-    alignItems: 'center',
-    marginRight: 40,
-    paddingVertical: 10,
+    flexDirection: 'row',     // Make each item a row
+    alignItems: 'center',     // Center items vertically
+    marginBottom: 16,         // Add space between rows (instead of marginRight)
+    width: '100%',            // Make each row take full width
   },
   nutritionIconCircle: {
     width: 44,
@@ -256,14 +257,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(34, 197, 94, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginRight: 16,          // Add margin right instead of marginBottom
+    marginBottom: 0,          // Remove bottom margin
   },
   nutritionValue: {
-    fontSize: 30,
+    fontSize: 22,             // Consider reducing from 30 for better fit in a row
     fontWeight: '700',
     color: '#ffffff',
-    marginTop: 4,
-    marginBottom: 2,
+    marginRight: 8,           // Add right margin
+    marginTop: 0,             // Remove top margin
+    marginBottom: 0,          // Remove bottom margin
   },
   nutritionUnit: {
     fontSize: 16,
@@ -271,9 +274,10 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
   },
   nutritionLabel: {
-    fontSize: 14,
+    fontSize: 16,             // Increase from 14 for better visibility
     color: '#9ca3af',
-    marginTop: 4,
+    marginTop: 0,             // Remove top margin
+    marginLeft: 'auto',       // Optional: pushes the label to the right side
   },
   loadingContainer: {
     justifyContent: 'center',

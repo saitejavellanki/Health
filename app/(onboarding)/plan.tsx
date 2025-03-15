@@ -9,6 +9,8 @@ import {
   Alert,
   SafeAreaView,
   Dimensions,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import {
   RefreshCw,
@@ -743,6 +745,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f7f9fc',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
