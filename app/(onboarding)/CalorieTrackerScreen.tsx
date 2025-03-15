@@ -42,11 +42,13 @@ export default function CalorieTrackerScreen() {
   const [result, setResult] = useState(null);
   const [calories, setCalories] = useState(null);
   const [protein, setProtein] = useState(null);
-  const [fat, setFat] = useState(null); // New state for fat grams
+  const [fat, setFat] = useState(null);
+  const [carbohydrates, setCarbohydrates] = useState(null); // New state for carbs
+  const [sugars, setSugars] = useState(null); // New state for sugars
   const [foodName, setFoodName] = useState('');
   const [loggedMeal, setLoggedMeal] = useState(false);
   const [showTickAnimation, setShowTickAnimation] = useState(false);
-  const [isJunkFood, setIsJunkFood] = useState(0); // State for junk food status
+  const [isJunkFood, setIsJunkFood] = useState(0);
   const cameraRef = useRef(null);
 
   // Animation values
@@ -154,11 +156,13 @@ export default function CalorieTrackerScreen() {
         setResult(null);
         setCalories(null);
         setProtein(null);
-        setFat(null); // Reset fat value
+        setFat(null);
+        setCarbohydrates(null); // Reset carbs value
+        setSugars(null); // Reset sugars value
         setFoodName('');
         setLoggedMeal(false);
         setShowTickAnimation(false);
-        setIsJunkFood(0); // Reset junk food value
+        setIsJunkFood(0);
         // Reset animation values
         fadeAnim.setValue(0);
         slideAnim.setValue(50);
@@ -185,13 +189,13 @@ export default function CalorieTrackerScreen() {
       // Extract just the base64 data without the prefix
       const base64Data = base64Image.split(',')[1];
 
-      // Prepare request for Gemini - Updated to include junk food assessment
+      // Prepare request for Gemini - Updated to include carbs and sugars
       const requestBody = {
         contents: [
           {
             parts: [
               {
-                text: 'This is an image of food. Analyze this image and tell me what food items are in it. I need to know: 1) The name of the dish or food items, 2) The total estimated calories, 3) The estimated grams of protein, 4) The estimated grams of fat, and 5) Whether this is considered junk food (yes or no). Format your response in plain text with only these details.',
+                text: 'This is an image of food. Analyze this image and tell me what food items are in it. I need to know: 1) The name of the dish or food items, 2) The total estimated calories, 3) The estimated grams of protein, 4) The estimated grams of fat, 5) The estimated grams of carbohydrates, 6) The estimated grams of sugar, and 7) Whether this is considered junk food (yes or no). Format your response in plain text with only these details.',
               },
               {
                 inline_data: {
@@ -226,72 +230,54 @@ export default function CalorieTrackerScreen() {
         setResult(textResponse);
 
         // Extract food name
-        const foodNameMatch = textResponse.match(
-          /(?:food item|dish|food)(?:s)?(?:\s*):(?:\s*)([^\n.]+)/i
-        );
-        if (foodNameMatch && foodNameMatch[1]) {
-          setFoodName(foodNameMatch[1].trim());
-        }
+        // Extract food name
+const foodNameMatch = textResponse.match(/(?:1\))(?:\s*)([^\n.]+)/i);
+if (foodNameMatch && foodNameMatch[1]) {
+  setFoodName(foodNameMatch[1].trim());
+}
 
-        // Extract calories, protein, and fat from response
-        const calorieMatch = textResponse.match(
-          /(\d+)(?:\s*)(?:to|-)(?:\s*)(\d+)(?:\s*)calories|(\d+)(?:\s*)calories/i
-        );
-        const proteinMatch = textResponse.match(
-          /(\d+)(?:\s*)(?:to|-)(?:\s*)(\d+)(?:\s*)(?:g|grams)(?:\s*)(?:of)?(?:\s*)protein|(\d+)(?:\s*)(?:g|grams)(?:\s*)(?:of)?(?:\s*)protein/i
-        );
-        const fatMatch = textResponse.match(
-          /(\d+)(?:\s*)(?:to|-)(?:\s*)(\d+)(?:\s*)(?:g|grams)(?:\s*)(?:of)?(?:\s*)fat|(\d+)(?:\s*)(?:g|grams)(?:\s*)(?:of)?(?:\s*)fat/i
-        );
+// Extract calories from a format like "2) 400 calories"
+const calorieMatch = textResponse.match(/(?:2\))(?:\s*)(\d+)(?:\s*)calories/i);
+if (calorieMatch && calorieMatch[1]) {
+  setCalories(calorieMatch[1]);
+}
 
-        // Check for junk food classification in the response
-        const junkFoodMatch = textResponse.match(
-          /junk food(?:\s*):(?:\s*)(\w+)/i
-        );
-        if (junkFoodMatch && junkFoodMatch[1]) {
-          // Set to 1 if AI responds with "yes", otherwise 0
-          setIsJunkFood(junkFoodMatch[1].toLowerCase() === 'yes' ? 1 : 0);
-        }
+// Extract protein from a format like "3) 30 grams"
+const proteinMatch = textResponse.match(/(?:3\))(?:\s*)(\d+)(?:\s*)(?:g|grams)/i);
+if (proteinMatch && proteinMatch[1]) {
+  setProtein(proteinMatch[1]);
+}
 
-        if (calorieMatch) {
-          if (calorieMatch[3]) {
-            // Single value match
-            setCalories(calorieMatch[3]);
-          } else if (calorieMatch[1] && calorieMatch[2]) {
-            // Range match - take the average
-            const avgCalories = Math.round(
-              (parseInt(calorieMatch[1]) + parseInt(calorieMatch[2])) / 2
-            );
-            setCalories(avgCalories.toString());
-          }
-        }
+// Extract fat from a format like "4) 30 grams"
+const fatMatch = textResponse.match(/(?:4\))(?:\s*)(\d+)(?:\s*)(?:g|grams)/i);
+if (fatMatch && fatMatch[1]) {
+  setFat(fatMatch[1]);
+}
 
-        if (proteinMatch) {
-          if (proteinMatch[3]) {
-            // Single value match
-            setProtein(proteinMatch[3]);
-          } else if (proteinMatch[1] && proteinMatch[2]) {
-            // Range match - take the average
-            const avgProtein = Math.round(
-              (parseInt(proteinMatch[1]) + parseInt(proteinMatch[2])) / 2
-            );
-            setProtein(avgProtein.toString());
-          }
-        }
+// Extract carbohydrates from a format like "5) 5 grams"
+const carbohydrateMatch = textResponse.match(/(?:5\))(?:\s*)(\d+)(?:\s*)(?:g|grams)/i);
+if (carbohydrateMatch && carbohydrateMatch[1]) {
+  setCarbohydrates(carbohydrateMatch[1]);
+}
 
-        // Process fat match
-        if (fatMatch) {
-          if (fatMatch[3]) {
-            // Single value match
-            setFat(fatMatch[3]);
-          } else if (fatMatch[1] && fatMatch[2]) {
-            // Range match - take the average
-            const avgFat = Math.round(
-              (parseInt(fatMatch[1]) + parseInt(fatMatch[2])) / 2
-            );
-            setFat(avgFat.toString());
-          }
-        }
+// Extract sugars from a format like "6) 2 grams"
+const sugarMatch = textResponse.match(/(?:6\))(?:\s*)(\d+)(?:\s*)(?:g|grams)/i);
+if (sugarMatch && sugarMatch[1]) {
+  setSugars(sugarMatch[1]);
+}
+
+// Check for junk food classification (7) yes/no)
+const junkFoodMatch = textResponse.match(/(?:7\))(?:\s*)(\w+)/i);
+if (junkFoodMatch && junkFoodMatch[1]) {
+  setIsJunkFood(junkFoodMatch[1].toLowerCase() === 'yes' ? 1 : 0);
+}
+
+        console.log('Extracted values:');
+console.log('Calories:', calories);
+console.log('Protein:', protein);
+console.log('Fat:', fat);
+console.log('Carbohydrates:', carbohydrates);
+console.log('Sugars:', sugars);
 
         console.log('Analysis result:', textResponse);
       } else {
@@ -316,7 +302,7 @@ export default function CalorieTrackerScreen() {
     });
   };
 
-  // Modified function to log the meal with junk flag from AI response
+  // Modified function to log the meal with carbs and sugars
   const logMealToFirebase = async () => {
     try {
       const auth = getAuth();
@@ -328,13 +314,15 @@ export default function CalorieTrackerScreen() {
         return;
       }
 
-      // Create meal object with junk flag from AI
+      // Create meal object with carbs and sugars
       const mealData = {
         userId: userId,
         foodName: foodName || 'Unknown food',
         calories: parseInt(calories) || 0,
         protein: protein ? parseInt(protein) : 0,
         fat: fat ? parseInt(fat) : 0,
+        carbohydrates: carbohydrates ? parseInt(carbohydrates) : 0,
+        sugars: sugars ? parseInt(sugars) : 0,
         junk: isJunkFood,
         image: image,
         timestamp: serverTimestamp(),
@@ -371,7 +359,7 @@ export default function CalorieTrackerScreen() {
             lastStreakDate.setHours(0, 0, 0, 0);
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
-
+            
             if (lastStreakDate.getTime() === yesterday.getTime()) {
               // Last streak was yesterday, continue the streak
               // But only increment if this is their first log of today
@@ -405,6 +393,8 @@ export default function CalorieTrackerScreen() {
         totalCalories: increment(parseInt(calories) || 0),
         totalProtein: increment(protein ? parseInt(protein) : 0),
         totalFat: increment(fat ? parseInt(fat) : 0),
+        totalCarbohydrates: increment(carbohydrates ? parseInt(carbohydrates) : 0),
+        totalSugars: increment(sugars ? parseInt(sugars) : 0),
         lastUpdated: serverTimestamp(),
         lastTrackingDate: today,
         mealsTrackedToday: mealsTrackedToday,
@@ -439,8 +429,8 @@ export default function CalorieTrackerScreen() {
 
       {!image ? (
         <View style={styles.cameraContainer}>
-          {/* Header - Changed from NutriLens to Powered by Gemini */}
-          <View style={styles.cameraHeader}>
+                    {/* Header - Changed from NutriLens to Powered by Gemini */}
+                    <View style={styles.cameraHeader}>
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle}>
                 Crunch<Text style={styles.redX}>X</Text>
@@ -562,57 +552,86 @@ export default function CalorieTrackerScreen() {
                   </View>
                 )}
 
-                <View style={styles.nutritionGrid}>
-                  <Animated.View
-                    style={[
-                      styles.nutritionItem,
-                      { transform: [{ scale: nutritionScaleAnim }] },
-                    ]}
-                  >
-                    <View style={styles.nutritionIconCircle}>
-                      <Feather name="zap" size={20} color="#22c55e" />
-                    </View>
-                    <Text style={styles.nutritionValue}>{calories}</Text>
-                    <Text style={styles.nutritionLabel}>calories</Text>
-                  </Animated.View>
+<View style={styles.nutritionGrid}>
+  <Animated.View
+    style={[
+      styles.nutritionItem,
+      { transform: [{ scale: nutritionScaleAnim }] },
+    ]}
+  >
+    <View style={styles.nutritionIconCircle}>
+      <Feather name="zap" size={20} color="#22c55e" />
+    </View>
+    <Text style={styles.nutritionValue}>{calories || "0"}</Text>
+    <Text style={styles.nutritionLabel}>calories</Text>
+  </Animated.View>
 
-                  {protein && (
-                    <Animated.View
-                      style={[
-                        styles.nutritionItem,
-                        { transform: [{ scale: nutritionScaleAnim }] },
-                      ]}
-                    >
-                      <View style={styles.nutritionIconCircle}>
-                        <Feather name="activity" size={20} color="#22c55e" />
-                      </View>
-                      <Text style={styles.nutritionValue}>
-                        {protein}
-                        <Text style={styles.nutritionUnit}>g</Text>
-                      </Text>
-                      <Text style={styles.nutritionLabel}>protein</Text>
-                    </Animated.View>
-                  )}
+  <Animated.View
+    style={[
+      styles.nutritionItem,
+      { transform: [{ scale: nutritionScaleAnim }] },
+    ]}
+  >
+    <View style={styles.nutritionIconCircle}>
+      <Feather name="activity" size={20} color="#22c55e" />
+    </View>
+    <Text style={styles.nutritionValue}>
+      {protein || "0"}
+      <Text style={styles.nutritionUnit}>g</Text>
+    </Text>
+    <Text style={styles.nutritionLabel}>protein</Text>
+  </Animated.View>
 
-                  {/* New fat display card */}
-                  {fat && (
-                    <Animated.View
-                      style={[
-                        styles.nutritionItem,
-                        { transform: [{ scale: nutritionScaleAnim }] },
-                      ]}
-                    >
-                      <View style={styles.nutritionIconCircle}>
-                        <Feather name="droplet" size={20} color="#22c55e" />
-                      </View>
-                      <Text style={styles.nutritionValue}>
-                        {fat}
-                        <Text style={styles.nutritionUnit}>g</Text>
-                      </Text>
-                      <Text style={styles.nutritionLabel}>fat</Text>
-                    </Animated.View>
-                  )}
-                </View>
+  <Animated.View
+    style={[
+      styles.nutritionItem,
+      { transform: [{ scale: nutritionScaleAnim }] },
+    ]}
+  >
+    <View style={styles.nutritionIconCircle}>
+      <Feather name="droplet" size={20} color="#22c55e" />
+    </View>
+    <Text style={styles.nutritionValue}>
+      {fat || "0"}
+      <Text style={styles.nutritionUnit}>g</Text>
+    </Text>
+    <Text style={styles.nutritionLabel}>fat</Text>
+  </Animated.View>
+  
+  <Animated.View
+    style={[
+      styles.nutritionItem,
+      { transform: [{ scale: nutritionScaleAnim }] },
+    ]}
+  >
+    <View style={styles.nutritionIconCircle}>
+      <Feather name="cube" size={20} color="#22c55e" />
+    </View>
+    <Text style={styles.nutritionValue}>
+      {carbohydrates || "0"}
+      <Text style={styles.nutritionUnit}>g</Text>
+    </Text>
+    <Text style={styles.nutritionLabel}>carbs</Text>
+  </Animated.View>
+  
+  <Animated.View
+    style={[
+      styles.nutritionItem,
+      { transform: [{ scale: nutritionScaleAnim }] },
+    ]}
+  >
+    <View style={styles.nutritionIconCircle}>
+      <Feather name="coffee" size={20} color="#22c55e" />
+    </View>
+    <Text style={styles.nutritionValue}>
+      {sugars || "0"}
+      <Text style={styles.nutritionUnit}>g</Text>
+    </Text>
+    <Text style={styles.nutritionLabel}>sugar</Text>
+  </Animated.View>
+</View>
+
+
 
                 {!loggedMeal ? (
                   <TouchableOpacity

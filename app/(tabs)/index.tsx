@@ -34,6 +34,7 @@ export default function Home() {
     calories: 0,
     protein: 0,
     fat: 0,
+    carbohydrates: 0
   });
   const [targetCalories, setTargetCalories] = useState(2000); // Default value
   const [calorieProgress, setCalorieProgress] = useState(0);
@@ -297,18 +298,21 @@ export default function Home() {
       let totalCalories = 0;
       let totalProtein = 0;
       let totalFat = 0;
+      let totalCarbs = 0;
 
       querySnapshot.forEach((doc) => {
         const mealData = doc.data();
         totalCalories += mealData.calories || 0;
         totalProtein += mealData.protein || 0;
         totalFat += mealData.fat || 0;
+        totalCarbs += mealData.carbohydrates || 0;
       });
 
       setNutritionData({
         calories: totalCalories,
         protein: totalProtein,
         fat: totalFat,
+        carbohydrates: totalCarbs
       });
 
       // Calculate progress percentage
@@ -410,6 +414,7 @@ export default function Home() {
         calories: nutritionData.calories.toString(),
         protein: nutritionData.protein.toString(),
         fat: nutritionData.fat.toString(),
+        carbohydrates: nutritionData.carbohydrates.toString(),  // Add this line
         targetCalories: targetCalories.toString(),
       },
     });
@@ -506,30 +511,35 @@ export default function Home() {
       )}
 
       {/* Nutrition Stats */}
-      <Pressable
-        style={[
-          styles.statsContainer,
-          nutritionOnlyMode && styles.statsContainerExpanded,
-        ]}
-        onPress={navigateToTracker}
-        android_ripple={{ color: '#f3f4f6' }}
-      >
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Calories</Text>
-          <Text style={styles.statValue}>
-            {nutritionData.calories}{' '}
-            <Text style={styles.statTarget}>/ {targetCalories}</Text>
-          </Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Protein</Text>
-          <Text style={styles.statValue}>{nutritionData.protein}g</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Fat</Text>
-          <Text style={styles.statValue}>{nutritionData.fat}g</Text>
-        </View>
-      </Pressable>
+      {/* Nutrition Stats */}
+<Pressable
+  style={[
+    styles.statsContainer,
+    nutritionOnlyMode && styles.statsContainerExpanded,
+  ]}
+  onPress={navigateToTracker}
+  android_ripple={{ color: '#f3f4f6' }}
+>
+  <View style={styles.statCard}>
+    <Text style={styles.statLabel}>Calories</Text>
+    <Text style={styles.statValue}>
+      {nutritionData.calories}{' '}
+      <Text style={styles.statTarget}>/ {targetCalories}</Text>
+    </Text>
+  </View>
+  <View style={styles.statCard}>
+    <Text style={styles.statLabel}>Protein</Text>
+    <Text style={styles.statValue}>{nutritionData.protein}g</Text>
+  </View>
+  <View style={styles.statCard}>
+    <Text style={styles.statLabel}>Fat</Text>
+    <Text style={styles.statValue}>{nutritionData.fat}g</Text>
+  </View>
+  <View style={styles.statCard}>
+    <Text style={styles.statLabel}>Carbs</Text>
+    <Text style={styles.statValue}>{nutritionData.carbohydrates}g</Text>
+  </View>
+</Pressable>
 
       {/* Track Button */}
       <View style={styles.trackButtonContainer}>
