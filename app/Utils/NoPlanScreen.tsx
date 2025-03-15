@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-const NoPlanScreen = () => {
+const NoPlanScreen = ({ onToggleNutritionMode }) => {
   const router = useRouter();
 
   const handleStartOnboarding = () => {
@@ -15,11 +15,29 @@ const NoPlanScreen = () => {
     router.push('/(tabs)/subscription');
   };
 
+  // Function to handle the toggle
+  const handleToggleNutritionMode = () => {
+    if (onToggleNutritionMode) {
+      onToggleNutritionMode();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
+        {/* Updated header with logo and toggle side by side */}
         <View style={styles.headerContainer}>
           <Text style={styles.logoText}>Crunch<Text style={styles.logoAccent}>X</Text></Text>
+          
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>Nutrition-only Mode</Text>
+            <Switch
+              onValueChange={handleToggleNutritionMode}
+              value={false}
+              trackColor={{ false: '#e5e7eb', true: '#dcfce7' }}
+              thumbColor={'#9ca3af'}
+            />
+          </View>
         </View>
         
         <View style={styles.contentContainer}>
@@ -88,18 +106,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerContainer: {
+    flexDirection: 'row',
     width: '100%',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 20,
+    paddingVertical: 8,
   },
   logoText: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
     color: '#2d3748',
   },
   logoAccent: {
     color: '#e53e3e',
     fontWeight: '900',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  toggleLabel: {
+    fontSize: 14,
+    color: '#4b5563',
+    marginRight: 8,
   },
   contentContainer: {
     alignItems: 'center',

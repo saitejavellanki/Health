@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,10 +14,11 @@ import {
   StatusBar,
 } from 'react-native';
 import { Settings, Bell, Heart, CircleHelp, LogOut, Camera, RefreshCw } from 'lucide-react-native';
-import { collection, doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import { db } from '../../components/firebase/Firebase'; 
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { BarChart } from 'react-native-chart-kit';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -33,42 +34,120 @@ interface UserData {
   dateJoined: string;
 }
 
+interface NutritionData {
+  date: string;
+  protein: number;
+  carbs: number;
+  calories: number;
+}
+
 const ProfileScreen: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [nutritionData, setNutritionData] = useState<NutritionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profileImageKey, setProfileImageKey] = useState(Date.now()); // Add a key to force image refresh
+  const [activeNutrient, setActiveNutrient] = useState<'protein' | 'carbs' | 'calories'>('calories');
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const auth = getAuth();
-        const currentUser = auth.currentUser;
-        
-        if (!currentUser) {
-          setError('User not authenticated');
-          setLoading(false);
-          return;
-        }
-
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (userDoc.exists()) {
-          const data = userDoc.data() as UserData;
-          setUserData(data);
-        } else {
-          setError('User data not found');
-        }
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-        setError('Error loading user data');
-      } finally {
+  const fetchUserData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        setError('User not authenticated');
         setLoading(false);
+        return;
       }
-    };
 
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const data = userDoc.data() as UserData;
+        setUserData(data);
+        // Reset the profile image key to force a refresh
+        setProfileImageKey(Date.now());
+        
+        // After successful user data fetch, get nutrition data
+        await fetchNutritionData(currentUser.uid);
+      } else {
+        setError('User data not found');
+      }
+    } catch (err) {
+      console.error('Error fetching user data:', err);
+      setError('Error loading user data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  const fetchNutritionData = async (userId: string) => {
+    try {
+      // Get data for the last 7 days
+      const today = new Date();
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(today.getDate() - 6); // Get 7 days including today
+      
+      const mealsQuery = query(
+        collection(db, 'meals'),
+        where('userId', '==', userId),
+        where('timestamp', '>=', sevenDaysAgo),
+        orderBy('timestamp', 'asc')
+      );
+      
+      const mealsSnapshot = await getDocs(mealsQuery);
+      
+      // Process meal data by date
+      const mealsByDate: { [date: string]: { protein: number, carbs: number, calories: number } } = {};
+      
+      mealsSnapshot.forEach((doc) => {
+        const mealData = doc.data();
+        const mealDate = new Date(mealData.timestamp.toDate()).toISOString().split('T')[0];
+        
+        if (!mealsByDate[mealDate]) {
+          mealsByDate[mealDate] = { protein: 0, carbs: 0, calories: 0 };
+        }
+        
+        mealsByDate[mealDate].protein += mealData.protein || 0;
+        mealsByDate[mealDate].carbs += mealData.carbs || 0;
+        mealsByDate[mealDate].calories += mealData.calories || 0;
+      });
+      
+      // Create an array of the last 7 days
+      const last7Days: NutritionData[] = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(today.getDate() - (6 - i));
+        const dateString = date.toISOString().split('T')[0];
+        const dayData = mealsByDate[dateString] || { protein: 0, carbs: 0, calories: 0 };
+        
+        last7Days.push({
+          date: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()],
+          protein: dayData.protein,
+          carbs: dayData.carbs,
+          calories: dayData.calories
+        });
+      }
+      
+      setNutritionData(last7Days);
+    } catch (err) {
+      console.error('Error fetching nutrition data:', err);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
     fetchUserData();
   }, []);
+  
+  // Refetch when screen comes into focus (when navigating back)
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserData();
+    }, [fetchUserData])
+  );
 
   const navigateToSettings = () => {
     // Navigate to settings screen with userData as params
@@ -94,6 +173,27 @@ const ProfileScreen: React.FC = () => {
       Alert.alert('Error', 'Failed to sign out. Please try again.');
     }
   };
+  
+  const getNutrientColor = (nutrient: string) => {
+    switch (nutrient) {
+      case 'protein': return '#22c55e'; // Green for protein
+      case 'carbs': return '#3b82f6'; // Blue for carbs
+      case 'calories': return '#ef4444'; // Red for calories
+      default: return '#22c55e';
+    }
+  };
+  
+  const getActiveTabStyle = (nutrient: 'protein' | 'carbs' | 'calories') => {
+    return activeNutrient === nutrient ? 
+      { ...styles.nutrientTab, backgroundColor: getNutrientColor(nutrient) } : 
+      styles.nutrientTab;
+  };
+  
+  const getActiveTextStyle = (nutrient: 'protein' | 'carbs' | 'calories') => {
+    return activeNutrient === nutrient ? 
+      { ...styles.nutrientText, color: '#FFFFFF' } : 
+      styles.nutrientText;
+  };
 
   // If loading, show a loading indicator
   if (loading) {
@@ -117,13 +217,6 @@ const ProfileScreen: React.FC = () => {
     );
   }
 
-  // Dummy progress data for engagement features - calculate these values based on userData
-  const weightProgress =
-    ((userData.weight - userData.targetWeight) / 5) * 100;
-  
-  // These could potentially come from Firebase as well in a future implementation
-  const weeklyActivity = [5, 3, 6, 4, 7, 5, 6]; // Days active
-
   return (
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -132,7 +225,11 @@ const ProfileScreen: React.FC = () => {
         <View style={styles.profileHeaderContainer}>
           <View style={styles.coverImageContainer}>
             <Image
-              source={{ uri: userData.profileImage || 'https://randomuser.me/api/portraits/men/32.jpg' }}
+              key={profileImageKey} // Add key to force refresh when changed
+              source={{ 
+                uri: userData.profileImage || 'https://randomuser.me/api/portraits/men/32.jpg',
+                cache: 'reload' // Force image cache to reload
+              }}
               style={styles.coverImage}
               resizeMode="cover"
             />
@@ -170,42 +267,101 @@ const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Progress Section */}
+        {/* Nutrition Intake Section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Weight Progress</Text>
-            <Text style={styles.progressPercentage}>
-              {Math.round(weightProgress)}% to goal
-            </Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFill, { width: `${weightProgress}%` }]}
-            />
-          </View>
-          <View style={styles.weightStats}>
-            <Text style={styles.weightStat}>
-              Current: {userData.weight}kg
-            </Text>
-            <Text style={styles.weightStat}>
-              Target: {userData.targetWeight}kg
-            </Text>
-          </View>
-        </View>
-
-        {/* Weekly Activity */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Weekly Activity</Text>
-          <View style={styles.weekGrid}>
-            {weeklyActivity.map((days, index) => (
-              <View key={index} style={styles.dayPill}>
-                <Text style={styles.dayText}>
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'][index]}
-                </Text>
-                <View style={[styles.activityDot, { opacity: days / 7 }]} />
+          <Text style={styles.sectionTitle}>Nutrition Intake (Last 7 Days)</Text>
+          
+          {nutritionData.length > 0 ? (
+            <>
+              {/* Nutrient Selector Tabs */}
+              <View style={styles.nutrientTabsContainer}>
+                <TouchableOpacity 
+                  style={getActiveTabStyle('calories')}
+                  onPress={() => setActiveNutrient('calories')}
+                >
+                  <Text style={getActiveTextStyle('calories')}>Calories</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={getActiveTabStyle('protein')}
+                  onPress={() => setActiveNutrient('protein')}
+                >
+                  <Text style={getActiveTextStyle('protein')}>Protein</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={getActiveTabStyle('carbs')}
+                  onPress={() => setActiveNutrient('carbs')}
+                >
+                  <Text style={getActiveTextStyle('carbs')}>Carbs</Text>
+                </TouchableOpacity>
               </View>
-            ))}
-          </View>
+              
+              {/* Bar Chart for selected nutrient */}
+              <View style={styles.chartContainer}>
+                <BarChart
+                  data={{
+                    labels: nutritionData.map(day => day.date),
+                    datasets: [
+                      {
+                        data: activeNutrient === 'calories' 
+                          ? nutritionData.map(day => day.calories)
+                          : activeNutrient === 'protein'
+                            ? nutritionData.map(day => day.protein)
+                            : nutritionData.map(day => day.carbs)
+                      }
+                    ]
+                  }}
+                  width={screenWidth - 32}
+                  height={220}
+                  yAxisLabel={activeNutrient === 'calories' ? '' : ''}
+                  yAxisSuffix={activeNutrient === 'calories' ? ' cal' : 'g'}
+                  chartConfig={{
+                    backgroundColor: '#FFFFFF',
+                    backgroundGradientFrom: '#FFFFFF',
+                    backgroundGradientTo: '#FFFFFF',
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => getNutrientColor(activeNutrient),
+                    labelColor: (opacity = 1) => '#333333',
+                    barPercentage: 0.7,
+                    style: {
+                      borderRadius: 16
+                    }
+                  }}
+                  style={styles.chart}
+                  fromZero
+                  showValuesOnTopOfBars
+                />
+              </View>
+              
+              {/* Summary Cards */}
+              <View style={styles.summaryCardsContainer}>
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryLabel}>Avg. Calories</Text>
+                  <Text style={[styles.summaryValue, { color: '#ef4444' }]}>
+                    {Math.round(nutritionData.reduce((sum, day) => sum + day.calories, 0) / nutritionData.length)}
+                  </Text>
+                </View>
+                
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryLabel}>Avg. Protein</Text>
+                  <Text style={[styles.summaryValue, { color: '#22c55e' }]}>
+                    {Math.round(nutritionData.reduce((sum, day) => sum + day.protein, 0) / nutritionData.length)}g
+                  </Text>
+                </View>
+                
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryLabel}>Avg. Carbs</Text>
+                  <Text style={[styles.summaryValue, { color: '#3b82f6' }]}>
+                    {Math.round(nutritionData.reduce((sum, day) => sum + day.carbs, 0) / nutritionData.length)}g
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataText}>No nutrition data available</Text>
+              <Text style={styles.noDataSubtext}>Start tracking your meals to see stats here</Text>
+            </View>
+          )}
         </View>
 
         {/* Regenerate Plan Button */}
@@ -225,217 +381,267 @@ const ProfileScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  scrollView: {
-    backgroundColor: '#ffffff',
-  },
-  scrollContent: {
-    paddingBottom: 30,
-  },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileHeaderContainer: {
-    marginBottom: 16,
-  },
-  coverImageContainer: {
-    height: 320,
-    width: '100%',
-    position: 'relative',
-    marginTop: -StatusBar.currentHeight || 0,
-  },
-  coverImage: {
-    height: '100%',
-    width: '100%',
-  },
-  profileInfoOverlay: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-  },
-  nameOverlay: {
-    fontSize: 28,
-    fontFamily: 'Inter-Bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  emailOverlay: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  settingsButton: {
-    position: 'absolute',
-    top: 50,
-    right: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  streakContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 2,
-    marginHorizontal: 16,
-    marginTop: -10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  divider: {
-    width: 1,
-    height: '70%',
-    backgroundColor: '#ddd',
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  streakValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  flameIcon: {
-    fontSize: 20,
-    marginLeft: 4,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#2D2D2D',
-  },
-  progressPercentage: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#999999',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#EEE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#22c55e',
-    borderRadius: 4,
-  },
-  weightStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  weightStat: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#999999',
-  },
-  weekGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  dayPill: {
-    alignItems: 'center',
-  },
-  dayText: {
-    fontFamily: 'Inter-Medium',
-    color: '#2D2D2D',
-    marginBottom: 4,
-  },
-  activityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22c55e',
-  },
-  regenerateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: '#f0fdf4',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-  },
-  regenerateText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#22c55e',
-    marginLeft: 8,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: '#fef2f2',
-    marginHorizontal: 16,
-    marginBottom: 24,
-    borderRadius: 12,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#ef4444',
-    marginLeft: 8,
-  },
+    container: {
+      flex: 1,
+      backgroundColor: '#ffffff',
+    },
+    scrollContent: {
+      paddingBottom: 30,
+    },
+    loadingContainer: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    profileHeaderContainer: {
+      marginBottom: 16,
+    },
+    coverImageContainer: {
+      height: 320,
+      width: '100%',
+      position: 'relative',
+      marginTop: -StatusBar.currentHeight || 0,
+    },
+    coverImage: {
+      height: '100%',
+      width: '100%',
+    },
+    profileInfoOverlay: {
+      position: 'absolute',
+      bottom: 20,
+      left: 20,
+    },
+    nameOverlay: {
+      fontSize: 28,
+      fontFamily: 'Inter-Bold',
+      color: '#FFFFFF',
+      marginBottom: 4,
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 3,
+    },
+    emailOverlay: {
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+      color: '#FFFFFF',
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 3,
+    },
+    settingsButton: {
+      position: 'absolute',
+      top: 50,
+      right: 12,
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 5,
+    },
+    streakContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#FFFFFF',
+      padding: 16,
+      borderRadius: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 15,
+      elevation: 5,
+      marginHorizontal: 16,
+      marginTop: -30,
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    divider: {
+      width: 1,
+      height: 40,
+      backgroundColor: '#E1E1E1',
+    },
+    streakValueContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statValue: {
+      fontSize: 22,
+      fontFamily: 'Inter-Bold',
+      color: '#333333',
+    },
+    statLabel: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: '#666666',
+      marginTop: 4,
+    },
+    flameIcon: {
+      fontSize: 20,
+      marginLeft: 4,
+    },
+    section: {
+      padding: 16,
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontFamily: 'Inter-SemiBold',
+      color: '#333333',
+      marginBottom: 16,
+    },
+    chartContainer: {
+      marginVertical: 8,
+      alignItems: 'center',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 16,
+      padding: 8,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    chart: {
+      borderRadius: 16,
+      marginVertical: 8,
+    },
+    // Styles for Bar Chart version
+    nutrientTabsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    nutrientTab: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      marginHorizontal: 4,
+      borderRadius: 8,
+      backgroundColor: '#F3F4F6',
+    },
+    nutrientText: {
+      fontSize: 14,
+      fontFamily: 'Inter-Medium',
+      color: '#333333',
+    },
+    summaryCardsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 16,
+    },
+    summaryCard: {
+      flex: 1,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      padding: 12,
+      marginHorizontal: 4,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 5,
+      elevation: 1,
+    },
+    summaryLabel: {
+      fontSize: 12,
+      fontFamily: 'Inter-Regular',
+      color: '#666666',
+      marginBottom: 4,
+    },
+    summaryValue: {
+      fontSize: 16,
+      fontFamily: 'Inter-Bold',
+    },
+    // Styles for Line Chart version
+    legendContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginTop: 8,
+      flexWrap: 'wrap',
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginRight: 16,
+      marginBottom: 8,
+    },
+    legendDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      marginRight: 6,
+    },
+    legendText: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: '#333333',
+    },
+    noDataContainer: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 16,
+      padding: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 150,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    noDataText: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+      color: '#666666',
+      marginBottom: 8,
+    },
+    noDataSubtext: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: '#888888',
+      textAlign: 'center',
+    },
+    regenerateButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#ECFDF5',
+      marginHorizontal: 16,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 16,
+    },
+    regenerateText: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+      color: '#22c55e',
+      marginLeft: 8,
+    },
+    logoutButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#FEF2F2',
+      marginHorizontal: 16,
+      padding: 16,
+      borderRadius: 12,
+    },
+    logoutText: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+      color: '#ef4444',
+      marginLeft: 8,
+    }
 });
 
 export default ProfileScreen;

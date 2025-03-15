@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
@@ -9,11 +9,12 @@ const StreakComp = () => {
   // State to store the streak value
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
 
   // Animation values
   const flameSize = useRef(new Animated.Value(1.5)).current;
-const flamePosition = useRef(new Animated.Value(0)).current;
-const flameOpacity = useRef(new Animated.Value(0.85)).current;
+  const flamePosition = useRef(new Animated.Value(0)).current;
+  const flameOpacity = useRef(new Animated.Value(0.85)).current;
   
   // Fetch streak data from Firebase on component mount
   useEffect(() => {
@@ -148,7 +149,15 @@ const flameOpacity = useRef(new Animated.Value(0.85)).current;
         end={{ x: 0.5, y: 1 }}
       >
         <View style={styles.streakInfo}>
-          <Text style={styles.streakLabel}>STREAK</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.streakLabel}>STREAK</Text>
+            <TouchableOpacity 
+              style={styles.infoButton}
+              onPress={() => setInfoModalVisible(true)}
+            >
+              <MaterialCommunityIcons name="information-outline" size={18} color="#FF7043" />
+            </TouchableOpacity>
+          </View>
           <View style={styles.streakValueContainer}>
             <Text style={styles.streakValue}>{streak}</Text>
             <Text style={styles.streakUnit}>days</Text>
@@ -195,6 +204,66 @@ const flameOpacity = useRef(new Animated.Value(0.85)).current;
           )}
         </View>
       </LinearGradient>
+
+      {/* Info Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={infoModalVisible}
+        onRequestClose={() => setInfoModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Maintain Your Streak</Text>
+              <TouchableOpacity onPress={() => setInfoModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#FF5722" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.infoSection}>
+                <MaterialCommunityIcons name="scan-helper" size={28} color="#FF5722" />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoTitle}>Scan Daily</Text>
+                  <Text style={styles.infoText}>Use the scanner to log at least one meal every day to maintain your streak.</Text>
+                </View>
+              </View>
+              
+              <View style={styles.infoSection}>
+                <MaterialCommunityIcons name="food-apple" size={28} color="#FF5722" />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoTitle}>Analyze Your Meals</Text>
+                  <Text style={styles.infoText}>Review your nutrition insights after scanning to get the most from each entry.</Text>
+                </View>
+              </View>
+              
+              <View style={styles.infoSection}>
+                <MaterialCommunityIcons name="bell-ring" size={28} color="#FF5722" />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoTitle}>Set Reminders</Text>
+                  <Text style={styles.infoText}>Enable notifications to remind you to scan meals before your streak resets.</Text>
+                </View>
+              </View>
+              
+              <View style={styles.infoSection}>
+                <MaterialCommunityIcons name="alarm" size={28} color="#FF5722" />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoTitle}>Reset Time</Text>
+                  <Text style={styles.infoText}>Your streak resets at midnight if you haven't scanned any meals that day.</Text>
+                </View>
+              </View>
+            </ScrollView>
+            
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setInfoModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Got It</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -221,11 +290,19 @@ const styles = StyleSheet.create({
   streakInfo: {
     flex: 1,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
   streakLabel: {
     fontSize: 12,
     fontWeight: '600',
     color: '#FF7043',
-    marginBottom: 5,
+  },
+  infoButton: {
+    marginLeft: 8,
+    padding: 2,
   },
   streakValueContainer: {
     flexDirection: 'row',
@@ -273,6 +350,77 @@ const styles = StyleSheet.create({
     color: '#FF7043',
     textAlign: 'center',
     flex: 1,
+  },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    width: '100%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FF5722',
+  },
+  modalBody: {
+    padding: 20,
+    maxHeight: 400,
+  },
+  infoSection: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    alignItems: 'flex-start',
+  },
+  infoTextContainer: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 5,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  closeButton: {
+    backgroundColor: '#FF5722',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    padding: 15,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

@@ -1,18 +1,28 @@
 import { View, Text, ScrollView, Pressable, Alert, Switch } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { useState, useEffect } from 'react';
-import { getFirestore, collection, query, where, getDocs, orderBy, Timestamp, updateDoc, doc } from 'firebase/firestore';
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  Timestamp,
+  updateDoc,
+  doc,
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { router } from 'expo-router';
-import {styles} from '../Utils/HomePageStyles';
+import { styles } from '../Utils/HomePageStyles';
 import StreakComp from '@/components/UserStats/StreakComp';
 import NoPlanScreen from '../Utils/NoPlanScreen';
 import CrunchXLogo from '../Utils/Logo';
 
-
 // API configuration for Gemini
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export default function Home() {
   const [todaysPlan, setTodaysPlan] = useState(null);
@@ -23,7 +33,7 @@ export default function Home() {
   const [nutritionData, setNutritionData] = useState({
     calories: 0,
     protein: 0,
-    fat: 0
+    fat: 0,
   });
   const [targetCalories, setTargetCalories] = useState(2000); // Default value
   const [calorieProgress, setCalorieProgress] = useState(0);
@@ -39,15 +49,19 @@ export default function Home() {
         Goal: ${userData.goal}
         Gender: ${userData.gender || 'Not specified'}
         Age: ${userData.age || 'Not specified'}
-        Weight: ${userData.weight || 'Not specified'} ${userData.weightUnit || 'kg'}
-        Height: ${userData.height || 'Not specified'} ${userData.heightUnit || 'cm'}
+        Weight: ${userData.weight || 'Not specified'} ${
+        userData.weightUnit || 'kg'
+      }
+        Height: ${userData.height || 'Not specified'} ${
+        userData.heightUnit || 'cm'
+      }
         Activity level: ${userData.activityLevel || 'Moderate'}
         
-        Please respond with only a number representing the recommended daily calorie intake.
+        Please respond with only a number representing the recommended daily calorie intake. And also dont add items that include ragi, brown rice, johar.
       `;
-      
-      console.log("Sending request to Gemini API with prompt:", prompt);
-      
+
+      console.log('Sending request to Gemini API with prompt:', prompt);
+
       // Make API call to Gemini
       const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
         method: 'POST',
@@ -57,42 +71,42 @@ export default function Home() {
         body: JSON.stringify({
           contents: [
             {
-              parts: [
-                { text: prompt }
-              ]
-            }
+              parts: [{ text: prompt }],
+            },
           ],
           generationConfig: {
             temperature: 0.2,
             maxOutputTokens: 100,
-          }
-        })
+          },
+        }),
       });
-      
+
       const data = await response.json();
-      console.log("Gemini API response:", data);
-      
+      console.log('Gemini API response:', data);
+
       // Extract the recommended calories from the response
       if (data.candidates && data.candidates[0]?.content?.parts) {
         const responseText = data.candidates[0].content.parts[0].text.trim();
-        console.log("Raw response text:", responseText);
-        
+        console.log('Raw response text:', responseText);
+
         // Try to extract just the number from the response
         const matches = responseText.match(/\b\d{3,4}\b/); // Match 3-4 digit numbers
-        const recommendedCalories = matches ? parseInt(matches[0]) : parseInt(responseText);
-        
-        console.log("Parsed calorie value:", recommendedCalories);
-        
+        const recommendedCalories = matches
+          ? parseInt(matches[0])
+          : parseInt(responseText);
+
+        console.log('Parsed calorie value:', recommendedCalories);
+
         if (!isNaN(recommendedCalories) && recommendedCalories > 0) {
           return recommendedCalories;
         }
       }
-      
+
       // Fallback to default calculation if the API doesn't return a valid number
-      console.log("Falling back to default calorie calculation");
+      console.log('Falling back to default calorie calculation');
       return getDefaultCaloriesForGoal(userData.goal);
     } catch (error) {
-      console.error("Error getting personalized calories:", error);
+      console.error('Error getting personalized calories:', error);
       return getDefaultCaloriesForGoal(userData.goal);
     }
   };
@@ -102,43 +116,48 @@ export default function Home() {
       try {
         const auth = getAuth();
         const currentUser = auth.currentUser;
-        
+  
         if (!currentUser) {
-          console.error("No user is logged in");
+          console.error('No user is logged in');
+          setNutritionOnlyMode(true); // Set nutrition-only mode to true when no user
           setLoading(false);
           return;
         }
-
+  
         // Set user's name if available
         if (currentUser.displayName) {
           setUserName(currentUser.displayName.split(' ')[0]);
         }
-
+  
         const db = getFirestore();
-        const userPlansRef = collection(db, "userplans");
-        const q = query(userPlansRef, where("userId", "==", currentUser.uid));
-        
+        const userPlansRef = collection(db, 'userplans');
+        const q = query(userPlansRef, where('userId', '==', currentUser.uid));
+  
         const querySnapshot = await getDocs(q);
-        
+  
         if (querySnapshot.empty) {
-          console.error("No user plan found for this user");
+          console.error('No user plan found for this user');
+          setNutritionOnlyMode(true); // Set nutrition-only mode to true when no plan found
           setLoading(false);
           return;
         }
-        
+  
         const userPlanDoc = querySnapshot.docs[0];
         const userPlanData = userPlanDoc.data();
-        
+  
         setUserPlanDocId(userPlanDoc.id);
-        setUserGoal(userPlanData.goal || "");
-        
+        setUserGoal(userPlanData.goal || '');
+  
         // Get or set target calories
         if (userPlanData.targetCalories) {
-          console.log("Using existing target calories:", userPlanData.targetCalories);
+          console.log(
+            'Using existing target calories:',
+            userPlanData.targetCalories
+          );
           setTargetCalories(userPlanData.targetCalories);
         } else {
           try {
-            console.log("Getting personalized calorie recommendation");
+            console.log('Getting personalized calorie recommendation');
             // Get personalized calorie recommendation
             const personalizedCalories = await getPersonalizedCalories({
               goal: userPlanData.goal,
@@ -148,73 +167,96 @@ export default function Home() {
               weightUnit: userPlanData.weightUnit,
               height: userPlanData.height,
               heightUnit: userPlanData.heightUnit,
-              activityLevel: userPlanData.activityLevel || 'Moderate'
+              activityLevel: userPlanData.activityLevel || 'Moderate',
             });
-            
-            console.log("Personalized calories recommended:", personalizedCalories);
+  
+            console.log(
+              'Personalized calories recommended:',
+              personalizedCalories
+            );
             setTargetCalories(personalizedCalories);
-            
+  
             // Update the user plan with personalized target calories
             try {
-              await updateDoc(doc(db, "userplans", userPlanDoc.id), {
-                targetCalories: personalizedCalories
+              await updateDoc(doc(db, 'userplans', userPlanDoc.id), {
+                targetCalories: personalizedCalories,
               });
-              console.log("Updated user plan with personalized target calories");
+              console.log(
+                'Updated user plan with personalized target calories'
+              );
             } catch (error) {
-              console.error("Error updating target calories:", error);
+              console.error('Error updating target calories:', error);
             }
           } catch (error) {
             // Fallback to default calculation
-            console.error("Error in personalized calorie calculation, falling back to default:", error);
-            const goalBasedCalories = getDefaultCaloriesForGoal(userPlanData.goal);
+            console.error(
+              'Error in personalized calorie calculation, falling back to default:',
+              error
+            );
+            const goalBasedCalories = getDefaultCaloriesForGoal(
+              userPlanData.goal
+            );
             setTargetCalories(goalBasedCalories);
-            
+  
             // Update with default values
             try {
-              await updateDoc(doc(db, "userplans", userPlanDoc.id), {
-                targetCalories: goalBasedCalories
+              await updateDoc(doc(db, 'userplans', userPlanDoc.id), {
+                targetCalories: goalBasedCalories,
               });
-              console.log("Updated user plan with default target calories");
+              console.log('Updated user plan with default target calories');
             } catch (error) {
-              console.error("Error updating target calories:", error);
+              console.error('Error updating target calories:', error);
             }
           }
         }
-        
+  
         const parsedPlan = JSON.parse(userPlanData.parsedPlan);
         setFullPlanData(parsedPlan);
-        
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  
+        const days = [
+          'Sunday',
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+        ];
         const today = new Date();
         const dayName = days[today.getDay()];
-        
-        const todaysPlan = parsedPlan.find(plan => plan.day === dayName);
-        
+  
+        const todaysPlan = parsedPlan.find((plan) => plan.day === dayName);
+  
         if (!todaysPlan) {
           console.error(`No plan found for ${dayName}`);
+          setNutritionOnlyMode(true); // Set nutrition-only mode to true when no plan for today
           setLoading(false);
           return;
         }
-        
+  
         setTodaysPlan(todaysPlan);
-        
+  
         // Fetch nutrition data from the meals collection
         await fetchTodaysNutritionData(currentUser.uid);
       } catch (error) {
-        console.error("Error fetching user plan:", error);
-        Alert.alert("Error", "Could not load your nutrition plan. Please try again later.");
+        console.error('Error fetching user plan:', error);
+        Alert.alert(
+          'Error',
+          'Could not load your nutrition plan. Please try again later.'
+        );
+        setNutritionOnlyMode(true); // Set nutrition-only mode to true when error occurs
         setLoading(false);
       }
     };
-
+  
     fetchUserPlan();
   }, []);
 
   // Function to get default calories based on user goal
   const getDefaultCaloriesForGoal = (goal) => {
     if (!goal) return 2000;
-    
-    switch(goal.toLowerCase()) {
+
+    switch (goal.toLowerCase()) {
       case 'weight loss':
         return 1800;
       case 'muscle gain':
@@ -229,79 +271,98 @@ export default function Home() {
   const fetchTodaysNutritionData = async (userId) => {
     try {
       const db = getFirestore();
-      const mealsRef = collection(db, "meals");
-      
+      const mealsRef = collection(db, 'meals');
+
       // Get the start and end of today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const startOfDay = Timestamp.fromDate(today);
-      
+
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       const endOfDay = Timestamp.fromDate(tomorrow);
-      
+
       // Query meals for the current user from today
       const q = query(
-        mealsRef, 
-        where("userId", "==", userId),
-        where("timestamp", ">=", startOfDay),
-        where("timestamp", "<", endOfDay),
-        orderBy("timestamp", "desc")
+        mealsRef,
+        where('userId', '==', userId),
+        where('timestamp', '>=', startOfDay),
+        where('timestamp', '<', endOfDay),
+        orderBy('timestamp', 'desc')
       );
-      
+
       const querySnapshot = await getDocs(q);
-      
+
       // Calculate total nutrition values
       let totalCalories = 0;
       let totalProtein = 0;
       let totalFat = 0;
-      
+
       querySnapshot.forEach((doc) => {
         const mealData = doc.data();
         totalCalories += mealData.calories || 0;
         totalProtein += mealData.protein || 0;
         totalFat += mealData.fat || 0;
       });
-      
+
       setNutritionData({
         calories: totalCalories,
         protein: totalProtein,
-        fat: totalFat
+        fat: totalFat,
       });
-      
+
       // Calculate progress percentage
-      const progress = Math.min(Math.round((totalCalories / targetCalories) * 100), 100);
+      const progress = Math.min(
+        Math.round((totalCalories / targetCalories) * 100),
+        100
+      );
       setCalorieProgress(progress);
-      
+
       // Update progress in userplans collection
       if (userPlanDocId) {
         try {
           const db = getFirestore();
-          await updateDoc(doc(db, "userplans", userPlanDocId), {
+          await updateDoc(doc(db, 'userplans', userPlanDocId), {
             currentCalories: totalCalories,
             calorieProgress: progress,
-            lastUpdated: Timestamp.now()
+            lastUpdated: Timestamp.now(),
           });
         } catch (error) {
-          console.error("Error updating progress:", error);
+          console.error('Error updating progress:', error);
         }
       }
-      
+
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching nutrition data:", error);
+      console.error('Error fetching nutrition data:', error);
       setLoading(false);
     }
   };
 
   const getCurrentMeal = () => {
-    if (!todaysPlan || !todaysPlan.sections) return { type: 'No meal', name: 'No meal data available', calories: 0 };
-    
+    if (!todaysPlan || !todaysPlan.sections)
+      return { type: 'No meal', name: 'No meal data available', calories: 0 };
+
     const hour = new Date().getHours();
-    
-    if (hour < 11) return { type: 'Breakfast', name: todaysPlan.sections.breakfast[0], calories: 450 };
-    if (hour < 15) return { type: 'Lunch', name: todaysPlan.sections.lunch[0], calories: 650 };
-    if (hour < 19) return { type: 'Dinner', name: todaysPlan.sections.dinner[0], calories: 550 };
+
+    if (hour < 11)
+      return {
+        type: 'Breakfast',
+        name: todaysPlan.sections.breakfast[0],
+        calories: 450,
+      };
+    if (hour < 15)
+      return {
+        type: 'Lunch',
+        name: todaysPlan.sections.lunch[0],
+        calories: 650,
+      };
+    if (hour < 19)
+      return {
+        type: 'Dinner',
+        name: todaysPlan.sections.dinner[0],
+        calories: 550,
+      };
     return { type: 'Snack', name: todaysPlan.sections.snack[0], calories: 200 };
   };
 
@@ -311,8 +372,8 @@ export default function Home() {
         pathname: '/(onboarding)/AllMeals',
         params: {
           meals: JSON.stringify(todaysPlan.sections),
-          day: todaysPlan.day
-        }
+          day: todaysPlan.day,
+        },
       });
     }
   };
@@ -322,8 +383,8 @@ export default function Home() {
       router.push({
         pathname: '/(onboarding)/ShoppingList',
         params: {
-          fullPlan: JSON.stringify(fullPlanData)
-        }
+          fullPlan: JSON.stringify(fullPlanData),
+        },
       });
     }
   };
@@ -336,8 +397,8 @@ export default function Home() {
         params: {
           mealType: currentMeal.type.toLowerCase(),
           mealName: currentMeal.name,
-          calories: currentMeal.calories.toString()
-        }
+          calories: currentMeal.calories.toString(),
+        },
       });
     }
   };
@@ -349,8 +410,8 @@ export default function Home() {
         calories: nutritionData.calories.toString(),
         protein: nutritionData.protein.toString(),
         fat: nutritionData.fat.toString(),
-        targetCalories: targetCalories.toString()
-      }
+        targetCalories: targetCalories.toString(),
+      },
     });
   };
 
@@ -373,12 +434,12 @@ export default function Home() {
     );
   }
 
-  if (!todaysPlan) {
-    return <NoPlanScreen />;
+  if (!todaysPlan && !nutritionOnlyMode) {
+    return <NoPlanScreen onToggleNutritionMode={toggleNutritionMode} />;
   }
 
   const currentMeal = getCurrentMeal();
-  
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       
@@ -387,9 +448,15 @@ export default function Home() {
         <View style={styles.headerTop}>
           
           <View>
-            <Text style={styles.greeting}>Good {getTimeOfDay()}, {userName}!</Text>
+            <Text style={styles.greeting}>
+              Good {getTimeOfDay()}, {userName}!
+            </Text>
             <View style={styles.goalRow}>
-              <Text style={styles.subtitle}>{nutritionOnlyMode ? 'Nutrition Tracking' : `${todaysPlan.day}'s Plan`}</Text>
+              <Text style={styles.subtitle}>
+                {nutritionOnlyMode
+                  ? 'Nutrition Tracking'
+                  : `${todaysPlan.day}'s Plan`}
+              </Text>
               {!nutritionOnlyMode && (
                 <View style={styles.goalPill}>
                   <Text style={styles.goalPillText}>{userGoal}</Text>
@@ -426,9 +493,9 @@ export default function Home() {
               </View>
               <Text style={styles.calories}>{currentMeal.calories} cal</Text>
             </View>
-            
-            <Pressable 
-              style={styles.recipeButton} 
+
+            <Pressable
+              style={styles.recipeButton}
               onPress={navigateToRecipe}
               android_ripple={{ color: '#e6f7ef' }}
             >
@@ -439,14 +506,20 @@ export default function Home() {
       )}
 
       {/* Nutrition Stats */}
-      <Pressable 
-        style={[styles.statsContainer, nutritionOnlyMode && styles.statsContainerExpanded]} 
+      <Pressable
+        style={[
+          styles.statsContainer,
+          nutritionOnlyMode && styles.statsContainerExpanded,
+        ]}
         onPress={navigateToTracker}
         android_ripple={{ color: '#f3f4f6' }}
       >
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Calories</Text>
-          <Text style={styles.statValue}>{nutritionData.calories} <Text style={styles.statTarget}>/ {targetCalories}</Text></Text>
+          <Text style={styles.statValue}>
+            {nutritionData.calories}{' '}
+            <Text style={styles.statTarget}>/ {targetCalories}</Text>
+          </Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Protein</Text>
@@ -457,99 +530,51 @@ export default function Home() {
           <Text style={styles.statValue}>{nutritionData.fat}g</Text>
         </View>
       </Pressable>
-      
+
       {/* Track Button */}
       <View style={styles.trackButtonContainer}>
-  <Pressable 
-    style={[styles.trackButton, { width: '75%' }]}  // Add width: '75%' here
-    onPress={navigateToTracker}
-    android_ripple={{ color: '#e6f7ef' }}
-  >
-    <Feather name="bar-chart-2" size={18} color="#ffffff" style={styles.trackButtonIcon} />
-    <Text style={styles.trackButtonText}>Track Nutrition</Text>
-  </Pressable>
-  
-  <Pressable 
-    style={[styles.trackButton, { width: '22%' }]}  // Create memory button with remaining space
-    onPress={() => router.push('/(onboarding)/MemoryGalleryScreen')}
-    android_ripple={{ color: '#e6f7ef' }}
-  >
-    <Feather name="image" size={18} color="#ffffff" />
-  </Pressable>
-  
-</View>
-<View style={styles.StreakContainer}>
-  
-  </View>
-      
-      {/* Diet & Exercise Section - Only show when not in nutrition-only mode */}
-      {!nutritionOnlyMode && (
-        <>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Today's Plan</Text>
-            
-            {/* Meals Card */}
-            {/* <Pressable 
-              style={styles.actionCard} 
-              onPress={navigateToAllMeals}
-              android_ripple={{ color: '#f3f4f6' }}
-            >
-              <View style={styles.actionCardContent}>
-                <View style={styles.actionIconContainer}>
-                  <Feather name="coffee" size={20} color="#22c55e" />
-                </View>
-                <View style={styles.actionTextContainer}>
-                  <Text style={styles.actionTitle}>All Meals</Text>
-                  <Text style={styles.actionSubtitle}>View your full meal plan</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={18} color="#9ca3af" />
-            </Pressable> */}
-            
-            {/* Shopping List Card */}
-            <Pressable 
-              style={styles.actionCard} 
-              onPress={navigateToShoppingList}
-              android_ripple={{ color: '#f3f4f6' }}
-            >
-              <View style={styles.actionCardContent}>
-                <View style={styles.actionIconContainer}>
-                  <Feather name="shopping-bag" size={20} color="#22c55e" />
-                </View>
-                <View style={styles.actionTextContainer}>
-                  <Text style={styles.actionTitle}>Shopping List</Text>
-                  <Text style={styles.actionSubtitle}>All ingredients you need</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={18} color="#9ca3af" />
-            </Pressable>
-          </View>
+        <Pressable
+          style={[styles.trackButton, { width: '75%' }]} // Add width: '75%' here
+          onPress={navigateToTracker}
+          android_ripple={{ color: '#e6f7ef' }}
+        >
+          <Feather
+            name="bar-chart-2"
+            size={18}
+            color="#ffffff"
+            style={styles.trackButtonIcon}
+          />
+          <Text style={styles.trackButtonText}>Scan meal</Text>
+        </Pressable>
 
-          {/* Exercise Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Exercise</Text>
-            <View style={styles.exerciseCard}>
-              <View style={styles.exerciseHeader}>
-                <Feather name="activity" size={20} color="#22c55e" />
-                <Text style={styles.exerciseHeaderText}>Today's Workout</Text>
-              </View>
-              <Text style={styles.exerciseText}>{todaysPlan.sections.exercise[0]}</Text>
-            </View>
-          </View>
-        </>
-      )}
+        <Pressable
+          style={[styles.trackButton, { width: '22%' }]} // Create memory button with remaining space
+          onPress={() => router.push('/(onboarding)/MemoryGalleryScreen')}
+          android_ripple={{ color: '#e6f7ef' }}
+        >
+          <Feather name="image" size={18} color="#ffffff" />
+        </Pressable>
+      </View>
+      {/* <View style={styles.StreakContainer}>
+        <StreakComp />
+      </View> */}
+
+      {/* Diet & Exercise Section - Only show when not in nutrition-only mode */}
+      {/*  */}
 
       {/* Tracking Section - Always show regardless of mode */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tracking Focus</Text>
-        
+
         {!nutritionOnlyMode && (
           <View style={styles.trackingCard}>
             <View style={styles.trackingHeader}>
               <Feather name="file-text" size={20} color="#22c55e" />
               <Text style={styles.trackingHeaderText}>Today's Focus</Text>
             </View>
-            <Text style={styles.trackingText}>{todaysPlan.sections.tracking[0]}</Text>
+            <Text style={styles.trackingText}>
+              {todaysPlan.sections.tracking[0]}
+            </Text>
           </View>
         )}
         <View style={styles.progressContainer}>
@@ -558,15 +583,17 @@ export default function Home() {
             <Text style={styles.progressPercentage}>{calorieProgress}%</Text>
           </View>
           <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${calorieProgress}%` }]} />
+            <View
+              style={[styles.progressBar, { width: `${calorieProgress}%` }]}
+            />
           </View>
           <Text style={styles.progressText}>
             {nutritionData.calories} / {targetCalories} calories consumed
           </Text>
         </View>
       </View>
- 
-      <CrunchXLogo/>
+
+      <CrunchXLogo />
       {/* Bottom padding */}
       <View style={styles.bottomPadding} />
     </ScrollView>
