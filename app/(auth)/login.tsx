@@ -15,7 +15,6 @@ import {
   ScrollView,
 } from 'react-native';
 
-// Import Expo Font Loader
 import { useFonts } from 'expo-font';
 import {
   Poppins_400Regular,
@@ -47,10 +46,16 @@ import { maybeCompleteAuthSession } from 'expo-web-browser';
 // For Phone Authentication
 import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 
+// Import the AuthContext
+import { useAuth } from '../context/AuthContext';
+
 // Ensure auth session is completed
 maybeCompleteAuthSession();
 
 export default function Login() {
+  // Use the AuthContext
+  const { user, isLoading: authLoading, checkUserOnboardingStatus } = useAuth();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -88,6 +93,30 @@ export default function Login() {
     }
   }, [googleResponse]);
 
+  // Handle navigation after successful authentication
+  useEffect(() => {
+    const handleAuthNavigation = async () => {
+      if (user) {
+        try {
+          // Check if user needs onboarding
+          const needsOnboarding = await checkUserOnboardingStatus(user.uid);
+          
+          if (needsOnboarding) {
+            router.replace('/(onboarding)');
+          } else {
+            router.replace('/(tabs)');
+          }
+        } catch (error) {
+          console.error('Navigation error:', error);
+        }
+      }
+    };
+    
+    if (user && !authLoading) {
+      handleAuthNavigation();
+    }
+  }, [user, authLoading]);
+
   if (!fontsLoaded) {
     return null; // Prevent rendering until fonts are loaded
   }
@@ -101,8 +130,9 @@ export default function Login() {
     try {
       setLoading(true);
       setError('');
+      // Just sign in - the AuthContext will handle the state and navigation
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace('/(tabs)');
+      // No need to navigate here - useEffect will handle it
     } catch (err) {
       setError(err.message || 'Failed to login. Please try again.');
       Alert.alert('Login Error', err.message);
@@ -131,12 +161,12 @@ export default function Login() {
       const phoneProvider = new PhoneAuthProvider(auth);
       
       // Request verification code using the reCAPTCHA verifier
-      const verificationId = await phoneProvider.verifyPhoneNumber(
+      const verificationIdResult = await phoneProvider.verifyPhoneNumber(
         formattedPhoneNumber, 
         recaptchaVerifier.current
       );
       
-      setVerificationId(verificationId);
+      setVerificationId(verificationIdResult);
       setShowOtpInput(true);
       Alert.alert('Success', 'Verification code has been sent to your phone');
     } catch (error) {
@@ -164,42 +194,18 @@ export default function Login() {
         verificationCode
       );
       
-      // Sign in with credential
-      const userCredential = await signInWithCredential(auth, credential);
+      // Sign in with credential - AuthContext will handle the state
+      await signInWithCredential(auth, credential);
       
-      // Get user ID
-      const userId = userCredential.user.uid;
-      
-      // Get user document from Firestore
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
-      
-      if (userDoc.exists()) {
-        // Update existing user document with phone
-        await setDoc(userRef, { 
+      // Update user profile with phone number
+      if (user) {
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, { 
           phone: phoneNumber 
         }, { merge: true });
-      } else {
-        // Create new user document with phone and explicitly set onboarded to false
-        await setDoc(userRef, {
-          phone: phoneNumber,
-          onboarded: false,
-          createdAt: new Date()
-        });
       }
       
-      // Now fetch the updated user document
-      const updatedUserDoc = await getDoc(userRef);
-      const userData = updatedUserDoc.data();
-      
-      // Check onboarded status and redirect
-      if (!updatedUserDoc.exists() || userData.onboarded === false) {
-        // Redirect to onboarding
-        router.replace('/(onboarding)');
-      } else {
-        // User is already onboarded, go to tabs
-        router.replace('/(tabs)');
-      }
+      // Navigation will be handled by the useEffect
     } catch (error) {
       setError(`Code verification failed: ${error.message}`);
       Alert.alert('Verification Error', error.message);
@@ -225,11 +231,10 @@ export default function Login() {
       // Create a Google credential with the token
       const googleCredential = GoogleAuthProvider.credential(idToken);
 
-      // Sign in with credential from the Google user
-      const userCredential = await signInWithCredential(auth, googleCredential);
-
-      // Success, navigate to home screen
-      router.replace('/(tabs)');
+      // Sign in with credential - AuthContext will handle the state
+      await signInWithCredential(auth, googleCredential);
+      
+      // Navigation will be handled by the useEffect
     } catch (error) {
       Alert.alert('Authentication Error', error.message);
     } finally {
@@ -253,11 +258,10 @@ export default function Login() {
         idToken: appleCredential.identityToken,
       });
 
-      // Sign in with credential
-      const userCredential = await signInWithCredential(auth, credential);
-
-      // Success, navigate to home screen
-      router.replace('/(tabs)');
+      // Sign in with credential - AuthContext will handle the state
+      await signInWithCredential(auth, credential);
+      
+      // Navigation will be handled by the useEffect
     } catch (error) {
       // Ignore cancel errors
       if (error.code !== 'ERR_CANCELED') {
@@ -276,7 +280,6 @@ export default function Login() {
       <FirebaseRecaptchaVerifierModal
         ref={recaptchaVerifier}
         firebaseConfig={auth.app.options}
-        // Change title if needed
         title="Prove you're human!"
         cancelLabel="Close"
       />
@@ -373,9 +376,9 @@ export default function Login() {
               <Pressable
                 style={styles.button}
                 onPress={handleLogin}
-                disabled={loading}
+                disabled={loading || authLoading}
               >
-                {loading ? (
+                {loading || authLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <>
@@ -422,9 +425,9 @@ export default function Login() {
               <Pressable
                 style={styles.button}
                 onPress={!showOtpInput ? handlePhoneAuth : confirmCode}
-                disabled={loading}
+                disabled={loading || authLoading}
               >
-                {loading ? (
+                {loading || authLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <>
@@ -448,7 +451,7 @@ export default function Login() {
             <TouchableOpacity
               style={styles.socialButton}
               onPress={handleGoogleSignIn}
-              disabled={loading}
+              disabled={loading || authLoading}
             >
               <Image
                 source={require('../../assets/images/google-logo.png')}
@@ -460,7 +463,7 @@ export default function Login() {
               <TouchableOpacity
                 style={styles.socialButton}
                 onPress={handleAppleSignIn}
-                disabled={loading}
+                disabled={loading || authLoading}
               >
                 <Image
                   source={require('../../assets/images/apple-logo.png')}

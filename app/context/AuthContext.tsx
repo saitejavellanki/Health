@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth, db } from '../../components/firebase/Firebase'; // Adjust path as needed
-import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { auth, db } from '../../components/firebase/Firebase'; 
+import { onAuthStateChanged } from 'firebase/auth';
 import { getDoc, doc, setDoc } from 'firebase/firestore';
 import { router } from 'expo-router';
 
@@ -9,136 +9,144 @@ type AuthContextType = {
   user: any;
   isLoading: boolean;
   isNewUser: boolean;
+  signOut: () => Promise<void>;
+  checkUserOnboardingStatus: (userId: string) => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   isNewUser: false,
+  signOut: async () => {},
+  checkUserOnboardingStatus: async () => false,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
-  // Store more comprehensive user data
+  // Store user data in background without blocking UI
   const storeUserData = async (firebaseUser) => {
     if (!firebaseUser) return;
     
     try {
-      // Store full user data (but be careful not to store sensitive info)
       const userData = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         emailVerified: firebaseUser.emailVerified,
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL,
-        // Don't store tokens or sensitive authentication details
+        phoneNumber: firebaseUser.phoneNumber,
       };
       
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      console.log('User data stored in AsyncStorage');
-      
-      // Ensure user document exists in Firestore
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      // Don't await this - let it happen in the background
+      AsyncStorage.setItem('userData', JSON.stringify(userData))
+        .catch(err => console.error('Background AsyncStorage error:', err));
+    } catch (error) {
+      console.error('Error in storeUserData:', error);
+    }
+  };
+
+  // Check if user needs onboarding and return result
+  const checkUserOnboardingStatus = async (userId: string): Promise<boolean> => {
+    try {
+      const userDocRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userDocRef);
       
+      // Check if user document exists and has completed onboarding
       if (!userDoc.exists()) {
-        // Create user document if it doesn't exist
-        await setDoc(userDocRef, {
-          email: firebaseUser.email,
-          createdAt: new Date(),
-          onboardingCompleted: false,
-        });
+        return true; // New user needs onboarding
       }
+      
+      const userData = userDoc.data();
+      // Check both possible field names for onboarding status
+      const needsOnboarding = 
+        (userData.onboardingCompleted === undefined && userData.onboarded === undefined) || 
+        (userData.onboardingCompleted === false && userData.onboarded === false);
+      
+      return needsOnboarding;
     } catch (error) {
-      console.error('Error storing user data:', error);
+      console.error('Error checking onboarding status:', error);
+      return true; // Default to needing onboarding on error
+    }
+  };
+
+  // Handle user sign out
+  const signOut = async () => {
+    try {
+      await auth.signOut();
+      await AsyncStorage.removeItem('userData');
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
     }
   };
 
   useEffect(() => {
     let isMounted = true;
     
-    const checkAuthState = async () => {
+    // Pre-check AsyncStorage for faster initial load
+    const checkStoredUser = async () => {
       try {
-        // First, check if we have stored user data
         const storedUserData = await AsyncStorage.getItem('userData');
-        
-        if (storedUserData && !user) {
+        if (storedUserData && isMounted) {
+          // We have a stored user, but we'll still wait for Firebase to confirm
+          // This just speeds up the initial state setup
           const userData = JSON.parse(storedUserData);
-          console.log('Found stored user data for:', userData.email);
-          
-          // We'll still wait for Firebase's onAuthStateChanged to confirm
-          // But this lets us know a user should be logged in
+          console.log('Found stored user data for:', userData.email || userData.phoneNumber || userData.uid);
         }
       } catch (error) {
         console.error('Error checking stored auth state:', error);
+      } finally {
+        if (isMounted) {
+          setInitialCheckDone(true);
+        }
       }
     };
     
-    checkAuthState();
+    checkStoredUser();
 
     // Set up Firebase auth listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("Auth state changed:", firebaseUser ? `logged in as ${firebaseUser.email}` : "logged out");
+      console.log("Auth state changed:", firebaseUser ? `logged in as ${firebaseUser.email || firebaseUser.phoneNumber || firebaseUser.uid}` : "logged out");
       
       if (!isMounted) return;
       
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        await storeUserData(firebaseUser);
-        
-        try {
-          // Check onboarding status
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          const needsOnboarding = !userDoc.exists() || !userDoc.data().onboardingCompleted;
-          setIsNewUser(needsOnboarding);
-          
-          // Navigate accordingly
-          if (needsOnboarding) {
-            router.replace('/(onboarding)');
-          } else {
-            router.replace('/(tabs)');
-          }
-        } catch (error) {
-          console.error('Error checking onboarding status:', error);
-          setIsNewUser(true);
-          router.replace('/(onboarding)');
-        }
-      } else {
-        // Try to restore from AsyncStorage before giving up
-        try {
-          const storedUserData = await AsyncStorage.getItem('userData');
-          if (storedUserData) {
-            const userData = JSON.parse(storedUserData);
-            console.log('Found stored user data but Firebase reports logged out. User may need to re-authenticate.');
-            
-            // We could try to re-authenticate here in some cases
-            // But for now, we'll just clear the stored data and redirect to login
-            await AsyncStorage.removeItem('userData');
-          }
-        } catch (error) {
-          console.error('Error checking backup auth data:', error);
-        }
-        
-        setUser(null);
-        setIsNewUser(false);
-        router.replace('/(auth)/login');
-      }
+      // First, immediately update user state
+      setUser(firebaseUser);
       
-      setIsLoading(false);
+      if (firebaseUser) {
+        // Store user data in background
+        storeUserData(firebaseUser);
+        
+        // We don't automatically navigate here - the login page handles that
+        setIsLoading(false);
+      } else {
+        // Clear any stored user data
+        AsyncStorage.removeItem('userData').catch(err => 
+          console.error('Error removing user data:', err)
+        );
+        
+        setIsNewUser(false);
+        setIsLoading(false);
+        
+        // Only navigate to login if we're not already on the auth stack
+        const currentPath = router.getCurrentPath();
+        if (!currentPath.includes('/(auth)')) {
+          router.replace('/(auth)/login');
+        }
+      }
     });
     
-    // Safety timeout to prevent infinite loading
+    // Safety timeout - shorter now since we're handling UI faster
     const timeout = setTimeout(() => {
       if (isMounted && isLoading) {
         console.log("Auth timeout reached, forcing load completion");
         setIsLoading(false);
       }
-    }, 5000);
+    }, 3000); // 3 second timeout
 
     return () => {
       isMounted = false;
@@ -148,7 +156,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isNewUser }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isLoading, 
+      isNewUser, 
+      signOut,
+      checkUserOnboardingStatus
+    }}>
       {children}
     </AuthContext.Provider>
   );
