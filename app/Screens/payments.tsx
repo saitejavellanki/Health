@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ChevronLeft, Check, Shield, Lock, MapPin, Edit2 } from 'lucide-react-native';
+import { ChevronLeft, Check, Shield, Lock, MapPin, Edit2, Phone } from 'lucide-react-native';
 import { styles } from "../Utils/PaymentsStyles.tsx";
 import { auth, db } from '../../components/firebase/Firebase.js';
 import { collection, doc, getDoc, updateDoc, getDocs, query, where, setDoc } from 'firebase/firestore';
@@ -60,6 +60,11 @@ export default function PaymentScreen() {
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [newAddress, setNewAddress] = useState('');
 
+  const [phoneNumber, setPhoneNumber] = useState('');
+const [phoneModalVisible, setPhoneModalVisible] = useState(false);
+const [newPhoneNumber, setNewPhoneNumber] = useState('');
+
+
   // Fetch user data from Firebase
   useEffect(() => {
     const fetchUserData = async () => {
@@ -88,6 +93,11 @@ export default function PaymentScreen() {
           } else {
             setAddress(params.address || '');
           }
+          
+          // Set phone number if available
+          if (user.phone) {
+            setPhoneNumber(user.phone);
+          }
         } else {
           Alert.alert('Error', 'User profile not found.');
         }
@@ -101,6 +111,7 @@ export default function PaymentScreen() {
     
     fetchUserData();
   }, []);
+  
   
   // Parse JSON params
   useEffect(() => {
@@ -194,6 +205,11 @@ export default function PaymentScreen() {
       return;
     }
     
+    if (!phoneNumber.trim()) {
+      Alert.alert('Missing Phone Number', 'Click on update to add phone number');
+      return;
+    }
+    
     setIsProcessing(true);
     
     try {
@@ -216,6 +232,81 @@ export default function PaymentScreen() {
       setIsProcessing(false);
     }
   };
+  
+
+  const renderPhoneModal = () => {
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={phoneModalVisible}
+        onRequestClose={() => setPhoneModalVisible(false)}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Update Phone Number</Text>
+                <Pressable style={styles.closeButton} onPress={() => setPhoneModalVisible(false)}>
+                  <Text style={{ fontSize: 16, color: '#64748b' }}>Cancel</Text>
+                </Pressable>
+              </View>
+              
+              <View style={styles.modalBody}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Phone Number</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your phone number"
+                    value={newPhoneNumber}
+                    onChangeText={setNewPhoneNumber}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              </View>
+              
+              <View style={styles.modalFooter}>
+                <Pressable style={styles.saveButton} onPress={handleUpdatePhone}>
+                  <Text style={styles.saveButtonText}>Update Phone</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    );
+  };
+
+  const handleUpdatePhone = async () => {
+    if (newPhoneNumber.trim().length < 10) {
+      Alert.alert('Invalid Phone Number', 'Please enter a valid phone number.');
+      return;
+    }
+    
+    try {
+      setPhoneNumber(newPhoneNumber);
+      setPhoneModalVisible(false);
+      
+      // Update phone in Firebase if user is logged in
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userDocRef, { phone: newPhoneNumber });
+      }
+      
+      Alert.alert('Success', 'Phone number has been updated.');
+    } catch (error) {
+      console.error('Error updating phone number:', error);
+      Alert.alert('Error', 'Failed to update phone number. Please try again.');
+    }
+  };
+  
+  const openPhoneModal = () => {
+    setNewPhoneNumber(phoneNumber);
+    setPhoneModalVisible(true);
+  };
+  
   
   // Save order to Firestore
   const saveOrderToFirestore = async (paymentData) => {
@@ -242,9 +333,11 @@ export default function PaymentScreen() {
         timeSlot: selectedTimeSlot,
         duration: selectedDuration,
         address,
+        phoneNumber, // Add phone number to order
         priceInfo,
-        paymentMethod: 'PayU Gateway', // Generic payment method since we're letting PayU handle the selection
+        paymentMethod: 'PayU Gateway',
         status: 'pending',
+        deliveryStatus: 'pending', // Add delivery status field
         createdAt: new Date(),
       };
       
@@ -256,6 +349,7 @@ export default function PaymentScreen() {
       throw error;
     }
   };
+  
   
   // Handle payment response
   const handlePaymentResponse = (data) => {
@@ -564,6 +658,8 @@ export default function PaymentScreen() {
     <View style={styles.container}>
       {/* Address Update Modal */}
       {renderAddressModal()}
+
+      {renderPhoneModal()}
       
       {/* Payment WebView Modal */}
       {renderPaymentWebView()}
@@ -653,6 +749,28 @@ export default function PaymentScreen() {
             </View>
           </View>
         </View>
+
+        {/* Phone Number with Update Button */}
+<View style={styles.section}>
+  <View style={styles.sectionHeader}>
+    <Text style={styles.sectionTitle}>Contact Number</Text>
+    <Pressable 
+      style={styles.editButton} 
+      onPress={openPhoneModal}>
+      <Edit2 size={16} color="#22c55e" />
+      <Text style={styles.editButtonText}>Update</Text>
+    </Pressable>
+  </View>
+  <View style={styles.addressCard}>
+    <View style={styles.addressRow}>
+      <Phone size={20} color="#64748b" style={styles.addressIcon} />
+      <Text style={styles.addressText}>
+        {phoneNumber || "Please add your phone number"}
+      </Text>
+    </View>
+  </View>
+</View>
+
         
         {/* Payment Section - Updated to show PayU info instead of payment methods */}
         <View style={styles.section}>

@@ -223,9 +223,10 @@ export default function DateOfBirth() {
         >
           <ChevronLeft size={24} color="#000" />
         </Pressable>
-        <View style={styles.progressBar}>
-          <View style={styles.progressFill} />
-        </View>
+        
+        <View style={styles.headerRight}>
+    <Text style={styles.stepCounter}>Step 4/8</Text>
+  </View>
       </View>
 
       <View style={styles.contentContainer}>
@@ -414,12 +415,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 20,
   },
+  
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between', // Changed to space-between
     paddingTop: 20,
     marginBottom: 20,
     marginTop: 20,
+  },
+  
+  headerRight: {
+    marginLeft: 'auto', // Pushes content to the right
+  },
+  
+  stepCounter: {
+    fontFamily: 'Inter-bold',
+    fontSize: 25, // Increased from 1 to a visible size
+    fontWeight: 'bold', // Added bold
+    color: '#64748b',
   },
   backButton: {
     width: 48,

@@ -79,6 +79,8 @@ export default function Height() {
         >
           <ChevronLeft size={24} color="#000" />
         </Pressable>
+
+        <Text style={styles.stepCounter}>Step 1/8</Text>
       </View>
 
       <View style={styles.contentContainer}>
@@ -152,6 +154,14 @@ const styles = StyleSheet.create({
   backButtonContainer: {
     paddingTop: 48,
     paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  stepCounter: {
+    fontFamily: 'Inter-bold',
+    fontSize: 25,
+    color: '#64748b',
   },
   backButton: {
     width: 48,

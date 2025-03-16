@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Stack, SplashScreen, Redirect } from 'expo-router';
+import { Stack, SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   useFonts,
@@ -9,20 +9,12 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { onAuthStateChanged } from 'firebase/auth';
-import { getDoc, doc } from 'firebase/firestore';
-import { auth, db } from '../components/firebase/Firebase'; // Adjust path as needed
-import { View, Text } from 'react-native';
+import { AuthProvider } from './context/AuthContext';
 
-// Keep the splash screen visible while we check authentication
+// Prevent auto-hiding the splash screen
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  // Always declare all hooks at the top level
-  const [user, setUser] = useState(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
-  const [isNewUser, setIsNewUser] = useState(false);
-
   useFrameworkReady();
 
   const [fontsLoaded, fontError] = useFonts({
@@ -32,81 +24,30 @@ export default function RootLayout() {
     'Inter-Bold': Inter_700Bold,
   });
 
-  // Auth state listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-
-      if (currentUser) {
-        // Check if user has completed onboarding
-        try {
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          const userDoc = await getDoc(userDocRef);
-
-          // If user document doesn't exist or onboarding not completed, mark as new user
-          if (!userDoc.exists() || !userDoc.data().onboardingCompleted) {
-            setIsNewUser(true);
-          } else {
-            setIsNewUser(false);
-          }
-        } catch (error) {
-          console.error('Error checking user onboarding status:', error);
-          // Default to showing onboarding if we can't verify status
-          setIsNewUser(true);
-        }
-      }
-
-      setAuthInitialized(true);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  // Handle initialization
+  // Hide splash screen when fonts are loaded
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      if (authInitialized) {
-        SplashScreen.hideAsync();
-      }
+      SplashScreen.hideAsync().catch(() => {
+        // Ignore errors when hiding splash screen
+      });
     }
-  }, [fontsLoaded, fontError, authInitialized]);
+  }, [fontsLoaded, fontError]);
 
-  // If fonts or auth aren't loaded yet, return null to keep splash screen
-  if (!fontsLoaded || !authInitialized) {
-    return null;
+  // If fonts aren't loaded yet, return null to keep splash screen
+  if (!fontsLoaded) {
+    return null; // This keeps the splash screen visible
   }
 
-  // Redirect based on authentication state
   return (
-    <>
+    <AuthProvider>
       <Stack screenOptions={{ headerShown: false }}>
-        {/* If user is not authenticated, show auth screens */}
-        {!user ? (
-          <Stack.Screen
-            name="(auth)"
-            options={{ animation: 'slide_from_right' }}
-          />
-        ) : isNewUser ? (
-          // If new user, show onboarding
-          <Stack.Screen 
-            name="(onboarding)" 
-            options={{ animation: 'slide_from_bottom' }}
-          />
-        ) : (
-          // If existing user, show tabs
-          <Stack.Screen 
-            name="(tabs)" 
-            options={{ animation: 'flip' }} 
-          />
-        )}
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="(onboarding)" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'flip' }} />
         <Stack.Screen name="+not-found" options={{ presentation: 'modal' }} />
-        <Stack.Screen 
-          name="index" 
-          options={{ headerShown: false }} 
-          redirect={user ? true : false} 
-        />
       </Stack>
       <StatusBar style="auto" />
-    </>
+    </AuthProvider>
   );
 }

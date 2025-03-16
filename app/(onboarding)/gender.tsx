@@ -5,13 +5,12 @@ import {
   StyleSheet,
   Pressable,
   SafeAreaView,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
 import { doc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../../components/firebase/Firebase'; // Update this path to point to your firebase config file
+import { auth, db } from '../../components/firebase/Firebase';
 
 export default function Gender() {
   const [selectedGender, setSelectedGender] = useState(null);
@@ -31,7 +30,7 @@ export default function Gender() {
       // Update the user document in the users collection
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
-        gender: selectedGender, // This should be one of: "male", "female", or "prefer_not_say"
+        gender: selectedGender,
         updatedAt: new Date(),
       });
 
@@ -50,12 +49,15 @@ export default function Gender() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.push('/weight')}
-        >
-          <ChevronLeft size={24} color="#1a1a1a" />
-        </Pressable>
+        <View style={styles.header}>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => router.push('/weight')}
+          >
+            <ChevronLeft size={24} color="#000" />
+          </Pressable>
+          <Text style={styles.stepCounter}>Step 3/8</Text>
+        </View>
 
         <View style={styles.contentContainer}>
           <Text style={styles.title}>What's your gender?</Text>
@@ -112,7 +114,6 @@ export default function Gender() {
                     styles.optionTextSelected,
                 ]}
               >
-                {/* 👤 Prefer Not to Say */}
                 Prefer Not to Say
               </Text>
             </Pressable>
@@ -158,29 +159,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
-    // alignItems:"center",
+  },
+  header: {
+    paddingTop: 48,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  stepCounter: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 25,
+    color: '#64748b',
   },
   backButton: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    padding: 10,
-    borderRadius: 20,
-    zIndex: 10,
-    marginTop: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   contentContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    // alignContent: "center",
     paddingHorizontal: 24,
   },
   title: {
     fontSize: 28,
     fontFamily: 'Inter-Bold',
-    fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 40,
     textAlign: 'center',
@@ -205,12 +213,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#e2e8f0',
-    width: '50%', // Adjusted for two options in a row
-    marginLeft: 7,
-    marginRight: 7,
+    width: '45%',
+    marginHorizontal: 7,
   },
   preferNotSayOption: {
-    width: '90%', // Full width for "Prefer Not to Say" option
+    width: '90%',
     alignItems: 'center',
   },
   optionSelected: {
@@ -220,7 +227,6 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 18,
     color: '#999999',
-    // padding: 14,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
   },
@@ -228,8 +234,9 @@ const styles = StyleSheet.create({
     color: '#22c55e',
   },
   footer: {
-    padding: 24,
-    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    paddingTop: 16,
   },
   button: {
     flexDirection: 'row',
@@ -237,7 +244,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#22c55e',
     paddingVertical: 16,
-    paddingHorizontal: 32,
     borderRadius: 12,
     gap: 8,
     width: '100%',
@@ -251,6 +257,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 18,
     color: '#fff',
+    fontFamily: 'Inter-SemiBold',
   },
   buttonTextDisabled: {
     color: '#94a3b8',

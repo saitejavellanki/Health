@@ -18,6 +18,7 @@ import { styles } from '../Utils/HomePageStyles';
 import StreakComp from '@/components/UserStats/StreakComp';
 import NoPlanScreen from '../Utils/NoPlanScreen';
 import CrunchXLogo from '../Utils/Logo';
+import ActiveOrders from '@/components/ActiveOrders/activeOrders';
 
 // API configuration for Gemini
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -464,6 +465,8 @@ export default function Home() {
         </View>
         <StreakComp/>
       </View>
+
+      <ActiveOrders/>
       
       {/* Current Meal Card - Only show when not in nutrition-only mode */}
       {!nutritionOnlyMode && (

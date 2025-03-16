@@ -22,13 +22,13 @@ export default function Welcome() {
   const handleSkip = async () => {
     try {
       const uid = auth.currentUser?.uid;
-      if (uid) {
-        const userRef = doc(db, 'users', uid);
-        await updateDoc(userRef, {
-          onboarded: false
-        });
-      }
-      router.push('/(tabs)/');
+      // if (uid) {
+      //   const userRef = doc(db, 'users', uid);
+      //   await updateDoc(userRef, {
+      //     onboarded: false
+      //   });
+      // }
+      router.push('/(tabs)');
     } catch (error) {
       console.error("Error updating onboarded status:", error);
     }
