@@ -8,14 +8,15 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft, Calendar } from 'lucide-react-native';
-import { db, auth } from '../../components/firebase/Firebase'; // Update this path as needed
+import { db, auth } from '../../components/firebase/Firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 
 export default function DateOfBirth() {
-  // Generate arrays for days, months, and years
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
   const months = [
     'January',
@@ -34,13 +35,12 @@ export default function DateOfBirth() {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 100 }, (_, i) => currentYear - i - 10);
 
-  // State for selected values
   const [selectedDay, setSelectedDay] = useState(29);
   const [selectedMonth, setSelectedMonth] = useState('September');
   const [selectedYear, setSelectedYear] = useState(2003);
   const [isLoading, setIsLoading] = useState(false);
+  const [progressAnimation] = useState(new Animated.Value(0));
 
-  // Refs for scroll views
   const dayScrollRef = useRef(null);
   const monthScrollRef = useRef(null);
   const yearScrollRef = useRef(null);
@@ -49,7 +49,18 @@ export default function DateOfBirth() {
   const visibleItems = 5;
   const scrollViewHeight = ITEM_HEIGHT * visibleItems;
 
-  // Function to center a value in its scroll view
+  const totalSteps = 9;
+  const currentStep = 4;
+
+  useEffect(() => {
+    Animated.timing(progressAnimation, {
+      toValue: currentStep / totalSteps,
+      duration: 1000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
   const centerValueInScrollView = (scrollRef, value, array) => {
     if (!scrollRef.current) return;
 
@@ -62,9 +73,7 @@ export default function DateOfBirth() {
     }
   };
 
-  // Initialize scroll positions when component mounts
   useEffect(() => {
-    // Set initial scroll positions to center the default selected values
     setTimeout(() => {
       centerValueInScrollView(dayScrollRef, selectedDay, days);
       centerValueInScrollView(monthScrollRef, selectedMonth, months);
@@ -72,7 +81,6 @@ export default function DateOfBirth() {
     }, 200);
   }, []);
 
-  // Function to handle day scroll
   const handleDayScroll = (event) => {
     const y = event.nativeEvent.contentOffset.y;
     const index = Math.round(y / ITEM_HEIGHT);
@@ -80,7 +88,6 @@ export default function DateOfBirth() {
       const newDay = days[index];
       if (newDay !== selectedDay) {
         setSelectedDay(newDay);
-        // Re-center the day after a small delay
         setTimeout(() => {
           centerValueInScrollView(dayScrollRef, newDay, days);
         }, 100);
@@ -88,7 +95,6 @@ export default function DateOfBirth() {
     }
   };
 
-  // Function to handle month scroll
   const handleMonthScroll = (event) => {
     const y = event.nativeEvent.contentOffset.y;
     const index = Math.round(y / ITEM_HEIGHT);
@@ -96,7 +102,6 @@ export default function DateOfBirth() {
       const newMonth = months[index];
       if (newMonth !== selectedMonth) {
         setSelectedMonth(newMonth);
-        // Re-center the month after a small delay
         setTimeout(() => {
           centerValueInScrollView(monthScrollRef, newMonth, months);
         }, 100);
@@ -104,7 +109,6 @@ export default function DateOfBirth() {
     }
   };
 
-  // Function to handle year scroll
   const handleYearScroll = (event) => {
     const y = event.nativeEvent.contentOffset.y;
     const index = Math.round(y / ITEM_HEIGHT);
@@ -112,7 +116,6 @@ export default function DateOfBirth() {
       const newYear = years[index];
       if (newYear !== selectedYear) {
         setSelectedYear(newYear);
-        // Re-center the year after a small delay
         setTimeout(() => {
           centerValueInScrollView(yearScrollRef, newYear, years);
         }, 100);
@@ -124,18 +127,15 @@ export default function DateOfBirth() {
     try {
       setIsLoading(true);
 
-      // Validate the date
       const monthIndex = months.indexOf(selectedMonth);
       const date = new Date(selectedYear, monthIndex, selectedDay);
 
-      // Check if date is valid
       if (date.getDate() !== selectedDay || date.getMonth() !== monthIndex) {
         Alert.alert('Invalid Date', 'Please select a valid date of birth.');
         setIsLoading(false);
         return;
       }
 
-      // Check if user is at least 13 years old
       const today = new Date();
       const age = today.getFullYear() - date.getFullYear();
       const isBirthdayPassed =
@@ -154,7 +154,6 @@ export default function DateOfBirth() {
         return;
       }
 
-      // Format DOB for storage
       const formattedDOB = {
         day: selectedDay,
         month: selectedMonth,
@@ -163,7 +162,6 @@ export default function DateOfBirth() {
         age: actualAge,
       };
 
-      // Get current user
       const currentUser = auth.currentUser;
 
       if (!currentUser) {
@@ -175,15 +173,12 @@ export default function DateOfBirth() {
         return;
       }
 
-      // Save to Firestore
       const userRef = doc(db, 'users', currentUser.uid);
 
-      // Update the user document
       await updateDoc(userRef, {
         dateOfBirth: formattedDOB,
         updatedAt: new Date().toISOString(),
       }).catch(async (error) => {
-        // If document doesn't exist yet, create it
         if (error.code === 'not-found') {
           await setDoc(userRef, {
             dateOfBirth: formattedDOB,
@@ -201,7 +196,6 @@ export default function DateOfBirth() {
         `Date of Birth saved: ${selectedDay} ${selectedMonth} ${selectedYear}`
       );
 
-      // Navigate to the next screen
       router.push('/doesworkout');
     } catch (error) {
       console.error('Error saving date of birth:', error);
@@ -214,6 +208,11 @@ export default function DateOfBirth() {
     }
   };
 
+  const progressWidth = progressAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -223,13 +222,19 @@ export default function DateOfBirth() {
         >
           <ChevronLeft size={24} color="#000" />
         </Pressable>
-        
-        <View style={styles.headerRight}>
-    <Text style={styles.stepCounter}>Step 4/8</Text>
-  </View>
       </View>
 
       <View style={styles.contentContainer}>
+        <View style={styles.stepProgressContainer}>
+          <View style={styles.progressBarContainer}>
+            <Animated.View
+              style={[styles.progressBar, { width: progressWidth }]}
+            />
+          </View>
+          <Text style={styles.stepText}>
+            Step {currentStep} of {totalSteps}
+          </Text>
+        </View>
         <View style={styles.titleContainer}>
           <Calendar size={28} color="#8cc63f" style={styles.icon} />
           <Text style={styles.title}>When were you born?</Text>
@@ -240,7 +245,6 @@ export default function DateOfBirth() {
 
         <View style={styles.pickerOuterContainer}>
           <View style={styles.pickerContainer}>
-            {/* Day Picker */}
             <View style={styles.pickerColumn}>
               <Text style={styles.pickerLabel}>Day</Text>
               <View style={styles.pickerWrapper}>
@@ -288,7 +292,6 @@ export default function DateOfBirth() {
               </View>
             </View>
 
-            {/* Month Picker */}
             <View style={[styles.pickerColumn, { flex: 2 }]}>
               <Text style={styles.pickerLabel}>Month</Text>
               <View style={styles.pickerWrapper}>
@@ -337,7 +340,6 @@ export default function DateOfBirth() {
               </View>
             </View>
 
-            {/* Year Picker */}
             <View style={styles.pickerColumn}>
               <Text style={styles.pickerLabel}>Year</Text>
               <View style={styles.pickerWrapper}>
@@ -415,25 +417,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 20,
   },
-  
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between', // Changed to space-between
+    justifyContent: 'space-between',
     paddingTop: 20,
     marginBottom: 20,
     marginTop: 20,
-  },
-  
-  headerRight: {
-    marginLeft: 'auto', // Pushes content to the right
-  },
-  
-  stepCounter: {
-    fontFamily: 'Inter-bold',
-    fontSize: 25, // Increased from 1 to a visible size
-    fontWeight: 'bold', // Added bold
-    color: '#64748b',
   },
   backButton: {
     width: 48,
@@ -444,22 +434,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 15,
   },
-  //   progressBar: {
-  //     flex: 1,
-  //     height: 8,
-  //     backgroundColor: '#e2e8f0',
-  //     borderRadius: 4,
-  //     overflow: 'hidden',
-  //   },
-  //   progressFill: {
-  //     width: '60%', // Adjust based on progress
-  //     height: '100%',
-  //     backgroundColor: '#8cc63f',
-  //     borderRadius: 4,
-  //   },
+  stepProgressContainer: {
+    alignItems: 'center',
+    width: '80%',
+    marginTop: -20,
+    marginBottom: 40,
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+    // alignContent: 'center',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 5,
+  },
   contentContainer: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   titleContainer: {
     alignItems: 'center',

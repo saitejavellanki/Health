@@ -6,15 +6,21 @@ import {
   Pressable,
   SafeAreaView,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
 import { doc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../../components/firebase/Firebase'; // Update this path to point to your firebase config file
+import { auth, db } from '../../components/firebase/Firebase';
 
 export default function WorkoutFrequency() {
   const [selectedFrequency, setSelectedFrequency] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [progressAnimation] = useState(new Animated.Value(0));
+
+  const totalSteps = 9;
+  const currentStep = 5;
 
   const workoutOptions = [
     {
@@ -44,10 +50,18 @@ export default function WorkoutFrequency() {
     },
   ];
 
+  React.useEffect(() => {
+    Animated.timing(progressAnimation, {
+      toValue: currentStep / totalSteps,
+      duration: 1000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
   const handleContinue = async () => {
     try {
       setIsLoading(true);
-
       const currentUser = auth.currentUser;
       if (!currentUser) {
         Alert.alert(
@@ -56,7 +70,6 @@ export default function WorkoutFrequency() {
         );
         return;
       }
-
       const doesWorkout = selectedFrequency !== 'none';
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
@@ -64,7 +77,6 @@ export default function WorkoutFrequency() {
         doesWorkout: doesWorkout,
         updatedAt: new Date(),
       });
-
       console.log(
         `Workout frequency saved: ${selectedFrequency}, Does workout: ${doesWorkout}`
       );
@@ -84,6 +96,11 @@ export default function WorkoutFrequency() {
     router.push('/dob');
   };
 
+  const progressWidth = progressAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -98,6 +115,16 @@ export default function WorkoutFrequency() {
         </View>
 
         <View style={styles.contentContainer}>
+          <View style={styles.stepProgressContainer}>
+            <View style={styles.progressBarContainer}>
+              <Animated.View
+                style={[styles.progressBar, { width: progressWidth }]}
+              />
+            </View>
+            <Text style={styles.stepText}>
+              Step {currentStep} of {totalSteps}
+            </Text>
+          </View>
           <Text style={styles.title}>How much workout do you do?</Text>
 
           <View style={styles.optionsContainer}>
@@ -159,7 +186,15 @@ export default function WorkoutFrequency() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#fff' },
   container: { flex: 1, backgroundColor: '#fff', padding: 20 },
-  headerContainer: { width: '100%', height: 50, zIndex: 10 },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    height: 50,
+    zIndex: 10,
+    marginTop: 20,
+  },
   backButton: {
     width: 40,
     height: 40,
@@ -168,8 +203,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
-    marginTop: 24,
-    marginLeft: 10,
+  },
+  stepProgressContainer: {
+    alignItems: 'center',
+    marginTop: -20,
+    marginBottom: 30,
+    width: '80%',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 8,
   },
   contentContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   title: {

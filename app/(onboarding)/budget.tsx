@@ -13,6 +13,8 @@ import {
   FlatList,
   SafeAreaView,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ChevronLeft, ArrowRight, ChevronDown } from 'lucide-react-native';
@@ -24,6 +26,10 @@ export default function Budget() {
   const [currency, setCurrency] = useState('INR'); // Set default to INR
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [progressAnimation] = useState(new Animated.Value(0));
+
+  const totalSteps = 9;
+  const currentStep = 9; // Final step
 
   // Fetch existing budget data if available
   useEffect(() => {
@@ -32,7 +38,7 @@ export default function Budget() {
         try {
           const userDocRef = doc(db, 'users', auth.currentUser.uid);
           const userDoc = await getDoc(userDocRef);
-          
+
           if (userDoc.exists() && userDoc.data().budget) {
             setBudget(userDoc.data().budget.amount || '');
             setCurrency(userDoc.data().budget.currency || 'INR');
@@ -42,9 +48,22 @@ export default function Budget() {
         }
       }
     };
-    
+
     fetchBudgetData();
+
+    // Animate progress bar
+    Animated.timing(progressAnimation, {
+      toValue: currentStep / totalSteps,
+      duration: 1000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
   }, []);
+
+  const progressWidth = progressAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   const handleBudgetChange = (text) => {
     const numericValue = text.replace(/[^0-9]/g, '');
@@ -60,25 +79,29 @@ export default function Budget() {
     }
 
     setIsLoading(true);
-    
+
     try {
       if (auth.currentUser) {
         const userDocRef = doc(db, 'users', auth.currentUser.uid);
-        
+
         // Get existing user data first
         const userDoc = await getDoc(userDocRef);
         const userData = userDoc.exists() ? userDoc.data() : {};
-        
+
         // Update only the budget field, preserving other user data
-        await setDoc(userDocRef, {
-          ...userData,
-          budget: {
-            amount: budget,
-            currency: currency,
-            updatedAt: new Date().toISOString()
-          }
-        }, { merge: true });
-        
+        await setDoc(
+          userDocRef,
+          {
+            ...userData,
+            budget: {
+              amount: budget,
+              currency: currency,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+          { merge: true }
+        );
+
         router.push('/plan');
       } else {
         Alert.alert('Error', 'You must be signed in to continue.');
@@ -133,6 +156,18 @@ export default function Budget() {
           </View>
 
           <View style={styles.contentContainer}>
+            <View style={styles.progressParent}>
+              <View style={styles.stepProgressContainer}>
+                <View style={styles.progressBarContainer}>
+                  <Animated.View
+                    style={[styles.progressBar, { width: progressWidth }]}
+                  />
+                </View>
+                <Text style={styles.stepText}>
+                  Step {currentStep} of {totalSteps}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.title}>
               What is your maximum monthly budget?
             </Text>
@@ -237,10 +272,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     justifyContent: 'space-between', // Distribute space evenly
   },
-//   backButtonContainer: {
-//     marginTop: 20, // Push the back button down
-//     alignItems: 'flex-start',
-//   },
   backButton: {
     width: 40,
     height: 40,
@@ -248,19 +279,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f1f5f9',
-    marginBottom: 16,
+    marginBottom: 26,
   },
   backButtonContainer: {
-    paddingTop: 48,
+    paddingTop: 38,
     paddingHorizontal: 24,
   },
+  progressParent: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 26,
+  },
+  stepProgressContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+    width: '80%',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 8,
+  },
   contentContainer: {
+    marginTop: -55,
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
-    fontFamily:"Inter-Bold",
+    fontFamily: 'Inter-Bold',
     fontSize: 28,
     fontWeight: '600',
     color: '#1a1a1a',

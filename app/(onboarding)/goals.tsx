@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Alert,
   TextInput,
   Modal,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
@@ -61,21 +63,39 @@ export default function FitnessGoals() {
   const [isLoading, setIsLoading] = useState(false);
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [targetWeight, setTargetWeight] = useState('');
+  const [progressAnimation] = useState(new Animated.Value(0));
+
+  const totalSteps = 9;
+  const currentStep = 7; // Adjust based on your app flow
+
+  useEffect(() => {
+    Animated.timing(progressAnimation, {
+      toValue: currentStep / totalSteps,
+      duration: 1000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  const progressWidth = progressAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   const handleContinue = async () => {
     if (!selected) return;
-    
+
     // Check if the selected goal requires a target weight
     const selectedGoal = GOALS.find((goal) => goal.id === selected);
-    
+
     if (selectedGoal?.requiresTarget && !targetWeight) {
       setShowTargetModal(true);
       return;
     }
-    
+
     saveGoal();
   };
-  
+
   const saveGoal = async () => {
     try {
       setIsLoading(true);
@@ -101,7 +121,7 @@ export default function FitnessGoals() {
         title: selectedGoal.title,
         createdAt: new Date(),
       };
-      
+
       // Add targetWeight if it exists
       if (targetWeight) {
         goalToSave.targetWeight = parseFloat(targetWeight);
@@ -129,7 +149,7 @@ export default function FitnessGoals() {
       Alert.alert('Error', 'Please enter a valid target weight');
       return;
     }
-    
+
     setShowTargetModal(false);
     saveGoal();
   };
@@ -145,11 +165,13 @@ export default function FitnessGoals() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {selected === 'weight-loss' ? 'Target Weight (kg)' : 'Goal Weight (kg)'}
+              {selected === 'weight-loss'
+                ? 'Target Weight (kg)'
+                : 'Goal Weight (kg)'}
             </Text>
             <Text style={styles.modalSubtitle}>
-              {selected === 'weight-loss' 
-                ? 'What weight would you like to achieve?' 
+              {selected === 'weight-loss'
+                ? 'What weight would you like to achieve?'
                 : 'What weight would you like to gain to?'}
             </Text>
             <TextInput
@@ -161,13 +183,13 @@ export default function FitnessGoals() {
               placeholderTextColor="#94a3b8"
             />
             <View style={styles.modalButtons}>
-              <Pressable 
-                style={styles.modalCancelButton} 
+              <Pressable
+                style={styles.modalCancelButton}
                 onPress={() => setShowTargetModal(false)}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
-              <Pressable 
+              <Pressable
                 style={styles.modalSubmitButton}
                 onPress={handleTargetWeightSubmit}
               >
@@ -185,10 +207,25 @@ export default function FitnessGoals() {
         >
           <ChevronLeft size={24} color="#1a1a1a" />
         </Pressable>
-        <Text style={styles.title}>What's your primary goal?</Text>
-        <Text style={styles.subtitle}>
-          We'll customize your meal plans to help you achieve your fitness goals
-        </Text>
+        <View style={styles.progressParent}>
+          <View style={styles.stepProgressContainer}>
+            <View style={styles.progressBarContainer}>
+              <Animated.View
+                style={[styles.progressBar, { width: progressWidth }]}
+              />
+            </View>
+            <Text style={styles.stepText}>
+              Step {currentStep} of {totalSteps}
+            </Text>
+          </View>
+        </View>
+        <View>
+          <Text style={styles.title}>What's your primary goal?</Text>
+          <Text style={styles.subtitle}>
+            We'll customize your meal plans to help you achieve your fitness
+            goals
+          </Text>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -252,17 +289,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f1f5f9',
   },
+  stepProgressContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+    width: '80%',
+  },
+  progressParent: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 8,
+  },
   title: {
     fontFamily: 'Inter-Bold',
     fontSize: 28,
     color: '#1a1a1a',
     marginBottom: 8,
+    textAlign:"center",
   },
   subtitle: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
     color: '#64748b',
     lineHeight: 24,
+    textAlign:"center",
   },
   content: {
     flex: 1,
@@ -308,7 +373,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
-    alignItems:'center',
+    alignItems: 'center',
   },
   button: {
     flexDirection: 'row',
@@ -318,8 +383,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
-    width:'90%',
-    marginBottom:12,
+    width: '90%',
+    marginBottom: 12,
   },
   buttonDisabled: {
     backgroundColor: '#f1f5f9',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,31 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
 import { doc, updateDoc } from "firebase/firestore";
-import { auth, db } from '../../components/firebase/Firebase'; // Update this path to point to your firebase config file
+import { auth, db } from '../../components/firebase/Firebase';
 
 export default function Height() {
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [progressAnimation] = useState(new Animated.Value(0));
+
+  const totalSteps = 9;
+  const currentStep = 1;
+
+  useEffect(() => {
+    Animated.timing(progressAnimation, {
+      toValue: currentStep / totalSteps,
+      duration: 1000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, []);
 
   const handleContinue = async () => {
     if (!heightFeet || !heightInches) {
@@ -27,7 +42,6 @@ export default function Height() {
 
     try {
       setIsLoading(true);
-
       const currentUser = auth.currentUser;
       
       if (!currentUser) {
@@ -35,10 +49,8 @@ export default function Height() {
         return;
       }
 
-      // Convert to total height in inches for easier calculations later if needed
       const totalHeightInInches = (parseInt(heightFeet) * 12) + parseInt(heightInches);
       
-      // Update the user document in the users collection
       const userRef = doc(db, "users", currentUser.uid);
       await updateDoc(userRef, {
         height: {
@@ -50,8 +62,6 @@ export default function Height() {
       });
 
       console.log(`Height saved: ${heightFeet} ft ${heightInches} in`);
-
-      // Navigate to the next screen
       router.push('/weight');
     } catch (error) {
       console.error('Error saving height:', error);
@@ -61,29 +71,38 @@ export default function Height() {
     }
   };
 
-  // Only allow integers
   const handleNumericInput = (text, setter) => {
     const numericValue = text.replace(/[^0-9]/g, '');
     setter(numericValue);
   };
+
+  const progressWidth = progressAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <View style={styles.backButtonContainer}>
+      <View style={styles.header}>
         <Pressable
           style={styles.backButton}
           onPress={() => router.push('/(onboarding)')}
         >
           <ChevronLeft size={24} color="#000" />
         </Pressable>
-
-        <Text style={styles.stepCounter}>Step 1/8</Text>
       </View>
 
       <View style={styles.contentContainer}>
+        <View style={styles.stepProgressContainer}>
+          <View style={styles.progressBarContainer}>
+            <Animated.View style={[styles.progressBar, { width: progressWidth }]} />
+          </View>
+          <Text style={styles.stepText}>Step {currentStep} of {totalSteps}</Text>
+        </View>
+
         <Text style={styles.title}>Enter your height</Text>
 
         <View style={styles.inputContainer}>
@@ -151,17 +170,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  backButtonContainer: {
+  header: {
     paddingTop: 48,
     paddingHorizontal: 24,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  stepCounter: {
-    fontFamily: 'Inter-bold',
-    fontSize: 25,
-    color: '#64748b',
   },
   backButton: {
     width: 48,
@@ -176,6 +190,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
+  },
+  stepProgressContainer: {
+    alignItems: 'center',
+    marginTop:-20,
+    marginBottom: 40,
+    width: '80%',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 8,
   },
   title: {
     fontFamily: 'Inter-Bold',

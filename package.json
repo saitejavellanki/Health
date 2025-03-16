@@ -33,6 +33,7 @@
     "expo-auth-session": "~6.0.3",
     "expo-blur": "^14.0.3",
     "expo-camera": "~16.0.18",
+    "expo-checkbox": "^4.0.1",
     "expo-constants": "^17.0.5",
     "expo-crypto": "^14.0.2",
     "expo-firebase-recaptcha": "^2.3.1",
