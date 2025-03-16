@@ -22,8 +22,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      "./buildConfig.js"
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true

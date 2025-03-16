@@ -25,8 +25,10 @@ import {
 import { Link, router } from 'expo-router';
 import {
   signInWithEmailAndPassword,
-  PhoneAuthProvider,
+  GoogleAuthProvider,
   signInWithCredential,
+  OAuthProvider,
+  PhoneAuthProvider,
 } from 'firebase/auth';
 import { auth, db } from '../../components/firebase/Firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -37,6 +39,9 @@ import {
   Phone,
 } from 'lucide-react-native';
 
+// Import Google Sign In
+import * as Google from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { maybeCompleteAuthSession } from 'expo-web-browser';
 
 // For Phone Authentication
@@ -61,10 +66,27 @@ export default function Login() {
   // Reference to recaptcha verifier
   const recaptchaVerifier = React.useRef(null);
 
+  // Configure Google Sign In
+  const [googleRequest, googleResponse, googlePromptAsync] =
+    Google.useAuthRequest({
+      // Get these values from your Firebase project settings
+      expoClientId: 'YOUR_EXPO_CLIENT_ID',
+      iosClientId: 'YOUR_IOS_CLIENT_ID',
+      androidClientId: 'YOUR_ANDROID_CLIENT_ID',
+      webClientId: 'YOUR_WEB_CLIENT_ID',
+    });
+
   const [fontsLoaded] = useFonts({
     Poppins_Regular: Poppins_400Regular,
     Poppins_Bold: Poppins_700Bold,
   });
+
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { id_token } = googleResponse.params;
+      handleGoogleCredential(id_token);
+    }
+  }, [googleResponse]);
 
   if (!fontsLoaded) {
     return null; // Prevent rendering until fonts are loaded
@@ -181,6 +203,66 @@ export default function Login() {
     } catch (error) {
       setError(`Code verification failed: ${error.message}`);
       Alert.alert('Verification Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true);
+      await googlePromptAsync();
+    } catch (error) {
+      Alert.alert('Google Sign In Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (idToken) => {
+    try {
+      setLoading(true);
+      // Create a Google credential with the token
+      const googleCredential = GoogleAuthProvider.credential(idToken);
+
+      // Sign in with credential from the Google user
+      const userCredential = await signInWithCredential(auth, googleCredential);
+
+      // Success, navigate to home screen
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Authentication Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      setLoading(true);
+      const appleCredential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      // Create an OAuthProvider credential
+      const provider = new OAuthProvider('apple.com');
+      const credential = provider.credential({
+        idToken: appleCredential.identityToken,
+      });
+
+      // Sign in with credential
+      const userCredential = await signInWithCredential(auth, credential);
+
+      // Success, navigate to home screen
+      router.replace('/(tabs)');
+    } catch (error) {
+      // Ignore cancel errors
+      if (error.code !== 'ERR_CANCELED') {
+        Alert.alert('Apple Sign In Error', error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -356,6 +438,38 @@ export default function Login() {
             </>
           )}
 
+          <View style={styles.dividerContainer}>
+            <View style={styles.divider} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.divider} />
+          </View>
+
+          <View style={styles.socialButtonsContainer}>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={handleGoogleSignIn}
+              disabled={loading}
+            >
+              <Image
+                source={require('../../assets/images/google-logo.png')}
+                style={styles.socialIcon}
+              />
+            </TouchableOpacity>
+
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={styles.socialButton}
+                onPress={handleAppleSignIn}
+                disabled={loading}
+              >
+                <Image
+                  source={require('../../assets/images/apple-logo.png')}
+                  style={styles.socialIcon}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Don't have an account? </Text>
             <Link href="/(auth)/register" asChild>
@@ -369,7 +483,6 @@ export default function Login() {
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
