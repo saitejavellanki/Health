@@ -31,7 +31,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../../components/firebase/Firebase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import Gender from './gender';
+import { Checkbox } from 'expo-checkbox';
 
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
 const GEMINI_API_URL =
@@ -161,7 +161,6 @@ const parseDailyPlan = (planText) => {
 };
 
 const createPrompt = (userData) => {
-  console.log(userData);
   const goal =
     userData.goals && userData.goals.length > 0
       ? userData.goals[0]?.title
@@ -202,7 +201,7 @@ const createPrompt = (userData) => {
       5.003 * userData.height['totalInches'] * 2.54 -
       6.755 * userData.dateOfBirth['age'];
   }
-  console.log(`BMR ${bmr}`);
+
   let act_fac = 0;
   if (userData.workoutFrequency === 'none') {
     act_fac += 1.2;
@@ -215,38 +214,9 @@ const createPrompt = (userData) => {
   } else if (userData.workoutFrequency === 'intense') {
     act_fac = 1.9;
   }
-  console.log(`Activity factor ${act_fac}`);
+
   let tdde = bmr * act_fac;
-  console.log(`TDDE ${tdde}`);
 
-  //   return `Suggest additional food items to take along with regular meals for ${goal} ${weightGoalText}.
-  // ${weightContext} Diet preference: ${diet} with Indian food specific to ${state} region.
-  // Allergies: ${allergies}. Calorie intake target per day: ${tdde}. Monthly budget: ${userData.budget.amount} INR.
-
-  // For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
-
-  // Start with just the day name (e.g., "Monday")
-
-  // -Exercise: [brief workout plan]
-
-  // -Breakfast: [suggest additional food items to take along with breakfast,
-  // specifying how many calories (kcal) they provide at the end of the line]
-  // -Lunch: [suggest food items to take as lunch, specifying how many calories (kcal)
-  // they provide at the end of the line]
-  // -Snack: [suggest food items to take as snacks, specifying how many calories (kcal)
-  // they provide at the end of the line]
-
-  // -Dinner: [suggest additional food items to take along with dinner,
-  // specifying how many calories (kcal) they provide at the end of the line]
-
-  // Tracking: [simple tip for monitoring progress]
-
-  // Keep each section brief - 1-2 sentences maximum. Focus on actionable items.
-  // All suggestions should be authentic ${state}-style South Indian
-  // cuisine options that are commonly prepared in that region,
-  // tailored to the user's diet and allergies. Ensure calorie intake aligns with ${tdde},
-  // and all recommendations fit within the monthly budget (${userData.budget.amount}).
-  // Strictly follow that no pricing information should be included in the output.`;
   return `Create a 7-day wellness plan for ${goal} ${weightGoalText}. 
    ${weightContext}Diet preference: ${diet} with Indian food specific to ${state} region. Allergies: ${allergies}.
 
@@ -262,7 +232,7 @@ const createPrompt = (userData) => {
    Keep each section brief - 1-2 sentences maximum. Give total calories that meal holds at the end of sentence. 
    Try to use give meals that use "most regularly/commonly used food items in that area" only.  
    Focus on actionable items. All meals should be authentic ${state}-style Indian cuisine 
-   options that are commonly prepared in that region.`;
+   options that are commonly prepared in that region.`;
 };
 
 const { width } = Dimensions.get('window');
@@ -277,6 +247,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
   const [savingPlan, setSavingPlan] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [isChecked, setChecked] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -580,163 +551,163 @@ const PlanScreen = ({ userData: propUserData, route }) => {
   const renderDayPlan = () => {
     if (!dailyPlans || dailyPlans.length === 0) {
       return (
-        <View style={styles.noPlanContainer}>
-          <Calendar size={60} color="#22c55e" />
-          <Text style={styles.noPlanTitle}>Your Wellness Plan Awaits</Text>
-          <Pressable
-            style={styles.generateButton}
-            onPress={generatePlan}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.generateButtonText}>Create My Plan</Text>
-            )}
-          </Pressable>
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'column',
+            height: '100%',
+            justifyContent: 'center',
+          }}
+        >
+          <View style={styles.noPlanContainer}>
+            <Calendar size={60} color="#22c55e" />
+            <Text style={styles.noPlanTitle}>Your Wellness Plan Awaits</Text>
+            <Text style={styles.noPlanSubtitle}>
+              Generate a personalized 7-day meal and exercise plan based on your
+              fitness goals and preferences.
+            </Text>
+
+            <View style={styles.checkboxContainer}>
+              <Checkbox
+                style={styles.checkbox}
+                value={isChecked}
+                onValueChange={setChecked}
+                color={isChecked ? '#22c55e' : undefined}
+              />
+              <Text style={styles.termsText}>
+                I accept CrunchX AI's Terms of Service and Privacy Policy.
+              </Text>
+            </View>
+
+            <Pressable
+              style={[
+                styles.generateButton,
+                (!isChecked || loading) && styles.generateButtonDisabled,
+              ]}
+              onPress={generatePlan}
+              disabled={loading || !isChecked}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.generateButtonText}>Create My Plan</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       );
     }
 
     const selectedDay = dailyPlans[selectedDayIndex];
+    if (!selectedDay) return null;
 
     return (
-      <ScrollView
-        style={styles.dayPlanContainer}
-        contentContainerStyle={styles.dayPlanContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {Object.entries(selectedDay.sections).map(
-          ([sectionKey, sectionItems]) => {
-            if (!sectionItems || sectionItems.length === 0) return null;
+      <View style={styles.dayPlanContainer}>
+        <View style={styles.dayHeaderContainer}>
+          <Text style={styles.dayHeader}>{selectedDay.day}</Text>
+          <View style={styles.actionButtonsContainer}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={handleRegenerate}
+              disabled={loading}
+            >
+              <RefreshCw
+                size={16}
+                color={loading ? '#c1c1c1' : '#22c55e'}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  loading && styles.actionButtonTextDisabled,
+                ]}
+              >
+                Regenerate
+              </Text>
+            </Pressable>
 
-            return (
-              <View key={sectionKey} style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                  {getSectionIcon(sectionKey)}
-                  <Text style={styles.sectionTitle}>
-                    {getSectionTitle(sectionKey)}
-                  </Text>
-                </View>
-                {sectionItems.map((item, idx) => (
-                  <View key={idx} style={styles.sectionItemWrapper}>
-                    <View style={styles.itemDot} />
-                    <Text style={styles.sectionItem}>{item}</Text>
-                  </View>
-                ))}
-              </View>
-            );
-          }
+            <Pressable
+              style={styles.actionButton}
+              onPress={savePlanToFirebase}
+              disabled={savingPlan}
+            >
+              <Save
+                size={16}
+                color={savingPlan ? '#c1c1c1' : '#22c55e'}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  savingPlan && styles.actionButtonTextDisabled,
+                ]}
+              >
+                {savingPlan ? 'Saving...' : 'Save Plan'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {selectedDay.sections.overview.length > 0 && (
+          <View style={styles.overviewSection}>
+            <Text style={styles.overviewText}>
+              {selectedDay.sections.overview.join('\n')}
+            </Text>
+          </View>
         )}
 
-        <View style={styles.actionButtonsContainer}>
-          <Pressable
-            style={[styles.actionButton, styles.regenerateButton]}
-            onPress={handleRegenerate}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <RefreshCw size={18} color="#fff" />
-                <Text style={styles.actionButtonText}>Regenerate Plan</Text>
-              </>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={[styles.actionButton, styles.saveButton]}
-            onPress={() => savePlanToFirebase()}
-            disabled={savingPlan || loading || !rawPlan}
-          >
-            {savingPlan ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Save size={18} color="#fff" />
-                <Text style={styles.actionButtonText}>Save Plan</Text>
-              </>
-            )}
-          </Pressable>
-        </View>
-      </ScrollView>
+        {Object.entries(selectedDay.sections)
+          .filter(([key]) => key !== 'overview')
+          .map(([key, items]) => (
+            <View key={key} style={styles.planSection}>
+              <View style={styles.sectionHeader}>
+                {getSectionIcon(key)}
+                <Text style={styles.sectionTitle}>{getSectionTitle(key)}</Text>
+              </View>
+              {items.map((item, index) => (
+                <Text key={index} style={styles.sectionItem}>
+                  {item}
+                </Text>
+              ))}
+            </View>
+          ))}
+      </View>
     );
   };
 
-  if (loadingUserData) {
+  if (loadingUserData && !userData) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#22c55e" />
-          <Text style={styles.loadingText}>Loading your profile...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!userData) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.errorContainer}>
-          <View style={styles.errorIconContainer}>
-            <AlertCircle size={48} color="#fff" />
-          </View>
-          <Text style={styles.errorTitle}>Unable to load profile</Text>
-          <Text style={styles.errorText}>
-            We couldn't retrieve your information at this time.
-          </Text>
-          <Pressable
-            style={styles.retryButton}
-            onPress={() => {
-              window.location.reload();
-            }}
-          >
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </Pressable>
-        </View>
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#22c55e" />
+        <Text style={styles.loadingText}>Loading your profile...</Text>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <LinearGradient colors={['#ffffff', '#f9fafb']} style={styles.container}>
         <View style={styles.header}>
           <Pressable
             style={styles.backButton}
-            onPress={() => router.push('/(tabs)')}
+            onPress={() => router.push('/budget')}
           >
-            <ChevronLeft size={24} color="#22c55e" />
+            <ChevronLeft size={22} color="#1a1a1a" />
           </Pressable>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.title}>Your Wellness Plan</Text>
-            {userData?.goals && userData.goals.length > 0 && (
-              <Text style={styles.subTitle}>
-                For {userData.goals[0]?.title || 'health improvement'}
-              </Text>
-            )}
-          </View>
-
-          {dailyPlans && dailyPlans.length > 0 && (
-            <Pressable
-              style={styles.headerButton}
-              onPress={handleRegenerate}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#22c55e" />
-              ) : (
-                <RefreshCw size={22} color="#22c55e" />
-              )}
-            </Pressable>
-          )}
+          <Text style={styles.headerTitle}>Your Wellness Plan</Text>
+          <View style={{ width: 40 }} />
         </View>
 
         {renderError()}
         {renderDayTabs()}
-        {renderDayPlan()}
-      </View>
+
+        <ScrollView
+          style={styles.contentScrollView}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderDayPlan()}
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 };
@@ -744,162 +715,58 @@ const PlanScreen = ({ userData: propUserData, route }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f7f9fc',
+    backgroundColor: '#fff',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    backgroundColor: '#f7f9fc',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#edf2f7',
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  headerTextContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: 'Inter-Bold',
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#1a1a1a',
-    letterSpacing: 0.3,
-  },
-  subTitle: {
-    fontSize: 14,
-    color: '#4a5568',
-    marginTop: 2,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0fff4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   errorBanner: {
-    backgroundColor: '#ef4444',
-    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 12,
+    backgroundColor: '#ef4444',
+    padding: 10,
+    margin: 10,
     borderRadius: 8,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
   errorBannerText: {
     color: '#fff',
     marginLeft: 8,
+    flex: 1,
     fontSize: 14,
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f7f9fc',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#4b5563',
-    letterSpacing: 0.3,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f7f9fc',
-  },
-  errorIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#ef4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  errorTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1a202c',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#4a5568',
-    textAlign: 'center',
-    maxWidth: 300,
-    lineHeight: 22,
-  },
-  retryButton: {
-    backgroundColor: '#ef4444',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    marginTop: 24,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   dayTabsWrapper: {
-    marginVertical: 15,
-  },
-  dayTabsContainer: {
-    marginVertical: 15,
-  },
-  dayTabsScroll: {
-    paddingHorizontal: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
   dayTab: {
+    paddingHorizontal: 20,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    marginHorizontal: 4,
     borderRadius: 20,
-    marginHorizontal: 5,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#f1f5f9',
   },
   activeDayTab: {
     backgroundColor: '#22c55e',
@@ -907,106 +774,156 @@ const styles = StyleSheet.create({
   dayTabText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#64748b',
   },
   activeDayTabText: {
-    color: '#ffffff',
+    color: '#fff',
+  },
+  contentScrollView: {
+    flex: 1,
+    flexGrow: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  noPlanContainer: {
+    flexDirection: 'column',
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    minHeight: '100%', // Use percentage instead of fixed height
+  },
+
+  noPlanTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginTop: 20,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noPlanSubtitle: {
+    fontSize: isMobile ? 16 : 18,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  checkbox: {
+    marginRight: 10,
+  },
+  termsText: {
+    fontSize: isMobile ? 14 : 16,
+    color: '#333333',
+    flex: 1,
+  },
+  generateButton: {
+    backgroundColor: '#22c55e',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 300,
+  },
+  generateButtonDisabled: {
+    backgroundColor: '#a8e2c0',
+  },
+  generateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   dayPlanContainer: {
-    flex: 1,
-    backgroundColor: '#f7f9fc',
-  },
-  dayPlanContent: {
-    paddingBottom: 80,
-    paddingHorizontal: 16,
-  },
-  sectionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    marginBottom: 16,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+  dayHeaderContainer: {
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333333',
-    marginLeft: 10,
-  },
-  sectionItemWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  itemDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22c55e',
-    marginRight: 12,
-  },
-  sectionItem: {
-    fontSize: 16,
-    color: '#4a5568',
-    flex: 1,
+  dayHeader: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 8,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 24,
+    marginTop: 8,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 30,
-    flex: 1,
-    marginHorizontal: 8,
-    justifyContent: 'center',
-  },
-  regenerateButton: {
-    backgroundColor: '#3b82f6',
-  },
-  saveButton: {
-    backgroundColor: '#22c55e',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    backgroundColor: '#f1f5f9',
+    marginRight: 8,
   },
   actionButtonText: {
-    color: '#ffffff',
+    fontSize: 14,
+    color: '#22c55e',
+    fontWeight: '500',
+  },
+  actionButtonTextDisabled: {
+    color: '#c1c1c1',
+  },
+  overviewSection: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+  },
+  overviewText: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 20,
+  },
+  planSection: {
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#1a1a1a',
     marginLeft: 8,
   },
-  noPlanTitle: {
-    fontSize: isMobile ? 20 : 22,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginTop: isMobile ? 10 : 15,
-    marginBottom: isMobile ? 20 : 20,
-  },
-  generateButton: {
-    backgroundColor: '#22c55e',
-    paddingVertical: isMobile ? 12 : 15,
-    paddingHorizontal: isMobile ? 25 : 30,
-    borderRadius: isMobile ? 25 : 30,
-  },
-  generateButtonText: {
-    color: '#ffffff',
-    fontSize: isMobile ? 16 : 18,
-  },
-  noPlanContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+  sectionItem: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 20,
+    marginBottom: 4,
+    paddingLeft: 28,
   },
 });
 

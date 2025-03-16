@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Alert,
   SafeAreaView,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, Check, ChevronLeft } from 'lucide-react-native';
@@ -22,6 +24,24 @@ const DIETARY_PREFERENCES = [
 export default function DietaryPreferences() {
   const [selected, setSelected] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [progressAnimation] = useState(new Animated.Value(0));
+
+  const totalSteps = 9;
+  const currentStep = 6; // Adjust based on your app flow
+
+  useEffect(() => {
+    Animated.timing(progressAnimation, {
+      toValue: currentStep / totalSteps,
+      duration: 1000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  const progressWidth = progressAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   const handleContinue = async () => {
     if (!selected) return;
@@ -65,6 +85,17 @@ export default function DietaryPreferences() {
       </View>
 
       <View style={styles.mainContent}>
+        <View style={styles.stepProgressContainer}>
+          <View style={styles.progressBarContainer}>
+            <Animated.View
+              style={[styles.progressBar, { width: progressWidth }]}
+            />
+          </View>
+          <Text style={styles.stepText}>
+            Step {currentStep} of {totalSteps}
+          </Text>
+        </View>
+
         <View style={styles.titleContainer}>
           <Text style={styles.title}>What's your dietary preference?</Text>
         </View>
@@ -145,14 +176,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f1f5f9',
-    marginTop:25,
-    marginLeft:10,
+    marginTop: 25,
+    marginLeft: 10,
   },
   mainContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
+  },
+  stepProgressContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+    width: '80%',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 8,
   },
   titleContainer: {
     marginBottom: 40,
@@ -207,7 +260,7 @@ const styles = StyleSheet.create({
     // padding: 24,
     // borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
-    alignItems:'center',
+    alignItems: 'center',
   },
   button: {
     flexDirection: 'row',
@@ -217,8 +270,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
-    width:'80%',
-    marginBottom:12,
+    width: '80%',
+    marginBottom: 12,
   },
   buttonDisabled: {
     backgroundColor: '#f1f5f9',

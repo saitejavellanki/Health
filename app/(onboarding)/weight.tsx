@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,30 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
-import { doc, updateDoc } from "firebase/firestore";
-import { auth, db } from '../../components/firebase/Firebase'; // Update this path to point to your firebase config file
+import { doc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../../components/firebase/Firebase';
 
 export default function Weight() {
   const [weight, setWeight] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [progressAnimation] = useState(new Animated.Value(0));
+
+  const totalSteps = 9;
+  const currentStep = 2;
+
+  useEffect(() => {
+    Animated.timing(progressAnimation, {
+      toValue: currentStep / totalSteps,
+      duration: 1000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, []);
 
   const handleContinue = async () => {
     if (!weight) {
@@ -26,24 +41,20 @@ export default function Weight() {
 
     try {
       setIsLoading(true);
-      
       const currentUser = auth.currentUser;
-      
+
       if (!currentUser) {
         Alert.alert('Error', 'You must be logged in to save your weight.');
         return;
       }
-      
-      // Update the user document in the users collection
-      const userRef = doc(db, "users", currentUser.uid);
+
+      const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         weight: parseInt(weight),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       console.log(`Weight saved: ${weight} kgs`);
-
-      // Navigate to the next screen
       router.push('/gender');
     } catch (error) {
       console.error('Error saving weight:', error);
@@ -53,11 +64,15 @@ export default function Weight() {
     }
   };
 
-  // Only allow integers
   const handleNumericInput = (text) => {
     const numericValue = text.replace(/[^0-9]/g, '');
     setWeight(numericValue);
   };
+
+  const progressWidth = progressAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <KeyboardAvoidingView
@@ -71,10 +86,20 @@ export default function Weight() {
         >
           <ChevronLeft size={24} color="#000" />
         </Pressable>
-        <Text style={styles.stepCounter}>Step 2/8</Text>
       </View>
 
       <View style={styles.contentContainer}>
+        <View style={styles.stepProgressContainer}>
+          <View style={styles.progressBarContainer}>
+            <Animated.View
+              style={[styles.progressBar, { width: progressWidth }]}
+            />
+          </View>
+          <Text style={styles.stepText}>
+            Step {currentStep} of {totalSteps}
+          </Text>
+        </View>
+
         <Text style={styles.title}>Enter your weight</Text>
 
         <View style={styles.inputContainer}>
@@ -125,11 +150,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  stepCounter: {
-    fontFamily: 'Inter-bold',
-    fontSize: 25,
-    color: '#64748b',
-  },
   backButton: {
     width: 48,
     height: 48,
@@ -143,6 +163,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
+  },
+  stepProgressContainer: {
+    alignItems: 'center',
+    marginTop: -20,
+    marginBottom: 40,
+    width: '80%',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 8,
   },
   title: {
     fontFamily: 'Inter-Bold',

@@ -30,7 +30,7 @@ export default function Welcome() {
       // }
       router.push('/(tabs)');
     } catch (error) {
-      console.error("Error updating onboarded status:", error);
+      console.error('Error updating onboarded status:', error);
     }
   };
 
@@ -47,14 +47,14 @@ export default function Welcome() {
         </View>
         {/* <Text style={styles.aiText}>AI</Text> */}
       </View>
-      
+
       <Image
         source={{
           uri: 'https://images.unsplash.com/photo-1543362906-acfc16c67564?q=80&w=1000&auto=format&fit=crop',
         }}
         style={styles.image}
       />
-      
+
       <View style={styles.content}>
         <Text style={styles.subtitle}>
           Meal planning and grocery shopping, simplified.
@@ -64,15 +64,13 @@ export default function Welcome() {
           <Pressable
             style={styles.button}
             onPress={() => router.push('/height')}
+            // onPress={() => router.push('/plan')}
           >
             <Text style={styles.buttonText}>Get Started</Text>
             <ArrowRight size={20} color="#fff" />
           </Pressable>
-          
-          <Pressable
-            style={styles.skipButton}
-            onPress={handleSkip}
-          >
+
+          <Pressable style={styles.skipButton} onPress={handleSkip}>
             <Text style={styles.skipButtonText}>Skip</Text>
           </Pressable>
         </View>

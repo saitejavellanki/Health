@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Pressable,
   Alert,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, Check, ChevronLeft } from 'lucide-react-native';
@@ -35,6 +37,24 @@ const itemWidth = (width - 72) / 2; // 2 items per row with padding
 export default function Allergies() {
   const [selected, setSelected] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
+  const [progressAnimation] = useState(new Animated.Value(0));
+
+  const totalSteps = 9;
+  const currentStep = 8; // Last step
+
+  useEffect(() => {
+    Animated.timing(progressAnimation, {
+      toValue: currentStep / totalSteps,
+      duration: 1000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  const progressWidth = progressAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   const toggleAllergy = (id) => {
     const newSelected = new Set(selected);
@@ -92,11 +112,26 @@ export default function Allergies() {
         >
           <ChevronLeft size={24} color="#1a1a1a" />
         </Pressable>
-        <Text style={styles.title}>Any food allergies?</Text>
-        <Text style={styles.subtitle}>
-          Select all that apply. This helps us ensure your meal plans are safe
-          for you.
-        </Text>
+
+        <View style={styles.progressParent}>
+          <View style={styles.stepProgressContainer}>
+            <View style={styles.progressBarContainer}>
+              <Animated.View
+                style={[styles.progressBar, { width: progressWidth }]}
+              />
+            </View>
+            <Text style={styles.stepText}>
+              Step {currentStep} of {totalSteps}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.titleparent}>
+          <Text style={styles.title}>Any food allergies?</Text>
+          <Text style={styles.subtitle}>
+            Select all that apply. This helps us to ensure your meal plans are safe
+            for you.
+          </Text>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -156,7 +191,7 @@ const styles = StyleSheet.create({
   header: {
     padding: 24,
     paddingTop: 60,
-    backgroundColor: '#f8fafc',
+    // backgroundColor: '#f8fafc',
   },
   backButton: {
     width: 40,
@@ -167,17 +202,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     marginBottom: 16,
   },
+  progressParent: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  stepProgressContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+    width: '80%',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  titleparent:{
+    alignItems:"center",
+  },
   title: {
     fontFamily: 'Inter-Bold',
     fontSize: 28,
     color: '#1a1a1a',
     marginBottom: 8,
+    // alignItems:"center",
   },
   subtitle: {
     fontFamily: 'Inter-Regular',
     fontSize: 15,
     color: '#999999',
     lineHeight: 24,
+    textAlign:"center",
   },
   content: {
     flex: 1,
