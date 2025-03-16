@@ -5,6 +5,11 @@
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
+    "splash": {
+      "image": "./assets/images/CrunchX AI splash .png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
