@@ -13,10 +13,30 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { Settings, Bell, Heart, CircleHelp, LogOut, Camera, RefreshCw } from 'lucide-react-native';
+import {
+  Settings,
+  Bell,
+  Heart,
+  CircleHelp,
+  LogOut,
+  Camera,
+  RefreshCw,
+  User,
+  Calendar,
+  Scale,
+  Ruler,
+  Utensils,
+  Clock,
+  TrendingUp,
+  Award,
+  Apple,
+  Dumbbell,
+  Target,
+  Zap,
+} from 'lucide-react-native';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
-import { db } from '../../components/firebase/Firebase'; 
+import { db } from '../../components/firebase/Firebase';
 import { router, useFocusEffect } from 'expo-router';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -30,21 +50,26 @@ interface UserData {
   targetWeight: number;
   streak: number;
   totalWorkouts: number;
-  dateJoined: string;
+  dateJoined: any;
+  dateOfBirth: { age: number; timestamp?: string };
+  dietaryPreference: string;
+  mealsTrackedToday: number;
+  activityLevel: string;
+  goals: Array<{ id?: string; title?: string; targetWeight?: number }>;
 }
 
 const ProfileScreen: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [profileImageKey, setProfileImageKey] = useState(Date.now()); // Add a key to force image refresh
+  const [profileImageKey, setProfileImageKey] = useState(Date.now());
 
   const fetchUserData = useCallback(async () => {
     try {
       setLoading(true);
       const auth = getAuth();
       const currentUser = auth.currentUser;
-      
+
       if (!currentUser) {
         setError('User not authenticated');
         setLoading(false);
@@ -55,9 +80,24 @@ const ProfileScreen: React.FC = () => {
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
-        const data = userDoc.data() as UserData;
+        const firestoreData = userDoc.data();
+        const goals = firestoreData.goals || [];
+
+        // Get targetWeight from first goal or fallback to root value
+        const targetWeight =
+          goals[0]?.targetWeight || firestoreData.targetWeight || 100;
+
+        const data = {
+          ...firestoreData,
+          dateOfBirth: firestoreData.dateOfBirth || { age: 25 },
+          dietaryPreference: firestoreData.dietaryPreference || 'Balanced',
+          activityLevel: firestoreData.activityLevel || 'Moderate',
+          goals,
+          targetWeight,
+          weight: firestoreData.weight || 70,
+        } as UserData;
+
         setUserData(data);
-        // Reset the profile image key to force a refresh
         setProfileImageKey(Date.now());
       } else {
         setError('User data not found');
@@ -70,12 +110,10 @@ const ProfileScreen: React.FC = () => {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     fetchUserData();
   }, []);
-  
-  // Refetch when screen comes into focus (when navigating back)
+
   useFocusEffect(
     useCallback(() => {
       fetchUserData();
@@ -83,11 +121,10 @@ const ProfileScreen: React.FC = () => {
   );
 
   const navigateToSettings = () => {
-    // Navigate to settings screen with userData as params
     if (userData) {
       router.push({
         pathname: '/Utils/SettingsScreen',
-        params: { userData: JSON.stringify(userData) }
+        params: { userData: JSON.stringify(userData) },
       });
     }
   };
@@ -107,73 +144,122 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  // If loading, show a loading indicator
+  const formatHeight = (height: { feet: number; inches: number }) => {
+    return `${height.feet}' ${height.inches}"`;
+  };
+
+  const calculateAge = () => {
+    if (!userData) return 0;
+    return userData.dateOfBirth?.age || 25;
+  };
+
+  const getDaysUntilGoal = () => {
+    if (!userData) return 0;
+
+    const weightDifference = Math.abs(userData.weight - userData.targetWeight);
+    if (weightDifference <= 0) return 0;
+
+    return Math.ceil(weightDifference / 0.5) * 7;
+  };
+
+  const calculateWeightProgress = () => {
+    if (!userData) return 0;
+
+    if (userData.targetWeight > userData.weight) {
+      const progress = (userData.weight / userData.targetWeight) * 100;
+      return Math.min(100, Math.max(0, progress));
+    }
+
+    const progress =
+      100 - ((userData.weight - userData.targetWeight) / userData.weight) * 100;
+    return Math.min(100, Math.max(0, progress));
+  };
+
+  const formatJoinDate = (dateJoined: any) => {
+    if (dateJoined?.seconds) {
+      return new Date(dateJoined.seconds * 1000).toLocaleDateString();
+    }
+    return 'N/A';
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#22c55e" />
-        <Text style={{ marginTop: 12, fontFamily: 'Inter-Regular' }}>Loading profile...</Text>
+        <Text style={{ marginTop: 12, fontFamily: 'Inter-Regular' }}>
+          Loading profile...
+        </Text>
       </View>
     );
   }
 
-  // If error or no user data, show an error message
   if (error || !userData) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <CircleHelp size={48} color="#FF6B6B" />
-        <Text style={{ marginTop: 12, fontFamily: 'Inter-Regular', color: '#FF6B6B' }}>
+        <Text
+          style={{
+            marginTop: 12,
+            fontFamily: 'Inter-Regular',
+            color: '#FF6B6B',
+          }}
+        >
           {error || 'Unable to load profile'}
         </Text>
       </View>
     );
   }
 
-  // Dummy progress data for engagement features - calculate these values based on userData
-  const weightProgress =
-    ((userData.weight - userData.targetWeight) / 5) * 100;
-  
-  // These could potentially come from Firebase as well in a future implementation
-  const weeklyActivity = [5, 3, 6, 4, 7, 5, 6]; // Days active
+  const weightProgress = calculateWeightProgress();
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header with full-width background image */}
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.profileHeaderContainer}>
           <View style={styles.coverImageContainer}>
             <Image
-              key={profileImageKey} // Add key to force refresh when changed
-              source={{ 
-                uri: userData.profileImage || 'https://randomuser.me/api/portraits/men/32.jpg',
-                cache: 'reload' // Force image cache to reload
+              key={profileImageKey}
+              source={{
+                uri:
+                  userData.profileImage ||
+                  'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1742205498/placeholder_for_dp_nsojeb.jpg',
+                cache: 'reload',
               }}
               style={styles.coverImage}
               resizeMode="cover"
             />
-            
-            {/* Settings button */}
-            <TouchableOpacity style={styles.settingsButton} onPress={navigateToSettings}>
+
+            <TouchableOpacity
+              style={styles.settingsButton}
+              onPress={navigateToSettings}
+            >
               <Settings size={22} color="#FFFFFF" />
             </TouchableOpacity>
-            
-            {/* Profile info on top of image */}
+
             <View style={styles.profileInfoOverlay}>
               <Text style={styles.nameOverlay}>{userData.name}</Text>
               <Text style={styles.emailOverlay}>{userData.email}</Text>
             </View>
           </View>
 
-          {/* Streak container - moved downward */}
           <View style={styles.streakContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userData.mealsTrackedToday || 0}</Text>
-              <Text style={styles.statLabel}>Meals Tracked</Text>
+              <Text style={styles.statValue}>
+                {userData.mealsTrackedToday || 0}
+              </Text>
+              <Text style={styles.statLabel}>Meals Scanned</Text>
             </View>
-            
+
             <View style={styles.divider} />
-            
+
             <View style={styles.statItem}>
               <View style={styles.streakValueContainer}>
                 <Text style={styles.statValue}>{userData.streak || 0}</Text>
@@ -186,51 +272,149 @@ const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Progress Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Weight Progress</Text>
-            <Text style={styles.progressPercentage}>
-              {Math.round(weightProgress)}% to goal
-            </Text>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            <User size={20} color="#22c55e" />
           </View>
-          <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFill, { width: `${weightProgress}%` }]}
-            />
-          </View>
-          <View style={styles.weightStats}>
-            <Text style={styles.weightStat}>
-              Current: {userData.weight}kg
-            </Text>
-            <Text style={styles.weightStat}>
-              Target: {userData.targetWeight}kg
-            </Text>
+          <View style={styles.userDetailsGrid}>
+            <View style={styles.detailItem}>
+              <Calendar size={20} color="#6366f1" />
+              <Text style={styles.detailLabel}>Age</Text>
+              <Text style={styles.detailValue}>{calculateAge()}</Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Ruler size={20} color="#f59e0b" />
+              <Text style={styles.detailLabel}>Height</Text>
+              <Text style={styles.detailValue}>
+                {formatHeight(userData.height)}
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Scale size={20} color="#ef4444" />
+              <Text style={styles.detailLabel}>Weight</Text>
+              <Text style={styles.detailValue}>{userData.weight} kg</Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Dumbbell size={20} color="#8b5cf6" />
+              <Text style={styles.detailLabel}>Activity</Text>
+              <Text style={styles.detailValue}>{userData.activityLevel}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Weekly Activity */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Weekly Activity</Text>
-          <View style={styles.weekGrid}>
-            {weeklyActivity.map((days, index) => (
-              <View key={index} style={styles.dayPill}>
-                <Text style={styles.dayText}>
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'][index]}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Diet & Nutrition</Text>
+            <Apple size={20} color="#22c55e" />
+          </View>
+          <View style={styles.dietRow}>
+            <View style={styles.dietBadge}>
+              <Utensils size={16} color="#22c55e" />
+              <Text style={styles.dietBadgeText}>
+                {userData.dietaryPreference}
+              </Text>
+            </View>
+            <View style={styles.dietaryInfo}>
+              <Text style={styles.dietaryDescription}>
+                Your preferred diet pattern helps us create meal plans tailored
+                to your needs.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>My Goals</Text>
+            <Target size={20} color="#22c55e" />
+          </View>
+          <View style={styles.goalsContainer}>
+            {userData.goals.map((goal, index) => (
+              <View key={index} style={styles.goalItem}>
+                <Award size={18} color="#22c55e" />
+                <Text style={styles.goalText}>
+                  {goal.title + ' ' || 'Custom Goal'}
                 </Text>
-                <View style={[styles.activityDot, { opacity: days / 7 }]} />
+                {goal.targetWeight && (
+                  <Text style={styles.goalSubText}>
+                    (Target: {goal.targetWeight} kg)
+                  </Text>
+                )}
               </View>
             ))}
           </View>
         </View>
 
-        {/* Regenerate Plan Button */}
-        <TouchableOpacity style={styles.regenerateButton} onPress={handleRegeneratePlan}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Weight Progress</Text>
+            <TrendingUp size={20} color="#22c55e" />
+          </View>
+          <View style={styles.weightStats}>
+            <View style={styles.weightStatItem}>
+              <Text style={styles.weightLabel}>Current</Text>
+              <Text style={styles.weightValue}>{userData.weight} kg</Text>
+            </View>
+            <Zap size={24} color="#22c55e" />
+            <View style={styles.weightStatItem}>
+              <Text style={styles.weightLabel}>Target</Text>
+              <Text style={styles.weightValue}>{userData.targetWeight} kg</Text>
+            </View>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View style={styles.progressBar}>
+              <View
+                style={[styles.progressFill, { width: `${weightProgress}%` }]}
+              />
+            </View>
+            <Text style={styles.progressPercentage}>
+              {Math.round(weightProgress)}% to goal
+            </Text>
+          </View>
+          <View style={styles.estimatedTimeContainer}>
+            <Clock size={16} color="#666" />
+            <Text style={styles.estimatedTimeText}>
+              Estimated time to goal: {getDaysUntilGoal()} days
+            </Text>
+          </View>
+        </View>
+
+        {/* <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Workout Stats</Text>
+            <Dumbbell size={20} color="#22c55e" />
+          </View>
+          <View style={styles.workoutStatsContainer}>
+            <View style={styles.workoutStat}>
+              <Text style={styles.workoutStatValue}>
+                {userData.totalWorkouts || 0}
+              </Text>
+              <Text style={styles.workoutStatLabel}>Total Workouts</Text>
+            </View>
+            <View style={styles.workoutStat}>
+              <Text style={styles.workoutStatValue}>
+                {userData.streak || 0}
+              </Text>
+              <Text style={styles.workoutStatLabel}>Current Streak</Text>
+            </View>
+            <View style={styles.workoutStat}>
+              <Text style={styles.workoutStatValue}>
+                {formatJoinDate(userData.dateJoined)}
+              </Text>
+              <Text style={styles.workoutStatLabel}>Member Since</Text>
+            </View>
+          </View>
+        </View> */}
+
+        <TouchableOpacity
+          style={styles.regenerateButton}
+          onPress={handleRegeneratePlan}
+        >
           <RefreshCw size={24} color="#22c55e" />
           <Text style={styles.regenerateText}>Regenerate Plan</Text>
         </TouchableOpacity>
 
-        {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <LogOut size={24} color="#ef4444" />
           <Text style={styles.logoutText}>Log Out</Text>
@@ -240,7 +424,6 @@ const ProfileScreen: React.FC = () => {
   );
 };
 
-// Styles remain the same as in your original code
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -376,50 +559,149 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     color: '#2D2D2D',
   },
-  progressPercentage: {
+  userDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  detailItem: {
+    width: '48%',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  detailLabel: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#999999',
+    color: '#666',
+    marginTop: 8,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#2D2D2D',
+    marginTop: 4,
+  },
+  dietRow: {
+    flexDirection: 'column',
+  },
+  dietBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  dietBadgeText: {
+    color: '#22c55e',
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    marginLeft: 6,
+  },
+  dietaryInfo: {
+    marginTop: 8,
+  },
+  dietaryDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    lineHeight: 20,
+  },
+  goalsContainer: {
+    marginTop: 4,
+  },
+  goalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  goalText: {
+    marginLeft: 12,
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#333',
+  },
+  weightStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  weightStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  weightLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
+  },
+  weightValue: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: '#333',
+  },
+  progressBarContainer: {
+    marginBottom: 12,
   },
   progressBar: {
     height: 8,
     backgroundColor: '#EEE',
     borderRadius: 4,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#22c55e',
     borderRadius: 4,
   },
-  weightStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  weightStat: {
+  progressPercentage: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#999999',
+    color: '#666',
+    textAlign: 'right',
   },
-  weekGrid: {
+  estimatedTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  estimatedTimeText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    marginLeft: 8,
+  },
+  workoutStatsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
+    flexWrap: 'wrap',
   },
-  dayPill: {
+  workoutStat: {
+    width: '33%',
     alignItems: 'center',
+    paddingVertical: 8,
   },
-  dayText: {
-    fontFamily: 'Inter-Medium',
-    color: '#2D2D2D',
+  workoutStatValue: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#333',
     marginBottom: 4,
   },
-  activityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22c55e',
+  workoutStatLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    textAlign: 'center',
   },
   regenerateButton: {
     flexDirection: 'row',
@@ -452,7 +734,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#ef4444',
     marginLeft: 8,
-  }
+  },
 });
 
 export default ProfileScreen;
