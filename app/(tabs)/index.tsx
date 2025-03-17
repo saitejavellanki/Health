@@ -35,7 +35,7 @@ export default function Home() {
     calories: 0,
     protein: 0,
     fat: 0,
-    carbohydrates: 0
+    carbohydrates: 0,
   });
   const [targetCalories, setTargetCalories] = useState(2000); // Default value
   const [calorieProgress, setCalorieProgress] = useState(0);
@@ -114,43 +114,43 @@ export default function Home() {
   };
 
   useEffect(() => {
-    console.log("Home screen mounted, checking user plan");
+    console.log('Home screen mounted, checking user plan');
     const fetchUserPlan = async () => {
       try {
         const auth = getAuth();
         const currentUser = auth.currentUser;
-  
+
         if (!currentUser) {
           console.error('No user is logged in');
           setNutritionOnlyMode(true); // Set nutrition-only mode to true when no user
           setLoading(false);
           return;
         }
-  
+
         // Set user's name if available
         if (currentUser.displayName) {
           setUserName(currentUser.displayName.split(' ')[0]);
         }
-  
+
         const db = getFirestore();
         const userPlansRef = collection(db, 'userplans');
         const q = query(userPlansRef, where('userId', '==', currentUser.uid));
-  
+
         const querySnapshot = await getDocs(q);
-  
+
         if (querySnapshot.empty) {
           console.error('No user plan found for this user');
           setNutritionOnlyMode(true); // Set nutrition-only mode to true when no plan found
           setLoading(false);
           return;
         }
-  
+
         const userPlanDoc = querySnapshot.docs[0];
         const userPlanData = userPlanDoc.data();
-  
+
         setUserPlanDocId(userPlanDoc.id);
         setUserGoal(userPlanData.goal || '');
-  
+
         // Get or set target calories
         if (userPlanData.targetCalories) {
           console.log(
@@ -172,13 +172,13 @@ export default function Home() {
               heightUnit: userPlanData.heightUnit,
               activityLevel: userPlanData.activityLevel || 'Moderate',
             });
-  
+
             console.log(
               'Personalized calories recommended:',
               personalizedCalories
             );
             setTargetCalories(personalizedCalories);
-  
+
             // Update the user plan with personalized target calories
             try {
               await updateDoc(doc(db, 'userplans', userPlanDoc.id), {
@@ -200,7 +200,7 @@ export default function Home() {
               userPlanData.goal
             );
             setTargetCalories(goalBasedCalories);
-  
+
             // Update with default values
             try {
               await updateDoc(doc(db, 'userplans', userPlanDoc.id), {
@@ -212,10 +212,10 @@ export default function Home() {
             }
           }
         }
-  
+
         const parsedPlan = JSON.parse(userPlanData.parsedPlan);
         setFullPlanData(parsedPlan);
-  
+
         const days = [
           'Sunday',
           'Monday',
@@ -227,18 +227,18 @@ export default function Home() {
         ];
         const today = new Date();
         const dayName = days[today.getDay()];
-  
+
         const todaysPlan = parsedPlan.find((plan) => plan.day === dayName);
-  
+
         if (!todaysPlan) {
           console.error(`No plan found for ${dayName}`);
           setNutritionOnlyMode(true); // Set nutrition-only mode to true when no plan for today
           setLoading(false);
           return;
         }
-  
+
         setTodaysPlan(todaysPlan);
-  
+
         // Fetch nutrition data from the meals collection
         await fetchTodaysNutritionData(currentUser.uid);
       } catch (error) {
@@ -251,7 +251,7 @@ export default function Home() {
         setLoading(false);
       }
     };
-  
+
     fetchUserPlan();
   }, []);
 
@@ -314,7 +314,7 @@ export default function Home() {
         calories: totalCalories,
         protein: totalProtein,
         fat: totalFat,
-        carbohydrates: totalCarbs
+        carbohydrates: totalCarbs,
       });
 
       // Calculate progress percentage
@@ -372,10 +372,6 @@ export default function Home() {
     return { type: 'Snack', name: todaysPlan.sections.snack[0], calories: 200 };
   };
 
-  
-
-  
-
   const navigateToRecipe = () => {
     const currentMeal = getCurrentMeal();
     if (currentMeal && currentMeal.name && todaysPlan) {
@@ -397,7 +393,7 @@ export default function Home() {
         calories: nutritionData.calories.toString(),
         protein: nutritionData.protein.toString(),
         fat: nutritionData.fat.toString(),
-        carbohydrates: nutritionData.carbohydrates.toString(),  // Add this line
+        carbohydrates: nutritionData.carbohydrates.toString(), // Add this line
         targetCalories: targetCalories.toString(),
       },
     });
@@ -430,11 +426,9 @@ export default function Home() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      
       {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          
           <View>
             <Text style={styles.greeting}>
               Good {getTimeOfDay()}, {userName}!
@@ -452,9 +446,8 @@ export default function Home() {
               )}
             </View>
           </View>
-          
+
           <View style={styles.toggleContainer}>
-            
             <Text style={styles.toggleLabel}></Text>
             <Switch
               value={nutritionOnlyMode}
@@ -464,11 +457,11 @@ export default function Home() {
             />
           </View>
         </View>
-        <StreakComp/>
+        <StreakComp />
       </View>
 
-      <ActiveOrders/>
-      
+      <ActiveOrders />
+
       {/* Current Meal Card - Only show when not in nutrition-only mode */}
       {!nutritionOnlyMode && (
         <View style={styles.currentMealContainer}>
@@ -497,34 +490,34 @@ export default function Home() {
 
       {/* Nutrition Stats */}
       {/* Nutrition Stats */}
-<Pressable
-  style={[
-    styles.statsContainer,
-    nutritionOnlyMode && styles.statsContainerExpanded,
-  ]}
-  onPress={navigateToTracker}
-  android_ripple={{ color: '#f3f4f6' }}
->
-  <View style={styles.statCard}>
-    <Text style={styles.statLabel}>Calories</Text>
-    <Text style={styles.statValue}>
-      {nutritionData.calories}{' '}
-      <Text style={styles.statTarget}>/ {targetCalories}</Text>
-    </Text>
-  </View>
-  <View style={styles.statCard}>
-    <Text style={styles.statLabel}>Protein</Text>
-    <Text style={styles.statValue}>{nutritionData.protein}g</Text>
-  </View>
-  <View style={styles.statCard}>
-    <Text style={styles.statLabel}>Fat</Text>
-    <Text style={styles.statValue}>{nutritionData.fat}g</Text>
-  </View>
-  <View style={styles.statCard}>
-    <Text style={styles.statLabel}>Carbs</Text>
-    <Text style={styles.statValue}>{nutritionData.carbohydrates}g</Text>
-  </View>
-</Pressable>
+      <Pressable
+        style={[
+          styles.statsContainer,
+          nutritionOnlyMode && styles.statsContainerExpanded,
+        ]}
+        onPress={navigateToTracker}
+        android_ripple={{ color: '#f3f4f6' }}
+      >
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Calories</Text>
+          <Text style={styles.statValue}>
+            {nutritionData.calories}{' '}
+            <Text style={styles.statTarget}>/ {targetCalories}</Text>
+          </Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Protein</Text>
+          <Text style={styles.statValue}>{nutritionData.protein}g</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Fat</Text>
+          <Text style={styles.statValue}>{nutritionData.fat}g</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Carbs</Text>
+          <Text style={styles.statValue}>{nutritionData.carbohydrates}g</Text>
+        </View>
+      </Pressable>
 
       {/* Track Button */}
       <View style={styles.trackButtonContainer}>
