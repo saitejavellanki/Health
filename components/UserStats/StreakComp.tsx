@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  Easing,
+  TouchableOpacity,
+  Modal,
+  ScrollView,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
@@ -15,22 +24,22 @@ const StreakComp = () => {
   const flameSize = useRef(new Animated.Value(1.5)).current;
   const flamePosition = useRef(new Animated.Value(0)).current;
   const flameOpacity = useRef(new Animated.Value(0.85)).current;
-  
+
   // Fetch streak data from Firebase on component mount
   useEffect(() => {
     const fetchStreakData = async () => {
       try {
         const currentUser = auth.currentUser;
-        
+
         if (!currentUser) {
           console.log('No user is signed in');
           setLoading(false);
           return;
         }
-        
+
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDoc = await getDoc(userDocRef);
-        
+
         if (userDoc.exists()) {
           const userData = userDoc.data();
           setStreak(userData.streak || 0);
@@ -43,10 +52,10 @@ const StreakComp = () => {
         setLoading(false);
       }
     };
-    
+
     fetchStreakData();
   }, []);
-  
+
   // Determine the flame size and color based on streak
   const getFlameProperties = () => {
     if (streak < 3) return { size: 24, color: '#FF9800' };
@@ -54,9 +63,9 @@ const StreakComp = () => {
     if (streak < 14) return { size: 40, color: '#F44336' };
     return { size: 48, color: '#E91E63' };
   };
-  
+
   const { size, color } = getFlameProperties();
-  
+
   // Animation logic
   useEffect(() => {
     const animateFlame = () => {
@@ -105,27 +114,27 @@ const StreakComp = () => {
         animateFlame();
       });
     };
-    
+
     animateFlame();
-    
+
     return () => {
       flameSize.stopAnimation();
       flamePosition.stopAnimation();
       flameOpacity.stopAnimation();
     };
   }, []);
-  
+
   // Get streak description
   const getStreakDescription = () => {
-    if (streak === 0) return "Start your streak!";
-    if (streak === 1) return "First day!";
-    if (streak < 3) return "Just getting started!";
-    if (streak < 7) return "Keep it up!";
+    if (streak === 0) return 'Start your streak!';
+    if (streak === 1) return 'First day!';
+    if (streak < 3) return 'Just getting started!';
+    if (streak < 7) return 'Keep it up!';
     if (streak < 14) return "You're on fire!";
-    if (streak < 30) return "Blazing hot!";
-    return "Unstoppable!";
+    if (streak < 30) return 'Blazing hot!';
+    return 'Unstoppable!';
   };
-  
+
   // Show loading state
   if (loading) {
     return (
@@ -139,7 +148,7 @@ const StreakComp = () => {
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -151,11 +160,15 @@ const StreakComp = () => {
         <View style={styles.streakInfo}>
           <View style={styles.headerRow}>
             <Text style={styles.streakLabel}>STREAK</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.infoButton}
               onPress={() => setInfoModalVisible(true)}
             >
-              <MaterialCommunityIcons name="information-outline" size={18} color="#FF7043" />
+              <MaterialCommunityIcons
+                name="information-outline"
+                size={18}
+                color="#FF7043"
+              />
             </TouchableOpacity>
           </View>
           <View style={styles.streakValueContainer}>
@@ -164,7 +177,7 @@ const StreakComp = () => {
           </View>
           <Text style={styles.streakDescription}>{getStreakDescription()}</Text>
         </View>
-        
+
         <View style={styles.flameContainer}>
           <Animated.View
             style={[
@@ -172,15 +185,15 @@ const StreakComp = () => {
               {
                 transform: [
                   { translateY: flamePosition },
-                  { scale: flameSize }
+                  { scale: flameSize },
                 ],
                 opacity: flameOpacity,
-              }
+              },
             ]}
           >
             <MaterialCommunityIcons name="fire" size={size} color={color} />
           </Animated.View>
-          
+
           {streak >= 7 && (
             <View style={styles.sparksContainer}>
               {[...Array(3)].map((_, index) => (
@@ -189,15 +202,19 @@ const StreakComp = () => {
                   style={[
                     styles.spark,
                     {
-                      left: 10 + (index * 15),
+                      left: 10 + index * 15,
                       transform: [
                         { translateY: Animated.multiply(flamePosition, 1.5) },
-                        { scale: Animated.multiply(flameSize, 0.7) }
+                        { scale: Animated.multiply(flameSize, 0.7) },
                       ],
-                    }
+                    },
                   ]}
                 >
-                  <MaterialCommunityIcons name="star" size={10} color="#FFEB3B" />
+                  <MaterialCommunityIcons
+                    name="star"
+                    size={10}
+                    color="#FFEB3B"
+                  />
                 </Animated.View>
               ))}
             </View>
@@ -217,28 +234,48 @@ const StreakComp = () => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Maintain Your Streak</Text>
               <TouchableOpacity onPress={() => setInfoModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#FF5722" />
+                <MaterialCommunityIcons
+                  name="close"
+                  size={24}
+                  color="#FF5722"
+                />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.modalBody}>
               <View style={styles.infoSection}>
-                <MaterialCommunityIcons name="scan-helper" size={28} color="#FF5722" />
+                <MaterialCommunityIcons
+                  name="scan-helper"
+                  size={28}
+                  color="#FF5722"
+                />
                 <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoTitle}>Scan Daily</Text>
-                  <Text style={styles.infoText}>Use the scanner to log at least one meal every day to maintain your streak.</Text>
+                  <Text style={styles.infoTitle}>Condition 1</Text>
+                  <Text style={styles.infoText}>
+                    Log at least two meals daily using the scanner.
+                  </Text>
                 </View>
               </View>
-              
+
               <View style={styles.infoSection}>
-                <MaterialCommunityIcons name="food-apple" size={28} color="#FF5722" />
+                <MaterialCommunityIcons
+                  name="food-apple"
+                  size={28}
+                  color="#FF5722"
+                />
                 <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoTitle}>Analyze Your Meals</Text>
-                  <Text style={styles.infoText}>Review your nutrition insights after scanning to get the most from each entry.</Text>
+                  <Text style={styles.infoTitle}>Condition 2</Text>
+                  <Text style={styles.infoText}>
+                    Meet your daily calorie goal.
+                  </Text>
                 </View>
               </View>
-              
-              <View style={styles.infoSection}>
+              <Text style={styles.infoText2}>
+                Both conditions must be satisfied each day to keep your streak
+                alive!
+              </Text>
+
+              {/* <View style={styles.infoSection}>
                 <MaterialCommunityIcons name="bell-ring" size={28} color="#FF5722" />
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoTitle}>Set Reminders</Text>
@@ -252,10 +289,10 @@ const StreakComp = () => {
                   <Text style={styles.infoTitle}>Reset Time</Text>
                   <Text style={styles.infoText}>Your streak resets at midnight if you haven't scanned any meals that day.</Text>
                 </View>
-              </View>
+              </View> */}
             </ScrollView>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setInfoModalVisible(false)}
             >
@@ -351,7 +388,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flex: 1,
   },
-  
+
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -409,6 +446,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  infoText2: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    textAlign: 'center',
+    marginLeft: 20,
+    marginRight: 20,
   },
   closeButton: {
     backgroundColor: '#FF5722',
