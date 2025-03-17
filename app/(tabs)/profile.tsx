@@ -346,7 +346,7 @@ const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Weight Progress</Text>
             <TrendingUp size={20} color="#22c55e" />
@@ -378,7 +378,7 @@ const ProfileScreen: React.FC = () => {
               Estimated time to goal: {getDaysUntilGoal()} days
             </Text>
           </View>
-        </View>
+        </View> */}
 
         {/* <View style={styles.section}>
           <View style={styles.sectionHeader}>
