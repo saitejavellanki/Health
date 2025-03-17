@@ -336,239 +336,239 @@ const ActiveOrders = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginTop: 16,
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    paddingHorizontal: 16,
-  },
-  loadingContainer: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  noOrdersContainer: {
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    marginHorizontal: 16,
-  },
-  noOrdersText: {
-    color: '#6B7280',
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  ordersList: {
-    paddingHorizontal: 16,
-  },
-  orderCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  orderIdContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  orderId: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#4B5563',
-    marginLeft: 6,
-    flex: 1,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#3B82F6',
-    marginLeft: 4,
-  },
-  orderInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  orderItemsCount: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  orderTotal: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  orderDate: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  viewDetailsButton: {
-    backgroundColor: '#D1FAE5',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-  },
-  viewDetails: {
-    color: '#059669',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modalBody: {
-    padding: 16,
-  },
-  orderStatusBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  orderStatusText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  detailSection: {
-    marginTop: 20,
-  },
-  detailSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  detailLabel: {
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  detailValue: {
-    color: '#1F2937',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  totalValue: {
-    color: '#1F2937',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  savingsText: {
-    color: '#059669',
-  },
-  orderItemCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  orderItemDetails: {
-    flex: 1,
-  },
-  orderItemName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  orderItemQuantity: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  orderItemPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  noItems: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontStyle: 'italic',
-  },
-  addressText: {
-    fontSize: 14,
-    color: '#1F2937',
-    lineHeight: 20,
-  },
-  actionSection: {
-    marginTop: 20,
-  },
-  actionButton: {
-    backgroundColor: '#059669',
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
-  }
-});
-
-export default ActiveOrders;
+    container: {
+      marginTop: 16,
+      flex: 1,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#1F2937',
+      paddingHorizontal: 16,
+    },
+    loadingContainer: {
+      padding: 16,
+      alignItems: 'center',
+    },
+    loadingText: {
+      color: '#6B7280',
+      fontWeight: '500',
+    },
+    noOrdersContainer: {
+      padding: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#F9FAFB',
+      borderRadius: 12,
+      marginHorizontal: 16,
+    },
+    noOrdersText: {
+      color: '#6B7280',
+      marginTop: 8,
+      fontWeight: '500',
+    },
+    ordersList: {
+      paddingHorizontal: 16,
+    },
+    orderCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: '#F3F4F6',
+    },
+    orderHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    orderIdContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    orderId: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#4B5563',
+      marginLeft: 6,
+      flex: 1,
+    },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#EFF6FF',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 16,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: '#3B82F6',
+      marginLeft: 4,
+    },
+    orderInfo: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 12,
+    },
+    orderItemsCount: {
+      fontSize: 14,
+      color: '#6B7280',
+    },
+    orderTotal: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#1F2937',
+    },
+    orderFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 12,
+    },
+    orderDate: {
+      fontSize: 12,
+      color: '#6B7280',
+    },
+    viewDetailsButton: {
+      backgroundColor: '#D1FAE5',
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+    },
+    viewDetails: {
+      color: '#059669',
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    modalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: '#FFFFFF',
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      maxHeight: '90%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F3F4F6',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#1F2937',
+    },
+    closeButton: {
+      padding: 4,
+    },
+    modalBody: {
+      padding: 16,
+    },
+    orderStatusBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 8,
+    },
+    orderStatusText: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+      marginLeft: 8,
+      fontSize: 16,
+    },
+    detailSection: {
+      marginTop: 20,
+    },
+    detailSectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#1F2937',
+      marginBottom: 8,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 6,
+    },
+    detailLabel: {
+      color: '#6B7280',
+      fontSize: 14,
+    },
+    detailValue: {
+      color: '#1F2937',
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    totalValue: {
+      color: '#1F2937',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    savingsText: {
+      color: '#059669',
+    },
+    orderItemCard: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F3F4F6',
+    },
+    orderItemDetails: {
+      flex: 1,
+    },
+    orderItemName: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: '#1F2937',
+      marginBottom: 4,
+    },
+    orderItemQuantity: {
+      fontSize: 12,
+      color: '#6B7280',
+    },
+    orderItemPrice: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#1F2937',
+    },
+    noItems: {
+      fontSize: 14,
+      color: '#6B7280',
+      fontStyle: 'italic',
+    },
+    addressText: {
+      fontSize: 14,
+      color: '#1F2937',
+      lineHeight: 20,
+    },
+    actionSection: {
+      marginTop: 20,
+    },
+    actionButton: {
+      backgroundColor: '#059669',
+      paddingVertical: 12,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    actionButtonText: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+      fontSize: 16,
+    }
+  });
+  
+  export default ActiveOrders;

@@ -95,26 +95,10 @@ export default function Login() {
 
   // Handle navigation after successful authentication
   useEffect(() => {
-    const handleAuthNavigation = async () => {
-      if (user) {
-        try {
-          // Check if user needs onboarding
-          const needsOnboarding = await checkUserOnboardingStatus(user.uid);
-          
-          if (needsOnboarding) {
-            router.replace('/(onboarding)');
-          } else {
-            router.replace('/(tabs)');
-          }
-        } catch (error) {
-          console.error('Navigation error:', error);
-        }
-      }
-    };
-    
-    if (user && !authLoading) {
-      handleAuthNavigation();
-    }
+    // Only need to check if user exists - AuthContext will handle navigation
+    // if (user && !authLoading) {
+    //   console.log("User authenticated, letting AuthContext handle navigation");
+    // }
   }, [user, authLoading]);
 
   if (!fontsLoaded) {
@@ -126,13 +110,18 @@ export default function Login() {
       setError('Please fill in all fields');
       return;
     }
-
+  
     try {
       setLoading(true);
       setError('');
-      // Just sign in - the AuthContext will handle the state and navigation
+      // Add a console log to track timing
+      console.log('Login started:', new Date().toISOString());
+      
+      // Sign in with Firebase - don't await anything else after this
       await signInWithEmailAndPassword(auth, email, password);
-      // No need to navigate here - useEffect will handle it
+      console.log('Firebase auth completed:', new Date().toISOString());
+      
+      // Don't do anything else here - navigation should be handled by AuthContext
     } catch (err) {
       setError(err.message || 'Failed to login. Please try again.');
       Alert.alert('Login Error', err.message);

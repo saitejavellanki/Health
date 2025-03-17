@@ -26,9 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isNewUser, setIsNewUser] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Store user data in background without blocking UI
-  const storeUserData = async (firebaseUser) => {
+  const storeUserData = (firebaseUser) => {
     if (!firebaseUser) return;
     
     try {
@@ -49,24 +50,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const getStoredUser = async () => {
+    try {
+      const storedUserData = await AsyncStorage.getItem('userData');
+      if (storedUserData) {
+        return JSON.parse(storedUserData);
+      }
+    } catch (error) {
+      console.error('Error retrieving stored user:', error);
+    }
+    return null;
+  };
+
   // Check if user needs onboarding and return result
   const checkUserOnboardingStatus = async (userId: string): Promise<boolean> => {
     try {
       const userDocRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userDocRef);
       
-      // Check if user document exists and has completed onboarding
+      // If document doesn't exist, user needs onboarding
       if (!userDoc.exists()) {
-        return true; // New user needs onboarding
+        console.log("User document doesn't exist, needs onboarding");
+        return true;
       }
       
       const userData = userDoc.data();
-      // Check both possible field names for onboarding status
-      const needsOnboarding = 
-        (userData.onboardingCompleted === undefined && userData.onboarded === undefined) || 
-        (userData.onboardingCompleted === false && userData.onboarded === false);
+      // Be more explicit about checking onboarding status
+      const onboardingCompleted = 
+        userData.onboardingCompleted === true || userData.onboarded === true;
       
-      return needsOnboarding;
+      console.log("Onboarding status check:", onboardingCompleted ? "completed" : "not completed");
+      return !onboardingCompleted; // Return TRUE if needs onboarding (not completed)
     } catch (error) {
       console.error('Error checking onboarding status:', error);
       return true; // Default to needing onboarding on error
@@ -109,22 +123,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkStoredUser();
 
     // Set up Firebase auth listener
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // In AuthContext.tsx, modify the onAuthStateChanged callback
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       console.log("Auth state changed:", firebaseUser ? `logged in as ${firebaseUser.email || firebaseUser.phoneNumber || firebaseUser.uid}` : "logged out");
       
       if (!isMounted) return;
+      
+      // Check if we're already navigating to prevent duplicate navigation
+      if (isNavigating) {
+        console.log("Navigation already in progress, skipping");
+        return;
+      }
       
       // First, immediately update user state
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        // Store user data in background
-        storeUserData(firebaseUser);
+        // Set navigating lock immediately
+        setIsNavigating(true);
         
-        // We don't automatically navigate here - the login page handles that
-        setIsLoading(false);
+        // Use a separate async function since we can't make the callback async
+        const handleUserNavigation = async () => {
+          try {
+            // Store user data in background - don't await this
+            storeUserData(firebaseUser);
+            
+            // Try to get cached user data first for faster navigation
+            const storedUser = await getStoredUser();
+            
+            // If we have stored user data with onboarding info, use it
+            if (storedUser && storedUser.onboardingChecked) {
+              console.log("Using cached onboarding status:", !storedUser.needsOnboarding);
+              
+              if (storedUser.needsOnboarding) {
+                router.replace('/(onboarding)');
+              } else {
+                router.replace('/(tabs)');
+              }
+              
+              // Update in background
+              checkUserOnboardingStatus(firebaseUser.uid).then(needsOnboarding => {
+                // Update cache for next time
+                storeUserData({...firebaseUser, onboardingChecked: true, needsOnboarding});
+              });
+            } else {
+              // No cache, check onboarding status
+              const needsOnboarding = await checkUserOnboardingStatus(firebaseUser.uid);
+              
+              // Store for next time
+              storeUserData({...firebaseUser, onboardingChecked: true, needsOnboarding});
+              
+              if (needsOnboarding) {
+                router.replace('/(onboarding)');
+              } else {
+                router.replace('/(tabs)');
+              }
+            }
+          } catch (error) {
+            console.error("Navigation error:", error);
+            // Default to tabs on error
+            router.replace('/(tabs)');
+          } finally {
+            // Allow navigation again after a short delay
+            setTimeout(() => {
+              setIsNavigating(false);
+              setIsLoading(false);
+            }, 500);
+          }
+        };
+        
+        // Call the async function
+        handleUserNavigation();
       } else {
-        // Clear any stored user data
+        // Clear any stored user data - don't await this
         AsyncStorage.removeItem('userData').catch(err => 
           console.error('Error removing user data:', err)
         );
@@ -137,6 +208,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!currentPath.includes('/(auth)')) {
           router.replace('/(auth)/login');
         }
+        
+        // Reset navigation lock
+        setIsNavigating(false);
       }
     });
     

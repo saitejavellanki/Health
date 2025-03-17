@@ -7,6 +7,7 @@ export default function OnboardingLayout() {
       <Stack.Screen name="payments"/>
       <Stack.Screen name="MemoryGalleryScreen"/>
       
+      
     </Stack>
   );
 }
