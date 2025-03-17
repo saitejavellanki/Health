@@ -430,7 +430,7 @@ export default function Login() {
             </>
           )}
 
-          <View style={styles.dividerContainer}>
+          {/* <View style={styles.dividerContainer}>
             <View style={styles.divider} />
             <Text style={styles.dividerText}>OR</Text>
             <View style={styles.divider} />
@@ -460,7 +460,7 @@ export default function Login() {
                 />
               </TouchableOpacity>
             )}
-          </View>
+          </View> */}
 
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Don't have an account? </Text>

@@ -143,17 +143,22 @@ export default function Register() {
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.header}>
-            <Image
-              source={{
-                uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741589074/lcuvkrqkrbhudbj5kqjr.jpg',
-              }}
-              style={styles.headerImage}
-            />
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>{'Glad to have you onboard! ❣️'}</Text>
-            </View>
-          </View>
+        <View style={styles.header}>
+  <Image
+    source={{
+      uri: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+    }}
+    style={styles.headerImage}
+  />
+  <View style={styles.logoContainer}>
+    <Image
+      source={{
+        uri: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+      }}
+      style={styles.logoImage}
+    />
+  </View>
+</View>
 
           <View style={styles.formContainer}>
             <Text style={styles.title}>Create Account</Text>

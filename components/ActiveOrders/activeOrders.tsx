@@ -37,7 +37,7 @@ const ActiveOrders = () => {
         const q = query(
           ordersRef,
           where('userId', '==', currentUser.uid),
-          where('status', 'in', ['pending', 'processing', 'shipped', 'out_for_delivery', 'completed']),
+          where('deliveryStatus', 'in', ['pending', 'processing', 'shipped', 'out_for_delivery']),
           orderBy('createdAt', 'desc')
         );
 
@@ -126,6 +126,77 @@ const ActiveOrders = () => {
     });
   };
 
+  // Calculate estimated delivery time based on status
+  const getEstimatedDelivery = (order) => {
+    if (!order || !order.createdAt) return 'N/A';
+    
+    const createdDate = order.createdAt.toDate();
+    const now = new Date();
+    const hoursDifference = Math.floor((now - createdDate) / (1000 * 60 * 60));
+    
+    // Get delivery status from Firebase or use order status if not available
+    const deliveryStatus = order.deliveryStatus ;
+    
+    switch (deliveryStatus) {
+      case 'pending':
+        return 'Assigning delivery agent';
+      case 'processing':
+        return 'Processing, Being packed, Delivery in 15 min';
+      case 'shipped':
+        return 'Picked Up';
+      case 'out_for_delivery':
+        return 'Out for delivery, arriving in 10 min';
+      case 'completed':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Status unknown';
+    }
+  };
+
+  // Get a more detailed delivery message
+  const getDeliveryMessage = (order) => {
+    if (!order || !order.createdAt) return '';
+    
+    const createdDate = order.createdAt.toDate();
+    const now = new Date();
+    
+    // Get delivery status from Firebase or use order status if not available
+    const deliveryStatus = order.deliveryStatus || order.status;
+    
+    switch (deliveryStatus) {
+      case 'pending':
+        return 'We\'ve received your order and are assigning a delivery agent. This won\'t take long.';
+      case 'processing':
+        return 'Your order is being processed and packed. We\'re preparing your items for delivery within 15 minutes.';
+      case 'shipped':
+        return 'Great news! Your order has been picked up and is on its way to you.';
+      case 'out_for_delivery':
+        return 'Your order is out for delivery and should arrive at your address within 10 minutes.';
+      case 'completed':
+        return 'Your order has been delivered. Thank you for shopping with us!';
+      case 'cancelled':
+        return 'This order has been cancelled.';
+      default:
+        return 'Status unknown';
+    }
+  };
+
+  // Get the status sequence
+  const getStatusSequence = () => {
+    return ['pending', 'processing', 'shipped', 'out_for_delivery', 'completed'];
+  };
+
+  // Calculate status progress percentage
+  const getStatusProgress = (status) => {
+    const sequence = getStatusSequence();
+    const currentIndex = sequence.indexOf(status);
+    
+    if (currentIndex === -1) return 0;
+    return (currentIndex / (sequence.length - 1)) * 100;
+  };
+
   const handleOrderPress = (order) => {
     setSelectedOrder(order);
     setModalVisible(true);
@@ -141,7 +212,7 @@ const ActiveOrders = () => {
         <View style={styles.orderIdContainer}>
           <Feather name="shopping-bag" size={16} color="#4B5563" />
           <Text style={styles.orderId} numberOfLines={1}>
-            Order
+            Order #{item.orderId?.slice(-6) || 'N/A'}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
@@ -160,6 +231,14 @@ const ActiveOrders = () => {
           {formatPrice(item.priceInfo?.total || '0')}
         </Text>
       </View>
+      
+      {/* Add delivery estimate to the order card */}
+      <View style={styles.deliveryEstimate}>
+        <Feather name="truck" size={14} color="#4B5563" />
+        <Text style={styles.deliveryEstimateText}>
+          {getEstimatedDelivery(item)}
+        </Text>
+      </View>
 
       <View style={styles.orderFooter}>
         <Text style={styles.orderDate}>
@@ -171,6 +250,59 @@ const ActiveOrders = () => {
       </View>
     </Pressable>
   );
+
+  // Render the delivery status timeline
+  const renderDeliveryTimeline = (order) => {
+    if (!order) return null;
+    
+    const statuses = getStatusSequence();
+    const currentStatus = order.deliveryStatus || order.status;
+    const currentIndex = statuses.indexOf(currentStatus);
+    
+    return (
+      <View style={styles.timelineContainer}>
+        <View style={styles.timelineTrack}>
+          <View 
+            style={[
+              styles.timelineProgress, 
+              { width: `${getStatusProgress(currentStatus)}%` }
+            ]} 
+          />
+        </View>
+        <View style={styles.timelineSteps}>
+          {statuses.map((status, index) => {
+            const isCompleted = index <= currentIndex;
+            const isActive = index === currentIndex;
+            
+            return (
+              <View key={status} style={styles.timelineStep}>
+                <View 
+                  style={[
+                    styles.timelinePoint,
+                    isCompleted ? styles.timelinePointCompleted : styles.timelinePointPending,
+                    isActive ? styles.timelinePointActive : null
+                  ]}
+                >
+                  {isCompleted && (
+                    <Feather name={getStatusIcon(status)} size={12} color="#FFFFFF" />
+                  )}
+                </View>
+                <Text 
+                  style={[
+                    styles.timelineStepText,
+                    isCompleted ? styles.timelineStepTextCompleted : styles.timelineStepTextPending,
+                    isActive ? styles.timelineStepTextActive : null
+                  ]}
+                >
+                  {formatStatusText(status)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
 
   const OrderDetailsModal = () => (
     <Modal
@@ -197,12 +329,28 @@ const ActiveOrders = () => {
                 <View style={[styles.orderStatusBanner, { backgroundColor: getStatusColor(selectedOrder.status) }]}>
                   <Feather name={getStatusIcon(selectedOrder.status)} size={20} color="#FFFFFF" />
                   <Text style={styles.orderStatusText}>
-                    {formatStatusText(selectedOrder.status)}
+                    {formatStatusText(selectedOrder.deliveryStatus)}
+                  </Text>
+                </View>
+
+                {/* Add delivery timeline */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Delivery Status</Text>
+                  {renderDeliveryTimeline(selectedOrder)}
+                  <Text style={styles.deliveryMessage}>
+                    {getDeliveryMessage(selectedOrder)}
+                  </Text>
+                  <Text style={styles.estimatedDelivery}>
+                    Estimated Delivery: {getEstimatedDelivery(selectedOrder)}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>Order Information</Text>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Order ID</Text>
+                    <Text style={styles.detailValue}>{selectedOrder.orderId || 'N/A'}</Text>
+                  </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Date</Text>
                     <Text style={styles.detailValue}>{formatDate(selectedOrder.createdAt)}</Text>
@@ -311,12 +459,7 @@ const ActiveOrders = () => {
   }
 
   if (activeOrders.length === 0) {
-    return (
-      <View style={styles.noOrdersContainer}>
-        <Feather name="package" size={24} color="#9CA3AF" />
-        <Text style={styles.noOrdersText}>No active orders</Text>
-      </View>
-    );
+    return null;
   }
 
   return (
@@ -336,239 +479,333 @@ const ActiveOrders = () => {
 };
 
 const styles = StyleSheet.create({
-    container: {
-      marginTop: 16,
-      flex: 1,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#1F2937',
-      paddingHorizontal: 16,
-    },
-    loadingContainer: {
-      padding: 16,
-      alignItems: 'center',
-    },
-    loadingText: {
-      color: '#6B7280',
-      fontWeight: '500',
-    },
-    noOrdersContainer: {
-      padding: 24,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#F9FAFB',
-      borderRadius: 12,
-      marginHorizontal: 16,
-    },
-    noOrdersText: {
-      color: '#6B7280',
-      marginTop: 8,
-      fontWeight: '500',
-    },
-    ordersList: {
-      paddingHorizontal: 16,
-    },
-    orderCard: {
-      backgroundColor: '#FFFFFF',
-      borderRadius: 12,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: '#F3F4F6',
-    },
-    orderHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    orderIdContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    orderId: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: '#4B5563',
-      marginLeft: 6,
-      flex: 1,
-    },
-    statusBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#EFF6FF',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 16,
-    },
-    statusText: {
-      fontSize: 12,
-      fontWeight: '500',
-      color: '#3B82F6',
-      marginLeft: 4,
-    },
-    orderInfo: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: 12,
-    },
-    orderItemsCount: {
-      fontSize: 14,
-      color: '#6B7280',
-    },
-    orderTotal: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#1F2937',
-    },
-    orderFooter: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: 12,
-    },
-    orderDate: {
-      fontSize: 12,
-      color: '#6B7280',
-    },
-    viewDetailsButton: {
-      backgroundColor: '#D1FAE5',
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 16,
-    },
-    viewDetails: {
-      color: '#059669',
-      fontSize: 12,
-      fontWeight: '500',
-    },
-    modalContainer: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'flex-end',
-    },
-    modalContent: {
-      backgroundColor: '#FFFFFF',
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      maxHeight: '90%',
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: '#F3F4F6',
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#1F2937',
-    },
-    closeButton: {
-      padding: 4,
-    },
-    modalBody: {
-      padding: 16,
-    },
-    orderStatusBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 12,
-      borderRadius: 8,
-      marginTop: 8,
-    },
-    orderStatusText: {
-      color: '#FFFFFF',
-      fontWeight: '600',
-      marginLeft: 8,
-      fontSize: 16,
-    },
-    detailSection: {
-      marginTop: 20,
-    },
-    detailSectionTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: '#1F2937',
-      marginBottom: 8,
-    },
-    detailRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      paddingVertical: 6,
-    },
-    detailLabel: {
-      color: '#6B7280',
-      fontSize: 14,
-    },
-    detailValue: {
-      color: '#1F2937',
-      fontSize: 14,
-      fontWeight: '500',
-    },
-    totalValue: {
-      color: '#1F2937',
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    savingsText: {
-      color: '#059669',
-    },
-    orderItemCard: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: '#F3F4F6',
-    },
-    orderItemDetails: {
-      flex: 1,
-    },
-    orderItemName: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: '#1F2937',
-      marginBottom: 4,
-    },
-    orderItemQuantity: {
-      fontSize: 12,
-      color: '#6B7280',
-    },
-    orderItemPrice: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#1F2937',
-    },
-    noItems: {
-      fontSize: 14,
-      color: '#6B7280',
-      fontStyle: 'italic',
-    },
-    addressText: {
-      fontSize: 14,
-      color: '#1F2937',
-      lineHeight: 20,
-    },
-    actionSection: {
-      marginTop: 20,
-    },
-    actionButton: {
-      backgroundColor: '#059669',
-      paddingVertical: 12,
-      borderRadius: 8,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    actionButtonText: {
-      color: '#FFFFFF',
-      fontWeight: '600',
-      fontSize: 16,
-    }
-  });
-  
-  export default ActiveOrders;
+  container: {
+    marginTop: 16,
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    paddingHorizontal: 16,
+  },
+  loadingContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  noOrdersContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    marginHorizontal: 16,
+  },
+  noOrdersText: {
+    color: '#6B7280',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  ordersList: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  orderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  orderIdContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  orderId: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4B5563',
+    marginLeft: 6,
+    flex: 1,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#3B82F6',
+    marginLeft: 4,
+  },
+  orderInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  orderItemsCount: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  orderTotal: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  deliveryEstimate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  deliveryEstimateText: {
+    fontSize: 13,
+    color: '#4B5563',
+    marginLeft: 6,
+  },
+  orderFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  orderDate: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  viewDetailsButton: {
+    backgroundColor: '#D1FAE5',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  viewDetails: {
+    color: '#059669',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalBody: {
+    padding: 16,
+  },
+  orderStatusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  orderStatusText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 16,
+  },
+  detailSection: {
+    marginTop: 20,
+  },
+  detailSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  detailLabel: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  detailValue: {
+    color: '#1F2937',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  totalValue: {
+    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  savingsText: {
+    color: '#059669',
+  },
+  orderItemCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  orderItemDetails: {
+    flex: 1,
+  },
+  orderItemName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  orderItemQuantity: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  orderItemPrice: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  noItems: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#1F2937',
+    lineHeight: 20,
+  },
+  actionSection: {
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  actionButton: {
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  timelineContainer: {
+    marginVertical: 16,
+  },
+  timelineTrack: {
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    marginTop: 12,
+    marginBottom: 8,
+    position: 'relative',
+  },
+  timelineProgress: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    height: 4,
+    backgroundColor: '#059669',
+    borderRadius: 2,
+  },
+  timelineSteps: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+  },
+  timelineStep: {
+    alignItems: 'center',
+    width: 60,
+  },
+  timelinePoint: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  timelinePointPending: {
+    backgroundColor: '#E5E7EB',
+  },
+  timelinePointCompleted: {
+    backgroundColor: '#059669',
+  },
+  timelinePointActive: {
+    borderWidth: 2,
+    borderColor: '#059669',
+  },
+  timelineStepText: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  timelineStepTextPending: {
+    color: '#9CA3AF',
+  },
+  timelineStepTextCompleted: {
+    color: '#059669',
+    fontWeight: '500',
+  },
+  timelineStepTextActive: {
+    fontWeight: '700',
+  },
+  deliveryMessage: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  estimatedDelivery: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '500',
+    marginTop: 8,
+  }
+});
+
+export default ActiveOrders;

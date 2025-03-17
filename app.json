@@ -8,7 +8,7 @@
     "splash": {
       "image": "./assets/images/CrunchX AI splash .png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#ffffff"
     },
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
