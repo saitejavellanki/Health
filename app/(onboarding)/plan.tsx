@@ -12,6 +12,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
+import CrunchXLogo from '../Utils/Logo';
 import {
   RefreshCw,
   AlertCircle,
@@ -594,6 +595,10 @@ const PlanScreen = ({ userData: propUserData, route }) => {
               )}
             </Pressable>
           </View>
+          <View style={styles.bottomLogo}>
+            <CrunchXLogo />
+          </View>
+          
         </View>
       );
     }
@@ -749,6 +754,14 @@ const styles = StyleSheet.create({
     padding: 10,
     margin: 10,
     borderRadius: 8,
+  },
+  bottomLogo:{
+    marginTop:"auto",
+    bottom:0,
+    display:"flex",
+    flexDirection:"row",
+    justifyContent:"flex-end",
+    // backgroundColor:"red",
   },
   errorBannerText: {
     color: '#fff',
