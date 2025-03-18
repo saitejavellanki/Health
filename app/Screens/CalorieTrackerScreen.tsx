@@ -230,40 +230,41 @@ export default function CalorieTrackerScreen() {
 
         // Extract food name
         // Extract food name
-const foodNameMatch = textResponse.match(/(?:1\))(?:\s*)([^\n.]+)/i);
-if (foodNameMatch && foodNameMatch[1]) {
-  setFoodName(foodNameMatch[1].trim());
-}
-
-// Extract calories from a format like "2) 400 calories"
-const calorieMatch = textResponse.match(/(?:2\))(?:\s*)(\d+)(?:\s*)calories/i);
-if (calorieMatch && calorieMatch[1]) {
-  setCalories(calorieMatch[1]);
-}
-
-// Extract protein from a format like "3) 30 grams"
-const proteinMatch = textResponse.match(/(?:3\))(?:\s*)(\d+)(?:\s*)(?:g|grams)/i);
-if (proteinMatch && proteinMatch[1]) {
-  setProtein(proteinMatch[1]);
-}
-
-// Extract fat from a format like "4) 30 grams"
-const fatMatch = textResponse.match(/(?:4\))(?:\s*)(\d+)(?:\s*)(?:g|grams)/i);
-if (fatMatch && fatMatch[1]) {
-  setFat(fatMatch[1]);
-}
-
-// Extract carbohydrates from a format like "5) 5 grams"
-const carbohydrateMatch = textResponse.match(/(?:5\))(?:\s*)(\d+)(?:\s*)(?:g|grams)/i);
-if (carbohydrateMatch && carbohydrateMatch[1]) {
-  setCarbohydrates(carbohydrateMatch[1]);
-}
-
-// Extract sugars from a format like "6) 2 grams"
-const sugarMatch = textResponse.match(/(?:6\))(?:\s*)(\d+)(?:\s*)(?:g|grams)/i);
-if (sugarMatch && sugarMatch[1]) {
-  setSugars(sugarMatch[1]);
-}
+        const foodNameMatch = textResponse.match(/(?:1\))(?:\s*)([^\n.]+)/i);
+        if (foodNameMatch && foodNameMatch[1]) {
+          setFoodName(foodNameMatch[1].trim());
+        }
+        
+        // Extract calories from a format like "2) 400 calories"
+        const calorieMatch = textResponse.match(/(?:2\))(?:\s*)(\d+(?:\.\d+)?)(?:\s*)(?:calories|kcal)(?:\s*(?:of\s*\w+)?)?/i);
+        if (calorieMatch && calorieMatch[1]) {
+          setCalories(calorieMatch[1]);
+        }
+        
+        // Extract protein from a format like "3) 30 grams" or "3) 30 grams of protein"
+        const proteinMatch = textResponse.match(/(?:3\))(?:\s*)(\d+(?:\.\d+)?)(?:\s*)(?:g|grams?)(?:\s*(?:of\s*\w+)?)?/i);
+        if (proteinMatch && proteinMatch[1]) {
+          setProtein(proteinMatch[1]);
+        }
+        
+        // Extract fat from a format like "4) 30 grams" or "4) 30 grams of fat"
+        const fatMatch = textResponse.match(/(?:4\))(?:\s*)(\d+(?:\.\d+)?)(?:\s*)(?:g|grams?)(?:\s*(?:of\s*\w+)?)?/i);
+        if (fatMatch && fatMatch[1]) {
+          setFat(fatMatch[1]);
+        }
+        
+        // Extract carbohydrates from a format like "5) 5 grams" or "5) 5 grams of carbohydrates"
+        const carbohydrateMatch = textResponse.match(/(?:5\))(?:\s*)(\d+(?:\.\d+)?)(?:\s*)(?:g|grams?)(?:\s*(?:of\s*\w+)?)?/i);
+        if (carbohydrateMatch && carbohydrateMatch[1]) {
+          setCarbohydrates(carbohydrateMatch[1]);
+        }
+        
+        // Extract sugars from a format like "6) 2 grams" or "6) 2 grams of sugar"
+        const sugarMatch = textResponse.match(/(?:6\))(?:\s*)(\d+(?:\.\d+)?)(?:\s*)(?:g|grams?)(?:\s*(?:of\s*\w+)?)?/i);
+        if (sugarMatch && sugarMatch[1]) {
+          setSugars(sugarMatch[1]);
+        }
+        
 
 // Check for junk food classification (7) yes/no)
 const junkFoodMatch = textResponse.match(/(?:7\))(?:\s*)(\w+)/i);

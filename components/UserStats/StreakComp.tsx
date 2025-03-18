@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -152,7 +153,7 @@ const StreakComp = () => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(255,62,0,0.1)', 'rgba(255,62,0,0.05)', 'transparent']}
+        colors={['rgba(255,62,0,0.15)', 'rgba(255,62,0,0.05)', 'transparent']}
         style={styles.gradientBackground}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
@@ -233,7 +234,10 @@ const StreakComp = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Maintain Your Streak</Text>
-              <TouchableOpacity onPress={() => setInfoModalVisible(false)}>
+              <TouchableOpacity 
+                style={styles.closeIcon}
+                onPress={() => setInfoModalVisible(false)}
+              >
                 <MaterialCommunityIcons
                   name="close"
                   size={24}
@@ -244,11 +248,13 @@ const StreakComp = () => {
 
             <ScrollView style={styles.modalBody}>
               <View style={styles.infoSection}>
-                <MaterialCommunityIcons
-                  name="scan-helper"
-                  size={28}
-                  color="#FF5722"
-                />
+                <View style={styles.iconContainer}>
+                  <MaterialCommunityIcons
+                    name="scan-helper"
+                    size={28}
+                    color="#FF5722"
+                  />
+                </View>
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoTitle}>Condition 1</Text>
                   <Text style={styles.infoText}>
@@ -258,11 +264,13 @@ const StreakComp = () => {
               </View>
 
               <View style={styles.infoSection}>
-                <MaterialCommunityIcons
-                  name="food-apple"
-                  size={28}
-                  color="#FF5722"
-                />
+                <View style={styles.iconContainer}>
+                  <MaterialCommunityIcons
+                    name="food-apple"
+                    size={28}
+                    color="#FF5722"
+                  />
+                </View>
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoTitle}>Condition 2</Text>
                   <Text style={styles.infoText}>
@@ -270,31 +278,19 @@ const StreakComp = () => {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.infoText2}>
-                Both conditions must be satisfied each day to keep your streak
-                alive!
-              </Text>
-
-              {/* <View style={styles.infoSection}>
-                <MaterialCommunityIcons name="bell-ring" size={28} color="#FF5722" />
-                <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoTitle}>Set Reminders</Text>
-                  <Text style={styles.infoText}>Enable notifications to remind you to scan meals before your streak resets.</Text>
-                </View>
-              </View>
               
-              <View style={styles.infoSection}>
-                <MaterialCommunityIcons name="alarm" size={28} color="#FF5722" />
-                <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoTitle}>Reset Time</Text>
-                  <Text style={styles.infoText}>Your streak resets at midnight if you haven't scanned any meals that day.</Text>
-                </View>
-              </View> */}
+              <View style={styles.infoNoteContainer}>
+                <Text style={styles.infoText2}>
+                  Both conditions must be satisfied each day to keep your streak
+                  alive!
+                </Text>
+              </View>
             </ScrollView>
 
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setInfoModalVisible(false)}
+              android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
             >
               <Text style={styles.closeButtonText}>Got It</Text>
             </TouchableOpacity>
@@ -315,7 +311,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: Platform.OS === 'android' ? 4 : 3,
+    backgroundColor: '#FFF',
   },
   gradientBackground: {
     paddingVertical: 20,
@@ -323,6 +320,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderRadius: 16,
   },
   streakInfo: {
     flex: 1,
@@ -336,37 +334,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FF7043',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   infoButton: {
     marginLeft: 8,
-    padding: 2,
+    padding: 3,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,112,67,0.08)',
   },
   streakValueContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   streakValue: {
-    fontSize: 36,
+    fontSize: 38,
     fontWeight: 'bold',
     color: '#FF5722',
+    fontFamily: Platform.OS === 'android' ? 'sans-serif-medium' : undefined,
   },
   streakUnit: {
     fontSize: 16,
     color: '#FF5722',
     marginLeft: 5,
     fontWeight: '500',
+    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
   },
   streakDescription: {
     fontSize: 14,
     color: '#FF7043',
     marginTop: 5,
+    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
   },
   flameContainer: {
     position: 'relative',
-    height: 60,
-    width: 60,
+    height: 70,
+    width: 70,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,112,67,0.08)',
+    borderRadius: 35,
   },
   flame: {
     position: 'absolute',
@@ -387,6 +394,7 @@ const styles = StyleSheet.create({
     color: '#FF7043',
     textAlign: 'center',
     flex: 1,
+    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
   },
 
   // Modal styles
@@ -396,17 +404,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
+    paddingVertical: Platform.OS === 'android' ? 30 : 0,
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: 16,
+    borderRadius: 12,
     width: '100%',
-    maxHeight: '80%',
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: Platform.OS === 'android' ? 8 : 5,
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -414,14 +424,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 10,
+    paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    backgroundColor: '#FAFAFA',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FF5722',
+    fontFamily: Platform.OS === 'android' ? 'sans-serif-medium' : undefined,
+  },
+  closeIcon: {
+    padding: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,87,34,0.08)',
   },
   modalBody: {
     padding: 20,
@@ -431,6 +448,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 20,
     alignItems: 'flex-start',
+    padding: 5,
+  },
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,87,34,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   infoTextContainer: {
     marginLeft: 15,
@@ -441,31 +467,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 5,
+    fontFamily: Platform.OS === 'android' ? 'sans-serif-medium' : undefined,
   },
   infoText: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 22,
+    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
+  },
+  infoNoteContainer: {
+    backgroundColor: 'rgba(255,87,34,0.05)',
+    borderRadius: 10,
+    padding: 15,
+    marginTop: 10,
+    marginBottom: 20,
   },
   infoText2: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 22,
     textAlign: 'center',
-    marginLeft: 20,
-    marginRight: 20,
+    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
+    fontWeight: '500',
   },
   closeButton: {
     backgroundColor: '#FF5722',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    padding: 15,
+    padding: Platform.OS === 'android' ? 16 : 15,
     alignItems: 'center',
   },
   closeButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: Platform.OS === 'android' ? 'sans-serif-medium' : undefined,
+    letterSpacing: 0.5,
   },
 });
 

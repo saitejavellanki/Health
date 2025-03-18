@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Modal, TextInput, KeyboardAvoidingView, Platform, BackHandler } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ChevronLeft, Check, Shield, Lock, MapPin, Edit2, Phone } from 'lucide-react-native';
 import { styles } from "../Utils/PaymentsStyles.tsx";
@@ -8,6 +8,8 @@ import { collection, doc, getDoc, updateDoc, getDocs, query, where, setDoc } fro
 import * as Crypto from 'expo-crypto';
 import WebView from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 // PayU configuration remains the same
 const PAYU_CONFIG = {
@@ -17,7 +19,6 @@ const PAYU_CONFIG = {
   productionBaseUrl: 'https://secure.payu.in/_payment',
   testBaseUrl: 'https://test.payu.in/_payment',
 };
-
 
 // Hash generation function
 const generateHash = async (input) => {
@@ -61,9 +62,68 @@ export default function PaymentScreen() {
   const [newAddress, setNewAddress] = useState('');
 
   const [phoneNumber, setPhoneNumber] = useState('');
-const [phoneModalVisible, setPhoneModalVisible] = useState(false);
-const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [phoneModalVisible, setPhoneModalVisible] = useState(false);
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
 
+  // Create a ref for the WebView
+  const webViewRef = useRef(null);
+
+  // Handle UPI deep links
+  const handleUpiDeepLink = async (url) => {
+    try {
+      console.log("Attempting to open URL:", url);
+      const canOpen = await Linking.canOpenURL(url);
+      
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        console.log("Cannot open URL: " + url);
+        Alert.alert(
+          "Payment App Required",
+          "The payment app needed is not installed. Please install it or use another payment method.",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error) {
+      console.error("Error opening URL:", error);
+      Alert.alert(
+        "Error",
+        "There was a problem opening the payment app. Please try another payment method.",
+        [{ text: "OK" }]
+      );
+    }
+  };
+
+  // Handle Android back button
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (showPaymentWebView) {
+          Alert.alert(
+            'Cancel Payment',
+            'Are you sure you want to cancel this payment?',
+            [
+              { text: 'No', style: 'cancel', onPress: () => {} },
+              { 
+                text: 'Yes', 
+                onPress: () => {
+                  setShowPaymentWebView(false);
+                  setIsProcessing(false);
+                  if (paymentFormData) {
+                    updateOrderStatus(paymentFormData.txnid, 'cancelled', { status: 'cancelled' });
+                  }
+                }
+              }
+            ]
+          );
+          return true;
+        }
+        return false;
+      });
+      
+      return () => backHandler.remove();
+    }
+  }, [showPaymentWebView]);
 
   // Fetch user data from Firebase
   useEffect(() => {
@@ -156,7 +216,7 @@ const [newPhoneNumber, setNewPhoneNumber] = useState('');
     return `TXN_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
   };
   
-  // Modified function to prepare payment data - removed direct payment method
+  // Modified function to prepare payment data with UPI specific parameters
   const preparePaymentData = async () => {
     if (!userData) {
       Alert.alert('Error', 'User data not available. Please try again.');
@@ -189,7 +249,10 @@ const [newPhoneNumber, setNewPhoneNumber] = useState('');
       surl,
       furl,
       hash,
-      // Removed pg parameter to let PayU handle payment method selection
+      pg: 'UPI', // Specify UPI as payment gateway
+      preferred_payment_method: 'UPI', // Set UPI as preferred method
+      enforce_paymethod: 'UPI', // Enforce UPI payment method
+      bankcode: 'UPI' // Additional parameter to enforce UPI
     };
   };
   
@@ -213,7 +276,7 @@ const [newPhoneNumber, setNewPhoneNumber] = useState('');
     setIsProcessing(true);
     
     try {
-      // Prepare payment data without direct payment method
+      // Prepare payment data with UPI specific parameters
       const paymentData = await preparePaymentData();
       if (!paymentData) {
         setIsProcessing(false);
@@ -500,14 +563,14 @@ const [newPhoneNumber, setNewPhoneNumber] = useState('');
     );
   };
   
-  // Modified: Standard PayU WebView without direct payment
+  // Modified: PayU WebView with UPI specific JavaScript injection
   const renderPaymentWebView = () => {
     if (!showPaymentWebView || !paymentFormData) return null;
     
     // Use payment URL 
     const paymentUrl = PAYU_CONFIG.testMode ? PAYU_CONFIG.testBaseUrl : PAYU_CONFIG.productionBaseUrl;
     
-    // Create HTML form for payment submission
+    // Create HTML form for payment submission with UPI focus
     const formHtml = `
       <html>
         <head>
@@ -612,12 +675,74 @@ const [newPhoneNumber, setNewPhoneNumber] = useState('');
           </View>
           
           <WebView
+            ref={webViewRef}
             source={{ html: formHtml }}
+            injectedJavaScript={`
+              (function() {
+                function interceptClickEvent(e) {
+                  var href = e.target.getAttribute('href') || (e.target.parentNode ? e.target.parentNode.getAttribute('href') : null);
+                  if (href) {
+                    if (href.startsWith('phonepe://') || 
+                        href.startsWith('gpay://') || 
+                        href.startsWith('upi://') ||
+                        href.startsWith('paytm://')) {
+                      e.preventDefault();
+                      window.ReactNativeWebView.postMessage(href);
+                      return false;
+                    }
+                  }
+                }
+                document.addEventListener('click', interceptClickEvent);
+                
+                // Monitor for changes in the DOM
+                var observer = new MutationObserver(function(mutations) {
+                  mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList') {
+                      var upiLinks = document.querySelectorAll('a[href^="upi://"], a[href^="phonepe://"], a[href^="gpay://"], a[href^="paytm://"]');
+                      upiLinks.forEach(function(link) {
+                        link.addEventListener('click', function(e) {
+                          e.preventDefault();
+                          window.ReactNativeWebView.postMessage(link.href);
+                          return false;
+                        });
+                      });
+                    }
+                  });
+                });
+                
+                observer.observe(document, { childList: true, subtree: true });
+              })();
+            `}
+            onMessage={(event) => {
+              const url = event.nativeEvent.data;
+              if (url.startsWith('phonepe://') || 
+                  url.startsWith('gpay://') || 
+                  url.startsWith('upi://') ||
+                  url.startsWith('paytm://')) {
+                handleUpiDeepLink(url);
+              }
+            }}
             onNavigationStateChange={(navState) => {
+              console.log("Navigation state changed:", navState.url);
+              
+              // Handle UPI deep links
+              if (navState.url.startsWith('phonepe://') || 
+                  navState.url.startsWith('gpay://') || 
+                  navState.url.startsWith('upi://') ||
+                  navState.url.startsWith('paytm://')) {
+                
+                if (webViewRef.current) {
+                  webViewRef.current.stopLoading();
+                }
+                
+                handleUpiDeepLink(navState.url);
+                return;
+              }
+              
               // Handle success and failure URLs
               if (navState.url.includes('success') || navState.url.includes('failure')) {
                 // Extract response data from URL
-                const urlParams = new URLSearchParams(navState.url.split('?')[1]);
+                const urlParams = new URLSearchParams(navState.url.split('?')[1] || '');
                 const response = {};
                 
                 for (const [key, value] of urlParams.entries()) {
@@ -627,6 +752,20 @@ const [newPhoneNumber, setNewPhoneNumber] = useState('');
                 response.status = navState.url.includes('success') ? 'success' : 'failed';
                 handlePaymentResponse(JSON.stringify(response));
               }
+            }}
+            onShouldStartLoadWithRequest={(request) => {
+              console.log("Should start load:", request.url);
+              
+              // Check if this is a UPI app deep link
+              if (request.url.startsWith('phonepe://') || 
+                  request.url.startsWith('gpay://') || 
+                  request.url.startsWith('upi://') ||
+                  request.url.startsWith('paytm://')) {
+                
+                handleUpiDeepLink(request.url);
+                return false; // Prevent WebView from trying to load this URL
+              }
+              return true; // Allow WebView to load other URLs
             }}
             javaScriptEnabled={true}
             domStorageEnabled={true}

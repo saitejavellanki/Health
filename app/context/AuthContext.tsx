@@ -1,12 +1,16 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from '../../components/firebase/Firebase'; 
-import { onAuthStateChanged } from 'firebase/auth';
+import { 
+  onAuthStateChanged, 
+  signOut as firebaseSignOut,
+  User
+} from 'firebase/auth';
 import { getDoc, doc, setDoc } from 'firebase/firestore';
 import { router } from 'expo-router';
 
 type AuthContextType = {
-  user: any;
+  user: User | null;
   isLoading: boolean;
   isNewUser: boolean;
   signOut: () => Promise<void>;
@@ -22,14 +26,13 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
 
-  // Store user data in background without blocking UI
-  const storeUserData = (firebaseUser) => {
+  // Store user data in AsyncStorage for persistence
+  const storeUserData = async (firebaseUser: User) => {
     if (!firebaseUser) return;
     
     try {
@@ -40,16 +43,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL,
         phoneNumber: firebaseUser.phoneNumber,
+        // Add timestamp to track when this was stored
+        storedAt: new Date().toISOString()
       };
       
-      // Don't await this - let it happen in the background
-      AsyncStorage.setItem('userData', JSON.stringify(userData))
-        .catch(err => console.error('Background AsyncStorage error:', err));
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
     } catch (error) {
-      console.error('Error in storeUserData:', error);
+      console.error('Error storing user data:', error);
     }
   };
 
+  // Retrieve stored user data from AsyncStorage
   const getStoredUser = async () => {
     try {
       const storedUserData = await AsyncStorage.getItem('userData');
@@ -62,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
-  // Check if user needs onboarding and return result
+  // Check if user needs onboarding
   const checkUserOnboardingStatus = async (userId: string): Promise<boolean> => {
     try {
       const userDocRef = doc(db, 'users', userId);
@@ -75,12 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       const userData = userDoc.data();
-      // Be more explicit about checking onboarding status
+      // Check if onboarding is completed
       const onboardingCompleted = 
-        userData.onboardingCompleted === true || userData.onboarded === true;
+        userData.onboardingCompleted === true || 
+        userData.onboarded === true;
       
-      console.log("Onboarding status check:", onboardingCompleted ? "completed" : "not completed");
-      return !onboardingCompleted; // Return TRUE if needs onboarding (not completed)
+      console.log("Onboarding status:", onboardingCompleted ? "completed" : "not completed");
+      return !onboardingCompleted; // Return TRUE if needs onboarding
     } catch (error) {
       console.error('Error checking onboarding status:', error);
       return true; // Default to needing onboarding on error
@@ -90,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Handle user sign out
   const signOut = async () => {
     try {
-      await auth.signOut();
+      await firebaseSignOut(auth);
       await AsyncStorage.removeItem('userData');
       router.replace('/(auth)/login');
     } catch (error) {
@@ -101,127 +106,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     
-    // Pre-check AsyncStorage for faster initial load
-    const checkStoredUser = async () => {
+    // First try to load user from AsyncStorage for faster initial render
+    const initializeFromStorage = async () => {
       try {
-        const storedUserData = await AsyncStorage.getItem('userData');
-        if (storedUserData && isMounted) {
-          // We have a stored user, but we'll still wait for Firebase to confirm
-          // This just speeds up the initial state setup
-          const userData = JSON.parse(storedUserData);
-          console.log('Found stored user data for:', userData.email || userData.phoneNumber || userData.uid);
+        const storedUser = await getStoredUser();
+        if (storedUser && isMounted) {
+          // Set initial user state from storage
+          // This will be overridden by the Firebase auth state
+          setUser(storedUser as unknown as User);
+          console.log('Initialized from stored user data:', storedUser.email || storedUser.uid);
         }
       } catch (error) {
-        console.error('Error checking stored auth state:', error);
-      } finally {
-        if (isMounted) {
-          setInitialCheckDone(true);
-        }
+        console.error('Error initializing from storage:', error);
       }
     };
     
-    checkStoredUser();
+    initializeFromStorage();
 
     // Set up Firebase auth listener
-    // In AuthContext.tsx, modify the onAuthStateChanged callback
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      console.log("Auth state changed:", firebaseUser ? `logged in as ${firebaseUser.email || firebaseUser.phoneNumber || firebaseUser.uid}` : "logged out");
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth state changed:", firebaseUser ? 
+        `logged in as ${firebaseUser.email || firebaseUser.uid}` : 
+        "logged out");
       
       if (!isMounted) return;
       
-      // Check if we're already navigating to prevent duplicate navigation
-      if (isNavigating) {
-        console.log("Navigation already in progress, skipping");
-        return;
-      }
-      
-      // First, immediately update user state
+      // Update user state
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        // Set navigating lock immediately
+        // Prevent multiple navigations
+        if (isNavigating) return;
         setIsNavigating(true);
         
-        // Use a separate async function since we can't make the callback async
-        const handleUserNavigation = async () => {
-          try {
-            // Store user data in background - don't await this
-            storeUserData(firebaseUser);
-            
-            // Try to get cached user data first for faster navigation
-            const storedUser = await getStoredUser();
-            
-            // If we have stored user data with onboarding info, use it
-            if (storedUser && storedUser.onboardingChecked) {
-              console.log("Using cached onboarding status:", !storedUser.needsOnboarding);
-              
-              if (storedUser.needsOnboarding) {
-                router.replace('/(onboarding)');
-              } else {
-                router.replace('/(tabs)');
-              }
-              
-              // Update in background
-              checkUserOnboardingStatus(firebaseUser.uid).then(needsOnboarding => {
-                // Update cache for next time
-                storeUserData({...firebaseUser, onboardingChecked: true, needsOnboarding});
-              });
-            } else {
-              // No cache, check onboarding status
-              const needsOnboarding = await checkUserOnboardingStatus(firebaseUser.uid);
-              
-              // Store for next time
-              storeUserData({...firebaseUser, onboardingChecked: true, needsOnboarding});
-              
-              if (needsOnboarding) {
-                router.replace('/(onboarding)');
-              } else {
-                router.replace('/(tabs)');
-              }
-            }
-          } catch (error) {
-            console.error("Navigation error:", error);
-            // Default to tabs on error
+        try {
+          // Store user data for persistence
+          await storeUserData(firebaseUser);
+          
+          // Check if user needs onboarding
+          const needsOnboarding = await checkUserOnboardingStatus(firebaseUser.uid);
+          
+          // Navigate based on onboarding status
+          if (needsOnboarding) {
+            router.replace('/(onboarding)');
+          } else {
             router.replace('/(tabs)');
-          } finally {
-            // Allow navigation again after a short delay
-            setTimeout(() => {
-              setIsNavigating(false);
-              setIsLoading(false);
-            }, 500);
           }
-        };
-        
-        // Call the async function
-        handleUserNavigation();
+        } catch (error) {
+          console.error("Error handling authenticated user:", error);
+          // Default to tabs on error
+          router.replace('/(tabs)');
+        } finally {
+          // Reset navigation lock and loading state
+          setTimeout(() => {
+            setIsNavigating(false);
+            setIsLoading(false);
+          }, 500);
+        }
       } else {
-        // Clear any stored user data - don't await this
-        AsyncStorage.removeItem('userData').catch(err => 
-          console.error('Error removing user data:', err)
-        );
-        
+        // User is signed out
+        await AsyncStorage.removeItem('userData');
         setIsNewUser(false);
         setIsLoading(false);
         
-        // Only navigate to login if we're not already on the auth stack
+        // Only navigate to login if not already on auth stack
         const currentPath = router.getCurrentPath();
         if (!currentPath.includes('/(auth)')) {
           router.replace('/(auth)/login');
         }
         
-        // Reset navigation lock
         setIsNavigating(false);
       }
     });
     
-    // Safety timeout - shorter now since we're handling UI faster
+    // Safety timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       if (isMounted && isLoading) {
         console.log("Auth timeout reached, forcing load completion");
         setIsLoading(false);
       }
-    }, 3000); // 3 second timeout
-
+    }, 5000);
+    
     return () => {
       isMounted = false;
       clearTimeout(timeout);

@@ -27,7 +27,6 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
   OAuthProvider,
-  PhoneAuthProvider,
 } from 'firebase/auth';
 import { auth, db } from '../../components/firebase/Firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -35,16 +34,12 @@ import {
   Mail,
   Lock,
   ArrowRight,
-  Phone,
 } from 'lucide-react-native';
 
 // Import Google Sign In
 import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { maybeCompleteAuthSession } from 'expo-web-browser';
-
-// For Phone Authentication
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 
 // Import the AuthContext
 import { useAuth } from '../context/AuthContext';
@@ -60,16 +55,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  // Phone authentication states
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationId, setVerificationId] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
-  const [showOtpInput, setShowOtpInput] = useState(false);
-  
-  // Reference to recaptcha verifier
-  const recaptchaVerifier = React.useRef(null);
 
   // Configure Google Sign In
   const [googleRequest, googleResponse, googlePromptAsync] =
@@ -114,14 +99,11 @@ export default function Login() {
     try {
       setLoading(true);
       setError('');
-      // Add a console log to track timing
-      console.log('Login started:', new Date().toISOString());
       
-      // Sign in with Firebase - don't await anything else after this
+      // Sign in with Firebase
       await signInWithEmailAndPassword(auth, email, password);
-      console.log('Firebase auth completed:', new Date().toISOString());
       
-      // Don't do anything else here - navigation should be handled by AuthContext
+      // Don't navigate here - let the AuthContext handle it
     } catch (err) {
       setError(err.message || 'Failed to login. Please try again.');
       Alert.alert('Login Error', err.message);
@@ -129,79 +111,7 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  const handlePhoneAuth = async () => {
-    try {
-      // Validate phone number
-      if (!phoneNumber.trim() || phoneNumber.trim().length < 10) {
-        setError('Please enter a valid phone number with country code');
-        return;
-      }
-      
-      setLoading(true);
-      setError('');
-      
-      // Format phone number if needed
-      const formattedPhoneNumber = phoneNumber.startsWith('+') 
-        ? phoneNumber 
-        : `+${phoneNumber}`;
-      
-      // Get verify phone number with Firebase
-      const phoneProvider = new PhoneAuthProvider(auth);
-      
-      // Request verification code using the reCAPTCHA verifier
-      const verificationIdResult = await phoneProvider.verifyPhoneNumber(
-        formattedPhoneNumber, 
-        recaptchaVerifier.current
-      );
-      
-      setVerificationId(verificationIdResult);
-      setShowOtpInput(true);
-      Alert.alert('Success', 'Verification code has been sent to your phone');
-    } catch (error) {
-      setError(`Phone authentication failed: ${error.message}`);
-      Alert.alert('Error', error.message);
-      console.error("Phone auth error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
   
-  const confirmCode = async () => {
-    try {
-      if (!verificationCode.trim()) {
-        setError('Please enter the verification code');
-        return;
-      }
-      
-      setLoading(true);
-      setError('');
-      
-      // Create credential with verification ID and code
-      const credential = PhoneAuthProvider.credential(
-        verificationId,
-        verificationCode
-      );
-      
-      // Sign in with credential - AuthContext will handle the state
-      await signInWithCredential(auth, credential);
-      
-      // Update user profile with phone number
-      if (user) {
-        const userDocRef = doc(db, 'users', user.uid);
-        await setDoc(userDocRef, { 
-          phone: phoneNumber 
-        }, { merge: true });
-      }
-      
-      // Navigation will be handled by the useEffect
-    } catch (error) {
-      setError(`Code verification failed: ${error.message}`);
-      Alert.alert('Verification Error', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleSignIn = async () => {
     try {
@@ -265,14 +175,6 @@ export default function Login() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Firebase reCAPTCHA Verifier */}
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaVerifier}
-        firebaseConfig={auth.app.options}
-        title="Prove you're human!"
-        cancelLabel="Close"
-      />
-      
       <View style={styles.header}>
         <Image
           source={{
@@ -296,139 +198,51 @@ export default function Login() {
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          {/* Authentication Method Toggle */}
-          <View style={styles.authToggle}>
-            <Pressable
-              style={[
-                styles.authToggleButton,
-                !showPhoneAuth && styles.authToggleButtonActive
-              ]}
-              onPress={() => {
-                setShowPhoneAuth(false);
-                setShowOtpInput(false);
-              }}
-            >
-              <Text style={!showPhoneAuth ? styles.authToggleTextActive : styles.authToggleText}>
-                Email
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.authToggleButton,
-                showPhoneAuth && styles.authToggleButtonActive
-              ]}
-              onPress={() => {
-                setShowPhoneAuth(true);
-                setShowOtpInput(false);
-              }}
-            >
-              <Text style={showPhoneAuth ? styles.authToggleTextActive : styles.authToggleText}>
-                Phone
-              </Text>
-            </Pressable>
+          <View style={styles.inputContainer}>
+            <Mail size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#888"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
           </View>
 
-          {!showPhoneAuth ? (
-            // Email Login Form
-            <>
-              <View style={styles.inputContainer}>
-                <Mail size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor="#888"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
+          <View style={styles.inputContainer}>
+            <Lock size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#888"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
 
-              <View style={styles.inputContainer}>
-                <Lock size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  placeholderTextColor="#888"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
-              </View>
+          <Link href="/(auth)/forgot-password" asChild>
+            <TouchableOpacity style={styles.forgotPassword}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+          </Link>
 
-              <Link href="/(auth)/forgot-password" asChild>
-                <TouchableOpacity style={styles.forgotPassword}>
-                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-                </TouchableOpacity>
-              </Link>
-
-              <Pressable
-                style={styles.button}
-                onPress={handleLogin}
-                disabled={loading || authLoading}
-              >
-                {loading || authLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Text style={styles.buttonText}>Sign In</Text>
-                    <ArrowRight size={20} color="#fff" />
-                  </>
-                )}
-              </Pressable>
-            </>
-          ) : (
-            // Phone Login Form
-            <>
-              {!showOtpInput ? (
-                <>
-                  <View style={styles.inputContainer}>
-                    <Phone size={20} color="#666" style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Phone Number with country code"
-                      placeholderTextColor="#888"
-                      value={phoneNumber}
-                      onChangeText={setPhoneNumber}
-                      keyboardType="phone-pad"
-                    />
-                  </View>
-                  <Text style={styles.helperText}>
-                    Include country code (e.g. +91 for India)
-                  </Text>
-                </>
-              ) : (
-                <View style={styles.inputContainer}>
-                  <Lock size={20} color="#666" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Verification Code"
-                    placeholderTextColor="#888"
-                    value={verificationCode}
-                    onChangeText={setVerificationCode}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              )}
-
-              <Pressable
-                style={styles.button}
-                onPress={!showOtpInput ? handlePhoneAuth : confirmCode}
-                disabled={loading || authLoading}
-              >
-                {loading || authLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Text style={styles.buttonText}>
-                      {!showOtpInput ? "Send Verification Code" : "Verify & Sign In"}
-                    </Text>
-                    <ArrowRight size={20} color="#fff" />
-                  </>
-                )}
-              </Pressable>
-            </>
-          )}
+          <Pressable
+            style={styles.button}
+            onPress={handleLogin}
+            disabled={loading || authLoading}
+          >
+            {loading || authLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.buttonText}>Sign In</Text>
+                <ArrowRight size={20} color="#fff" />
+              </>
+            )}
+          </Pressable>
 
           {/* <View style={styles.dividerContainer}>
             <View style={styles.divider} />
@@ -626,36 +440,5 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     resizeMode: 'contain',
-  },
-  authToggle: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    borderRadius: 12,
-    backgroundColor: '#f5f5f5',
-    padding: 4,
-  },
-  authToggleButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  authToggleButtonActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  authToggleText: {
-    color: '#666',
-    fontFamily: 'Poppins_Regular',
-    fontSize: 14,
-  },
-  authToggleTextActive: {
-    color: '#22c55e',
-    fontFamily: 'Poppins_Bold',
-    fontSize: 14,
   },
 });

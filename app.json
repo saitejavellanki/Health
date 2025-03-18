@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "splash": {
-      "image": "./assets/images/CrunchX AI splash .png",
+      "image": "./assets/images/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -38,7 +38,7 @@
     "android": {
       "package": "com.tejvellank.boltexponativewind",
       "versionCode": 2,
-      "versionName": "1.0.1",
+      
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"

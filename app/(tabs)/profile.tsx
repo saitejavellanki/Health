@@ -152,7 +152,7 @@ const ProfileScreen: React.FC = () => {
           targetWeight,
           weight: firestoreData.weight || 70,
         } as UserData;
-
+        
         setUserData(data);
         setProfileImageKey(Date.now());
         
@@ -297,17 +297,17 @@ const ProfileScreen: React.FC = () => {
         <View style={styles.profileHeaderContainer}>
           <View style={styles.coverImageContainer}>
             <Image
-              key={profileImageKey}
+              key={`profile-image-${profileImageKey}-${Date.now()}`}
               source={{
-                uri:
-                  userData.profileImage ||
-                  'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1742205498/placeholder_for_dp_nsojeb.jpg',
+                uri: userData.profileImage 
+                  ? `${userData.profileImage}?timestamp=${Date.now()}` 
+                  : 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1742205498/placeholder_for_dp_nsojeb.jpg',
                 cache: 'reload',
               }}
               style={styles.coverImage}
               resizeMode="cover"
+              onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
             />
-
             <TouchableOpacity
               style={styles.settingsButton}
               onPress={navigateToSettings}
@@ -435,6 +435,8 @@ const ProfileScreen: React.FC = () => {
     </View>
   );
 };
+
+
 
 const styles = StyleSheet.create({
   container: {
