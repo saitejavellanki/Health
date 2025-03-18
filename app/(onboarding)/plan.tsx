@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,12 +27,14 @@ import {
   Info,
   ChevronLeft,
 } from 'lucide-react-native';
-import { doc, getDoc, setDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../../components/firebase/Firebase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Checkbox } from 'expo-checkbox';
+// import { doc, updateDoc } from 'firebase/firestore';
+// import { auth, db } from '../../components/firebase/Firebase';
 
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
 const GEMINI_API_URL =
@@ -217,23 +219,60 @@ const createPrompt = (userData) => {
   }
 
   let tdde = bmr * act_fac;
+  let new_tdde = 0;
+  if (userData.goals[0]['title'] === 'Weight Gain') {
+    new_tdde = tdde + 200;
+  } else if (userData.goals[0]['title'] === 'Weight Gain') {
+    new_tdde = tdde - 500;
+    if (new_tdde < 1500 && userData.gender === 'male') {
+      new_tdde = 1500;
+    } else if (new_tdde < 1200 && userData.gender === 'female') {
+      new_tdde = 1200;
+    }
+  }
+  console.log('tdde: ' + tdde);
+  console.log('new_tdde: ' + new_tdde);
 
-  return `Create a 7-day wellness plan for ${goal} ${weightGoalText}. 
-   ${weightContext}Diet preference: ${diet} with Indian food specific to ${state} region. Allergies: ${allergies}.
+  updateDoc(useRef,{
+    tdde:new_tdde,
+  });
+//check if this new_tdde is getting updated to firebase.
+  // const currentUser = auth.currentUser;
 
-   For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
-   - Start with just the day name (e.g., "Monday")
-   - Exercise: [brief workout plan] (Give only the workout that can be performed even at home at no cost)
-   - Breakfast: [${state}-style Indian meal suggestion]
-   - Lunch: [${state}-style Indian meal suggestion]
-   - Dinner: [${state}-style Indian meal suggestion]
-   - Snack: [1-2 healthy ${state}-style Indian options]
-   - Tracking: [simple tip for monitoring progress]
+  // const userRef = doc(db, 'users', currentUser.uid);
+  // await updateDoc(userRef, {
+  //   tdde: tdde,
+  // });
 
-   Keep each section brief - 1-2 sentences maximum. Give total calories that meal holds at the end of sentence. 
-   Try to use give meals that use "most regularly/commonly used food items in that area" only.  
-   Focus on actionable items. All meals should be authentic ${state}-style Indian cuisine 
-   options that are commonly prepared in that region.`;
+  return `Suggest a meal-plan for ${goal} ${weightGoalText}.
+${weightContext} Diet preference: ${diet} with Indian food specific to ${state} region.
+Allergies: ${allergies}. Calorie intake target per day should be almost equal to: ${new_tdde}. 
+Monthly budget: ${userData.budget.amount} INR.
+
+For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
+
+Start with just the day name (e.g., "Monday")
+
+Exercise: [brief workout plan]
+
+Breakfast: [suggest additional food items to take along with breakfast, 
+specifying how many calories (kcal) they provide at the end of the line]
+
+Snack: [suggest food items to take as snacks, specifying how many calories (kcal) 
+they provide at the end of the line]
+
+Dinner: [suggest additional food items to take along with dinner, 
+specifying how many calories (kcal) they provide at the end of the line]
+
+Tracking: [simple tip for monitoring progress]
+
+Keep each section brief - 1-2 sentences maximum. Focus on actionable items.
+All suggestions should be authentic ${state}-style South Indian cuisine options that are commonly 
+prepared in that region, tailored to the user's diet and allergies.  
+The items should be very common that every person should know about it. 
+Ensure calorie intake aligns with ${tdde}, and all recommendations fit 
+within the monthly budget (${userData.budget.amount}), though no pricing information 
+should be included in the output.`;
 };
 
 const { width } = Dimensions.get('window');
@@ -598,7 +637,6 @@ const PlanScreen = ({ userData: propUserData, route }) => {
           <View style={styles.bottomLogo}>
             <CrunchXLogo />
           </View>
-          
         </View>
       );
     }
@@ -755,12 +793,12 @@ const styles = StyleSheet.create({
     margin: 10,
     borderRadius: 8,
   },
-  bottomLogo:{
-    marginTop:"auto",
-    bottom:0,
-    display:"flex",
-    flexDirection:"row",
-    justifyContent:"flex-end",
+  bottomLogo: {
+    marginTop: 'auto',
+    bottom: 0,
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     // backgroundColor:"red",
   },
   errorBannerText: {

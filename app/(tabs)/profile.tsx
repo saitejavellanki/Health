@@ -330,7 +330,7 @@ const ProfileScreen: React.FC = () => {
             <Target size={20} color="#22c55e" />
           </View>
           <View style={styles.goalsContainer}>
-            {userData.goals.map((goal, index) => (
+            {/* {userData.goals.map((goal, index) => (
               <View key={index} style={styles.goalItem}>
                 <Award size={18} color="#22c55e" />
                 <Text style={styles.goalText}>
@@ -342,7 +342,22 @@ const ProfileScreen: React.FC = () => {
                   </Text>
                 )}
               </View>
-            ))}
+            ))} */}
+            {userData.goals.length > 0 && (
+              <View style={styles.goalItem}>
+                <Award size={18} color="#22c55e" />
+                <Text style={styles.goalText}>
+                  {userData.goals[userData.goals.length - 1].title + ' ' ||
+                    'Custom Goal'}
+                </Text>
+                {userData.goals[userData.goals.length - 1].targetWeight && (
+                  <Text style={styles.goalSubText}>
+                    (Target:{' '}
+                    {userData.goals[userData.goals.length - 1].targetWeight} kg)
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
         </View>
 
