@@ -370,7 +370,7 @@ const [newPhoneNumber, setNewPhoneNumber] = useState('');
         // Redirect to confirmation after success
         setTimeout(() => {
           router.replace({
-            pathname: '/(onboarding)/orderConfirmation',
+            pathname: '/Screens/OrderConfirmationScreen',
             params: { orderId: paymentFormData.txnid }
           });
         }, 2000);

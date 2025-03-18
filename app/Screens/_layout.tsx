@@ -6,7 +6,7 @@ export default function OnboardingLayout() {
       <Stack.Screen name="CalorieTrackerScreen" />
       <Stack.Screen name="payments"/>
       <Stack.Screen name="MemoryGalleryScreen"/>
-      
+      <Stack.Screen name="OrderConfirmationScreen"/>
       
     </Stack>
   );
