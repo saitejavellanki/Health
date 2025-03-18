@@ -12,6 +12,9 @@ import {
   Alert,
   Platform,
   StatusBar,
+  TextInput,
+  KeyboardAvoidingView,
+  Linking,
 } from 'react-native';
 import {
   Settings,
@@ -33,12 +36,17 @@ import {
   Dumbbell,
   Target,
   Zap,
+  Edit,
+  Save,
+  X,
 } from 'lucide-react-native';
-import { collection, doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from '../../components/firebase/Firebase';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -68,14 +76,20 @@ const ProfileScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [profileImageKey, setProfileImageKey] = useState(Date.now());
   const lastFetchTimeRef = useRef<number>(0);
-  
+
+  // Add state for editing
+  const [editMode, setEditMode] = useState<{ [key: string]: boolean }>({});
+  const [editedValues, setEditedValues] = useState<{ [key: string]: any }>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
   const getCachedUserData = async () => {
     try {
       const cachedData = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
       if (cachedData) {
         const { data, timestamp } = JSON.parse(cachedData);
         const isExpired = Date.now() - timestamp > CACHE_EXPIRY_TIME;
-        
+
         if (!isExpired && data) {
           setUserData(data);
           setProfileImageKey(Date.now());
@@ -94,7 +108,7 @@ const ProfileScreen: React.FC = () => {
     try {
       const cacheData = {
         data,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(cacheData));
       lastFetchTimeRef.current = Date.now();
@@ -103,71 +117,74 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  const fetchUserData = useCallback(async (forceRefresh = false) => {
-    // Use cache if not forcing refresh and cache isn't expired
-    if (!forceRefresh) {
-      const currentTime = Date.now();
-      const timeSinceLastFetch = currentTime - lastFetchTimeRef.current;
-      
-      // Check if we've fetched within the cache period
-      if (timeSinceLastFetch < CACHE_EXPIRY_TIME && userData) {
-        return;
-      }
-      
-      // Try to use cached data
-      const usedCache = await getCachedUserData();
-      if (usedCache) {
-        return;
-      }
-    }
-    
-    try {
-      setLoading(true);
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
+  const fetchUserData = useCallback(
+    async (forceRefresh = false) => {
+      // Use cache if not forcing refresh and cache isn't expired
+      if (!forceRefresh) {
+        const currentTime = Date.now();
+        const timeSinceLastFetch = currentTime - lastFetchTimeRef.current;
 
-      if (!currentUser) {
-        setError('User not authenticated');
+        // Check if we've fetched within the cache period
+        if (timeSinceLastFetch < CACHE_EXPIRY_TIME && userData) {
+          return;
+        }
+
+        // Try to use cached data
+        const usedCache = await getCachedUserData();
+        if (usedCache) {
+          return;
+        }
+      }
+
+      try {
+        setLoading(true);
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          setError('User not authenticated');
+          setLoading(false);
+          return;
+        }
+
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const firestoreData = userDoc.data();
+          const goals = firestoreData.goals || [];
+
+          // Get targetWeight from first goal or fallback to root value
+          const targetWeight =
+            goals[0]?.targetWeight || firestoreData.targetWeight || 100;
+
+          const data = {
+            ...firestoreData,
+            dateOfBirth: firestoreData.dateOfBirth || { age: 25 },
+            dietaryPreference: firestoreData.dietaryPreference || 'Balanced',
+            activityLevel: firestoreData.activityLevel || 'Moderate',
+            goals,
+            targetWeight,
+            weight: firestoreData.weight || 70,
+          } as UserData;
+
+          setUserData(data);
+          setProfileImageKey(Date.now());
+
+          // Cache the fetched data
+          await cacheUserData(data);
+        } else {
+          setError('User data not found');
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError('Error loading user data');
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const userDocRef = doc(db, 'users', currentUser.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const firestoreData = userDoc.data();
-        const goals = firestoreData.goals || [];
-
-        // Get targetWeight from first goal or fallback to root value
-        const targetWeight =
-          goals[0]?.targetWeight || firestoreData.targetWeight || 100;
-
-        const data = {
-          ...firestoreData,
-          dateOfBirth: firestoreData.dateOfBirth || { age: 25 },
-          dietaryPreference: firestoreData.dietaryPreference || 'Balanced',
-          activityLevel: firestoreData.activityLevel || 'Moderate',
-          goals,
-          targetWeight,
-          weight: firestoreData.weight || 70,
-        } as UserData;
-        
-        setUserData(data);
-        setProfileImageKey(Date.now());
-        
-        // Cache the fetched data
-        await cacheUserData(data);
-      } else {
-        setError('User data not found');
-      }
-    } catch (err) {
-      console.error('Error fetching user data:', err);
-      setError('Error loading user data');
-    } finally {
-      setLoading(false);
-    }
-  }, [userData]);
+    },
+    [userData]
+  );
 
   // Initial load - check cache first, then fetch if needed
   useEffect(() => {
@@ -177,7 +194,7 @@ const ProfileScreen: React.FC = () => {
         fetchUserData(true);
       }
     };
-    
+
     initializeData();
   }, []);
 
@@ -188,6 +205,242 @@ const ProfileScreen: React.FC = () => {
     }, [fetchUserData])
   );
 
+  // Function to upload image to Firebase Storage
+  const uploadImage = async (uri: string): Promise<string> => {
+    try {
+      // Create a blob from the image URI
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Create a unique filename
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+
+      const filename = `profile_${currentUser.uid}_${Date.now()}`;
+
+      // Upload to Firebase Storage
+      const storage = getStorage();
+      const storageRef = ref(storage, `profileImages/${filename}`);
+
+      await uploadBytes(storageRef, blob);
+
+      // Get download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
+
+  // Function to handle profile image edit
+  const handleProfileImageEdit = async () => {
+    try {
+      // Check and request permissions if needed (mainly for iOS)
+      if (Platform.OS !== 'web') {
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission Denied',
+            'Sorry, we need camera roll permissions to make this work!'
+          );
+          return;
+        }
+      }
+
+      setIsUploadingImage(true);
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Get the selected image URI
+        const imageUri = result.assets[0].uri;
+
+        // Upload image to Firebase
+        const downloadURL = await uploadImage(imageUri);
+
+        // Update Firestore document
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          Alert.alert('Error', 'User not authenticated');
+          return;
+        }
+
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userDocRef, {
+          profileImage: downloadURL,
+        });
+
+        // Update local state
+        if (userData) {
+          const updatedUserData = { ...userData, profileImage: downloadURL };
+          setUserData(updatedUserData);
+          await cacheUserData(updatedUserData); // Update cached data too
+        }
+
+        setProfileImageKey(Date.now()); // Force image refresh
+
+        Alert.alert('Success', 'Profile picture updated successfully');
+      }
+    } catch (error) {
+      console.error('Error updating profile picture:', error);
+      Alert.alert(
+        'Error',
+        'Failed to update profile picture. Please try again.'
+      );
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Function to toggle edit mode for a specific field
+  const toggleEditMode = (field: string) => {
+    setEditMode((prev) => ({
+      ...prev,
+      [field]: !prev[field],
+    }));
+
+    // Initialize edited value with current value when entering edit mode
+    if (!editMode[field]) {
+      setEditedValues((prev) => ({
+        ...prev,
+        [field]: getFieldCurrentValue(field),
+      }));
+    }
+  };
+
+  // Get current value of a field
+  const getFieldCurrentValue = (field: string): any => {
+    if (!userData) return '';
+
+    switch (field) {
+      case 'profileImage':
+        return userData.profileImage;
+      case 'height':
+        return userData.height;
+      case 'weight':
+        return userData.weight;
+      case 'age':
+        return userData.dateOfBirth.age;
+      case 'activityLevel':
+        return userData.activityLevel;
+      case 'dietaryPreference':
+        return userData.dietaryPreference;
+      case 'targetWeight':
+        return userData.targetWeight;
+      default:
+        return '';
+    }
+  };
+
+  // Handle field value changes
+  const handleFieldChange = (field: string, value: any) => {
+    setEditedValues((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // Check if any field is in edit mode
+  const isAnyFieldInEditMode = Object.values(editMode).some((value) => value);
+
+  // Cancel all edits
+  const cancelEdits = () => {
+    setEditMode({});
+    setEditedValues({});
+  };
+
+  // Save changes to Firebase
+  const saveChanges = async () => {
+    if (!userData) return;
+
+    try {
+      setIsSaving(true);
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        setError('User not authenticated');
+        setIsSaving(false);
+        return;
+      }
+
+      const userDocRef = doc(db, 'users', currentUser.uid);
+
+      // Create object with updated values
+      const updates: { [key: string]: any } = {};
+
+      if (editMode.profileImage && editedValues.profileImage !== undefined) {
+        updates.profileImage = editedValues.profileImage;
+      }
+
+      if (editMode.height && editedValues.height !== undefined) {
+        updates.height = editedValues.height;
+      }
+
+      if (editMode.weight && editedValues.weight !== undefined) {
+        updates.weight = parseFloat(editedValues.weight);
+      }
+
+      if (editMode.age && editedValues.age !== undefined) {
+        updates.dateOfBirth = {
+          ...userData.dateOfBirth,
+          age: parseInt(editedValues.age),
+        };
+      }
+
+      if (editMode.activityLevel && editedValues.activityLevel !== undefined) {
+        updates.activityLevel = editedValues.activityLevel;
+      }
+
+      if (
+        editMode.dietaryPreference &&
+        editedValues.dietaryPreference !== undefined
+      ) {
+        updates.dietaryPreference = editedValues.dietaryPreference;
+      }
+
+      if (editMode.targetWeight && editedValues.targetWeight !== undefined) {
+        updates.targetWeight = parseFloat(editedValues.targetWeight);
+
+        // Also update the targetWeight in the goals array if it exists
+        if (userData.goals && userData.goals.length > 0) {
+          const updatedGoals = [...userData.goals];
+          updatedGoals[0].targetWeight = parseFloat(editedValues.targetWeight);
+          updates.goals = updatedGoals;
+        }
+      }
+
+      // Update Firestore
+      await updateDoc(userDocRef, updates);
+
+      // Clear edit modes and refresh data
+      setEditMode({});
+      setEditedValues({});
+      fetchUserData(true);
+
+      Alert.alert('Success', 'Profile updated successfully');
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const navigateToSettings = () => {
     if (userData) {
       router.push({
@@ -195,6 +448,11 @@ const ProfileScreen: React.FC = () => {
         params: { userData: JSON.stringify(userData) },
       });
     }
+  };
+
+  // Add handler for email support
+  const handleEmailSupport = () => {
+    Linking.openURL('mailto:crunchx.ai@gmail.com');
   };
 
   const handleRegeneratePlan = () => {
@@ -205,7 +463,7 @@ const ProfileScreen: React.FC = () => {
     try {
       // Clear the cache when logging out
       await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
-      
+
       const auth = getAuth();
       await signOut(auth);
       router.replace('/(auth)/login');
@@ -284,7 +542,10 @@ const ProfileScreen: React.FC = () => {
   const weightProgress = calculateWeightProgress();
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <StatusBar
         translucent
         backgroundColor="transparent"
@@ -308,16 +569,23 @@ const ProfileScreen: React.FC = () => {
               resizeMode="cover"
               onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
             />
+
+            {/* Profile photo edit button */}
             <TouchableOpacity
-              style={styles.settingsButton}
-              onPress={navigateToSettings}
+              style={styles.profileEditButton}
+              onPress={handleProfileImageEdit}
+              disabled={isUploadingImage}
             >
-              <Settings size={22} color="#FFFFFF" />
+              {isUploadingImage ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Camera size={20} color="#FFFFFF" />
+              )}
             </TouchableOpacity>
 
             <View style={styles.profileInfoOverlay}>
               <Text style={styles.nameOverlay}>{userData.name}</Text>
-              <Text style={styles.emailOverlay}>{userData.email}</Text>
+              {/* <Text style={styles.emailOverlay}>{userData.email}</Text> */}
             </View>
           </View>
 
@@ -350,26 +618,168 @@ const ProfileScreen: React.FC = () => {
           </View>
           <View style={styles.userDetailsGrid}>
             <View style={styles.detailItem}>
+              <TouchableOpacity
+                style={styles.cardEditIcon}
+                onPress={() => toggleEditMode('age')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
               <Calendar size={20} color="#6366f1" />
               <Text style={styles.detailLabel}>Age</Text>
-              <Text style={styles.detailValue}>{calculateAge()}</Text>
+              {editMode.age ? (
+                <TextInput
+                  style={styles.detailEditInput}
+                  value={String(editedValues.age)}
+                  onChangeText={(text) => handleFieldChange('age', text)}
+                  keyboardType="numeric"
+                  autoFocus
+                />
+              ) : (
+                <Text style={styles.detailValue}>{calculateAge()}</Text>
+              )}
             </View>
+
             <View style={styles.detailItem}>
+              <TouchableOpacity
+                style={styles.cardEditIcon}
+                onPress={() => toggleEditMode('height')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
               <Ruler size={20} color="#f59e0b" />
               <Text style={styles.detailLabel}>Height</Text>
-              <Text style={styles.detailValue}>
-                {formatHeight(userData.height)}
-              </Text>
+              {editMode.height ? (
+                <View style={styles.heightInputContainer}>
+                  <TextInput
+                    style={[styles.heightInput, { width: '45%' }]}
+                    value={String(editedValues.height.feet)}
+                    onChangeText={(text) =>
+                      handleFieldChange('height', {
+                        ...editedValues.height,
+                        feet: parseInt(text) || 0,
+                      })
+                    }
+                    keyboardType="numeric"
+                    placeholder="Feet"
+                  />
+                  <Text style={styles.heightSeparator}>'</Text>
+                  <TextInput
+                    style={[styles.heightInput, { width: '45%' }]}
+                    value={String(editedValues.height.inches)}
+                    onChangeText={(text) =>
+                      handleFieldChange('height', {
+                        ...editedValues.height,
+                        inches: parseInt(text) || 0,
+                      })
+                    }
+                    keyboardType="numeric"
+                    placeholder="Inches"
+                  />
+                  <Text style={styles.heightSeparator}>"</Text>
+                </View>
+              ) : (
+                <Text style={styles.detailValue}>
+                  {formatHeight(userData.height)}
+                </Text>
+              )}
             </View>
+
             <View style={styles.detailItem}>
+              <TouchableOpacity
+                style={styles.cardEditIcon}
+                onPress={() => toggleEditMode('weight')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
               <Scale size={20} color="#ef4444" />
               <Text style={styles.detailLabel}>Weight</Text>
-              <Text style={styles.detailValue}>{userData.weight} kg</Text>
+              {editMode.weight ? (
+                <View style={styles.weightInputContainer}>
+                  <TextInput
+                    style={styles.detailEditInput}
+                    value={String(editedValues.weight)}
+                    onChangeText={(text) => handleFieldChange('weight', text)}
+                    keyboardType="numeric"
+                    autoFocus
+                  />
+                  <Text style={styles.weightUnit}>kg</Text>
+                </View>
+              ) : (
+                <Text style={styles.detailValue}>{userData.weight} kg</Text>
+              )}
             </View>
+
             <View style={styles.detailItem}>
+              <TouchableOpacity
+                style={styles.cardEditIcon}
+                onPress={() => toggleEditMode('activityLevel')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
               <Dumbbell size={20} color="#8b5cf6" />
               <Text style={styles.detailLabel}>Activity</Text>
-              <Text style={styles.detailValue}>{userData.activityLevel}</Text>
+              {editMode.activityLevel ? (
+                <View style={styles.pickerContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.activityOption,
+                      editedValues.activityLevel === 'Low' &&
+                        styles.selectedActivity,
+                    ]}
+                    onPress={() => handleFieldChange('activityLevel', 'Low')}
+                  >
+                    <Text
+                      style={
+                        editedValues.activityLevel === 'Low'
+                          ? styles.selectedActivityText
+                          : styles.activityOptionText
+                      }
+                    >
+                      Low
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.activityOption,
+                      editedValues.activityLevel === 'Moderate' &&
+                        styles.selectedActivity,
+                    ]}
+                    onPress={() =>
+                      handleFieldChange('activityLevel', 'Moderate')
+                    }
+                  >
+                    <Text
+                      style={
+                        editedValues.activityLevel === 'Moderate'
+                          ? styles.selectedActivityText
+                          : styles.activityOptionText
+                      }
+                    >
+                      Moderate
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.activityOption,
+                      editedValues.activityLevel === 'High' &&
+                        styles.selectedActivity,
+                    ]}
+                    onPress={() => handleFieldChange('activityLevel', 'High')}
+                  >
+                    <Text
+                      style={
+                        editedValues.activityLevel === 'High'
+                          ? styles.selectedActivityText
+                          : styles.activityOptionText
+                      }
+                    >
+                      High
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={styles.detailValue}>{userData.activityLevel}</Text>
+              )}
             </View>
           </View>
         </View>
@@ -380,11 +790,59 @@ const ProfileScreen: React.FC = () => {
             <Apple size={20} color="#22c55e" />
           </View>
           <View style={styles.dietRow}>
-            <View style={styles.dietBadge}>
-              <Utensils size={16} color="#22c55e" />
-              <Text style={styles.dietBadgeText}>
-                {userData.dietaryPreference}
-              </Text>
+            <View style={styles.dietaryHeader}>
+              <View style={styles.dietBadge}>
+                <Utensils size={16} color="#22c55e" />
+                {editMode.dietaryPreference ? (
+                  <View style={styles.dietaryOptionsContainer}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                    >
+                      {[
+                        'Vegetarian',
+                        'Non-Vegetarian',
+                        'Vegan',
+                        'Keto',
+                        'Paleo',
+                        'Mediterranean',
+                      ].map((diet) => (
+                        <TouchableOpacity
+                          key={diet}
+                          style={[
+                            styles.dietaryOption,
+                            editedValues.dietaryPreference === diet &&
+                              styles.selectedDietaryOption,
+                          ]}
+                          onPress={() =>
+                            handleFieldChange('dietaryPreference', diet)
+                          }
+                        >
+                          <Text
+                            style={
+                              editedValues.dietaryPreference === diet
+                                ? styles.selectedDietaryOptionText
+                                : styles.dietaryOptionText
+                            }
+                          >
+                            {diet}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : (
+                  <Text style={styles.dietBadgeText}>
+                    {userData.dietaryPreference}
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.dietEditIcon}
+                onPress={() => toggleEditMode('dietaryPreference')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
             </View>
             <View style={styles.dietaryInfo}>
               <Text style={styles.dietaryDescription}>
@@ -408,16 +866,45 @@ const ProfileScreen: React.FC = () => {
                   {userData.goals[userData.goals.length - 1].title + ' ' ||
                     'Custom Goal'}
                 </Text>
-                {userData.goals[userData.goals.length - 1].targetWeight && (
-                  <Text style={styles.goalSubText}>
-                    (Target:{' '}
-                    {userData.goals[userData.goals.length - 1].targetWeight} kg)
-                  </Text>
+                {!editMode.targetWeight ? (
+                  <View style={styles.targetWeightContainer}>
+                    <Text style={styles.goalSubText}>
+                      (Target: {userData.targetWeight} kg)
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.smallEditIcon}
+                      onPress={() => toggleEditMode('targetWeight')}
+                    >
+                      <Edit size={14} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.targetWeightEditContainer}>
+                    <TextInput
+                      style={styles.targetWeightInput}
+                      value={String(editedValues.targetWeight)}
+                      onChangeText={(text) =>
+                        handleFieldChange('targetWeight', text)
+                      }
+                      keyboardType="numeric"
+                      placeholder="Target Weight (kg)"
+                      autoFocus
+                    />
+                    <Text style={styles.weightUnit}>kg</Text>
+                  </View>
                 )}
               </View>
             )}
           </View>
         </View>
+
+        {/* Need help button */}
+        <TouchableOpacity
+          style={styles.helpButton}
+          onPress={handleEmailSupport}
+        >
+          <Text style={styles.helpText}>Need help?</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.regenerateButton}
@@ -431,13 +918,38 @@ const ProfileScreen: React.FC = () => {
           <LogOut size={24} color="#ef4444" />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
-    </View>
+
+      {isAnyFieldInEditMode && (
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity style={styles.cancelButton} onPress={cancelEdits}>
+            <X size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Cancel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.saveButton}
+            onPress={saveChanges}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Save size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Save Changes</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </KeyboardAvoidingView>
   );
 };
 
-
-
+// Extended styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -488,14 +1000,14 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  settingsButton: {
+  profileEditButton: {
     position: 'absolute',
-    top: Platform.OS === 'android' ? 50 + (StatusBar.currentHeight || 0) : 50,
-    right: 12,
+    top: 60,
+    right: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
@@ -585,6 +1097,19 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     alignItems: 'center',
+    position: 'relative',
+  },
+  cardEditIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    zIndex: 1,
   },
   detailLabel: {
     fontSize: 14,
@@ -640,6 +1165,25 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 16,
     fontFamily: 'Inter-Medium',
+    color: '#333',
+  },
+  targetWeightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  targetWeightEditContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  targetWeightInput: {
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 60,
     color: '#333',
   },
   weightStats: {
@@ -717,6 +1261,22 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
+  // Help button styles
+  helpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: '#f0f9ff',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+  },
+  helpText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#3b82f6',
+  },
   regenerateButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -748,6 +1308,176 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#ef4444',
     marginLeft: 8,
+  },
+  // Edit mode styles
+  editableFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smallEditIcon: {
+    marginLeft: 5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dietEditIcon: {
+    marginLeft: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 11,
+  },
+  detailEditInput: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#2D2D2D',
+    textAlign: 'center',
+    padding: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 4,
+    width: '80%',
+  },
+  heightInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  heightInput: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#2D2D2D',
+    textAlign: 'center',
+    padding: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  heightSeparator: {
+    marginHorizontal: 2,
+    fontSize: 16,
+    color: '#2D2D2D',
+  },
+  weightInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  weightUnit: {
+    marginLeft: 4,
+    fontSize: 16,
+    color: '#2D2D2D',
+  },
+  dietaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dietaryOptionsContainer: {
+    marginLeft: 6,
+  },
+  dietaryOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+  selectedDietaryOption: {
+    backgroundColor: '#22c55e',
+  },
+  dietaryOptionText: {
+    fontSize: 14,
+    color: '#22c55e',
+  },
+  selectedDietaryOptionText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  buttonsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 5,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  saveButton: {
+    flexDirection: 'row',
+    backgroundColor: '#22c55e',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 8,
+  },
+  cancelButton: {
+    flexDirection: 'row',
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 8,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  goalSubText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  activityOption: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginHorizontal: 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#8b5cf6',
+  },
+  selectedActivity: {
+    backgroundColor: '#8b5cf6',
+  },
+  activityOptionText: {
+    fontSize: 12,
+    color: '#8b5cf6',
+  },
+  selectedActivityText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
 });
 
