@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,7 @@ import { collection, doc, getDoc } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import { db } from '../../components/firebase/Firebase';
 import { router, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -58,13 +59,68 @@ interface UserData {
   goals: Array<{ id?: string; title?: string; targetWeight?: number }>;
 }
 
+const PROFILE_CACHE_KEY = 'profile_data_cache';
+const CACHE_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 const ProfileScreen: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileImageKey, setProfileImageKey] = useState(Date.now());
+  const lastFetchTimeRef = useRef<number>(0);
+  
+  const getCachedUserData = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+      if (cachedData) {
+        const { data, timestamp } = JSON.parse(cachedData);
+        const isExpired = Date.now() - timestamp > CACHE_EXPIRY_TIME;
+        
+        if (!isExpired && data) {
+          setUserData(data);
+          setProfileImageKey(Date.now());
+          setLoading(false);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.log('Error retrieving cached data:', error);
+      return false;
+    }
+  };
 
-  const fetchUserData = useCallback(async () => {
+  const cacheUserData = async (data: UserData) => {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now()
+      };
+      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(cacheData));
+      lastFetchTimeRef.current = Date.now();
+    } catch (error) {
+      console.log('Error caching user data:', error);
+    }
+  };
+
+  const fetchUserData = useCallback(async (forceRefresh = false) => {
+    // Use cache if not forcing refresh and cache isn't expired
+    if (!forceRefresh) {
+      const currentTime = Date.now();
+      const timeSinceLastFetch = currentTime - lastFetchTimeRef.current;
+      
+      // Check if we've fetched within the cache period
+      if (timeSinceLastFetch < CACHE_EXPIRY_TIME && userData) {
+        return;
+      }
+      
+      // Try to use cached data
+      const usedCache = await getCachedUserData();
+      if (usedCache) {
+        return;
+      }
+    }
+    
     try {
       setLoading(true);
       const auth = getAuth();
@@ -99,6 +155,9 @@ const ProfileScreen: React.FC = () => {
 
         setUserData(data);
         setProfileImageKey(Date.now());
+        
+        // Cache the fetched data
+        await cacheUserData(data);
       } else {
         setError('User data not found');
       }
@@ -108,15 +167,24 @@ const ProfileScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userData]);
 
+  // Initial load - check cache first, then fetch if needed
   useEffect(() => {
-    fetchUserData();
+    const initializeData = async () => {
+      const usedCache = await getCachedUserData();
+      if (!usedCache) {
+        fetchUserData(true);
+      }
+    };
+    
+    initializeData();
   }, []);
 
+  // When screen comes into focus - use cached data if valid
   useFocusEffect(
     useCallback(() => {
-      fetchUserData();
+      fetchUserData(false);
     }, [fetchUserData])
   );
 
@@ -135,6 +203,9 @@ const ProfileScreen: React.FC = () => {
 
   const handleLogout = async () => {
     try {
+      // Clear the cache when logging out
+      await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+      
       const auth = getAuth();
       await signOut(auth);
       router.replace('/(auth)/login');
@@ -330,19 +401,6 @@ const ProfileScreen: React.FC = () => {
             <Target size={20} color="#22c55e" />
           </View>
           <View style={styles.goalsContainer}>
-            {/* {userData.goals.map((goal, index) => (
-              <View key={index} style={styles.goalItem}>
-                <Award size={18} color="#22c55e" />
-                <Text style={styles.goalText}>
-                  {goal.title + ' ' || 'Custom Goal'}
-                </Text>
-                {goal.targetWeight && (
-                  <Text style={styles.goalSubText}>
-                    (Target: {goal.targetWeight} kg)
-                  </Text>
-                )}
-              </View>
-            ))} */}
             {userData.goals.length > 0 && (
               <View style={styles.goalItem}>
                 <Award size={18} color="#22c55e" />
@@ -360,67 +418,6 @@ const ProfileScreen: React.FC = () => {
             )}
           </View>
         </View>
-
-        {/* <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Weight Progress</Text>
-            <TrendingUp size={20} color="#22c55e" />
-          </View>
-          <View style={styles.weightStats}>
-            <View style={styles.weightStatItem}>
-              <Text style={styles.weightLabel}>Current</Text>
-              <Text style={styles.weightValue}>{userData.weight} kg</Text>
-            </View>
-            <Zap size={24} color="#22c55e" />
-            <View style={styles.weightStatItem}>
-              <Text style={styles.weightLabel}>Target</Text>
-              <Text style={styles.weightValue}>{userData.targetWeight} kg</Text>
-            </View>
-          </View>
-          <View style={styles.progressBarContainer}>
-            <View style={styles.progressBar}>
-              <View
-                style={[styles.progressFill, { width: `${weightProgress}%` }]}
-              />
-            </View>
-            <Text style={styles.progressPercentage}>
-              {Math.round(weightProgress)}% to goal
-            </Text>
-          </View>
-          <View style={styles.estimatedTimeContainer}>
-            <Clock size={16} color="#666" />
-            <Text style={styles.estimatedTimeText}>
-              Estimated time to goal: {getDaysUntilGoal()} days
-            </Text>
-          </View>
-        </View> */}
-
-        {/* <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Workout Stats</Text>
-            <Dumbbell size={20} color="#22c55e" />
-          </View>
-          <View style={styles.workoutStatsContainer}>
-            <View style={styles.workoutStat}>
-              <Text style={styles.workoutStatValue}>
-                {userData.totalWorkouts || 0}
-              </Text>
-              <Text style={styles.workoutStatLabel}>Total Workouts</Text>
-            </View>
-            <View style={styles.workoutStat}>
-              <Text style={styles.workoutStatValue}>
-                {userData.streak || 0}
-              </Text>
-              <Text style={styles.workoutStatLabel}>Current Streak</Text>
-            </View>
-            <View style={styles.workoutStat}>
-              <Text style={styles.workoutStatValue}>
-                {formatJoinDate(userData.dateJoined)}
-              </Text>
-              <Text style={styles.workoutStatLabel}>Member Since</Text>
-            </View>
-          </View>
-        </View> */}
 
         <TouchableOpacity
           style={styles.regenerateButton}

@@ -233,9 +233,9 @@ const createPrompt = (userData) => {
   console.log('tdde: ' + tdde);
   console.log('new_tdde: ' + new_tdde);
 
-  updateDoc(useRef,{
-    tdde:new_tdde,
-  });
+  // updateDoc(useRef,{
+  //   tdde:new_tdde,
+  // });
 //check if this new_tdde is getting updated to firebase.
   // const currentUser = auth.currentUser;
 
@@ -244,35 +244,23 @@ const createPrompt = (userData) => {
   //   tdde: tdde,
   // });
 
-  return `Suggest a meal-plan for ${goal} ${weightGoalText}.
-${weightContext} Diet preference: ${diet} with Indian food specific to ${state} region.
-Allergies: ${allergies}. Calorie intake target per day should be almost equal to: ${new_tdde}. 
-Monthly budget: ${userData.budget.amount} INR.
+  return `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} with Indian food specific to ${state} region. Allergies: ${allergies}. Calorie intake target per day should be almost equal to: ${new_tdde}. Monthly budget: ${userData.budget.amount} INR. 
+
+DO NOT include ragi, jowar, or quinoa in any meal suggestions.
 
 For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
 
 Start with just the day name (e.g., "Monday")
-
 Exercise: [brief workout plan]
-
-Breakfast: [suggest additional food items to take along with breakfast, 
-specifying how many calories (kcal) they provide at the end of the line]
-
-Snack: [suggest food items to take as snacks, specifying how many calories (kcal) 
-they provide at the end of the line]
-
-Dinner: [suggest additional food items to take along with dinner, 
-specifying how many calories (kcal) they provide at the end of the line]
-
+Breakfast: [suggest additional food items to take along with breakfast, specifying how many calories (kcal) they provide at the end of the line]
+Snack: [suggest food items to take as snacks, specifying how many calories (kcal) they provide at the end of the line]
+Lunch: [suggest food items for lunch, specifying how many calories (kcal) they provide at the end of the line]
+Dinner: [suggest additional food items to take along with dinner, specifying how many calories (kcal) they provide at the end of the line]
 Tracking: [simple tip for monitoring progress]
 
-Keep each section brief - 1-2 sentences maximum. Focus on actionable items.
-All suggestions should be authentic ${state}-style South Indian cuisine options that are commonly 
-prepared in that region, tailored to the user's diet and allergies.  
-The items should be very common that every person should know about it. 
-Ensure calorie intake aligns with ${tdde}, and all recommendations fit 
-within the monthly budget (${userData.budget.amount}), though no pricing information 
-should be included in the output.`;
+Keep each section brief - 1-2 sentences maximum. Focus on actionable items. All suggestions should be familiar, common, and easy-to-eat ${state}-style South Indian cuisine options that locals regularly consume. Only include dishes and ingredients that are widely available and commonly prepared in households in the ${state} region, tailored to the user's diet and allergies.
+
+The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${tdde}, and all recommendations fit within the monthly budget (${userData.budget.amount}), though no pricing information should be included in the output.`;
 };
 
 const { width } = Dimensions.get('window');
@@ -733,7 +721,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         <View style={styles.header}>
           <Pressable
             style={styles.backButton}
-            onPress={() => router.push('/budget')}
+            onPress={() => router.push('/(tabs)')}
           >
             <ChevronLeft size={22} color="#1a1a1a" />
           </Pressable>
