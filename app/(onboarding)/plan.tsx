@@ -27,7 +27,14 @@ import {
   Info,
   ChevronLeft,
 } from 'lucide-react-native';
-import { doc, getDoc, setDoc, collection, addDoc, updateDoc } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  addDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../../components/firebase/Firebase';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -233,10 +240,10 @@ const createPrompt = (userData) => {
   console.log('tdde: ' + tdde);
   console.log('new_tdde: ' + new_tdde);
 
-  updateDoc(useRef,{
-    tdde:new_tdde,
+  updateDoc(useRef, {
+    tdde: new_tdde,
   });
-//check if this new_tdde is getting updated to firebase.
+  //check if this new_tdde is getting updated to firebase.
   // const currentUser = auth.currentUser;
 
   // const userRef = doc(db, 'users', currentUser.uid);
