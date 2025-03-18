@@ -89,8 +89,9 @@ const parseDailyPlan = (planText) => {
         exercise: [],
         breakfast: [],
         lunch: [],
-        dinner: [],
         snack: [],
+        dinner: [],
+
         tracking: [],
       };
     } else if (currentDay && currentPlan) {
@@ -160,8 +161,9 @@ const parseDailyPlan = (planText) => {
         exercise: ['Details not available'],
         breakfast: ['Details not available'],
         lunch: ['Details not available'],
-        dinner: ['Details not available'],
         snack: ['Details not available'],
+        dinner: ['Details not available'],
+
         tracking: ['Details not available'],
       },
     }));
@@ -240,9 +242,9 @@ const createPrompt = (userData) => {
   console.log('tdde: ' + tdde);
   console.log('new_tdde: ' + new_tdde);
 
-  updateDoc(useRef, {
-    tdde: new_tdde,
-  });
+  // updateDoc(useRef, {
+  //   tdde: new_tdde,
+  // });
   //check if this new_tdde is getting updated to firebase.
   // const currentUser = auth.currentUser;
 
@@ -251,9 +253,12 @@ const createPrompt = (userData) => {
   //   tdde: tdde,
   // });
 
-  return `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} with Indian food specific to ${state} region. Allergies: ${allergies}. Calorie intake target per day should be almost equal to: ${new_tdde}. Monthly budget: ${userData.budget.amount} INR. 
+  return `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} 
+  with Indian food specific to ${state} region. Allergies: ${allergies}. 
+  Calorie intake target per day should be almost equal to: ${new_tdde}, the difference between the total given calories per day and ${new_tdde} should not exceed 100 calories. 
+  Monthly budget: ${userData.budget.amount} INR. 
 
-DO NOT include ragi, jowar, or quinoa in any meal suggestions.
+DO NOT include ragi, jowar, quinoa or any foods that are not found/user much in metro cities, in any meal suggestions.
 
 For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
 
@@ -510,10 +515,11 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         return <Coffee size={20} color="#22c55e" />;
       case 'lunch':
         return <Utensils size={20} color="#22c55e" />;
-      case 'dinner':
-        return <Moon size={20} color="#22c55e" />;
       case 'snack':
         return <Coffee size={20} color="#22c55e" />;
+      case 'dinner':
+        return <Moon size={20} color="#22c55e" />;
+
       case 'tracking':
         return <CheckCircle size={20} color="#22c55e" />;
       default:
@@ -529,10 +535,11 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         return 'Breakfast';
       case 'lunch':
         return 'Lunch';
-      case 'dinner':
-        return 'Dinner';
       case 'snack':
         return 'Snacks';
+      case 'dinner':
+        return 'Dinner';
+
       case 'tracking':
         return 'Daily Tracking';
       case 'overview':

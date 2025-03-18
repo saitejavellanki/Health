@@ -1,63 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Image,
+  Dimensions,
+  SafeAreaView,
+  ActivityIndicator,
   TouchableOpacity,
   Alert,
   Platform,
-  TextInput,
-  ActivityIndicator,
   StatusBar,
-  Modal,
-  Pressable,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { X, Save, Camera, ChevronLeft, Check } from 'lucide-react-native';
-import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { db, storage } from '../../components/firebase/Firebase';
+import {
+  Settings,
+  Bell,
+  Heart,
+  CircleHelp,
+  LogOut,
+  Camera,
+  RefreshCw,
+  User,
+  Calendar,
+  Scale,
+  Ruler,
+  Utensils,
+  Clock,
+  TrendingUp,
+  Award,
+  Apple,
+  Dumbbell,
+  Target,
+  Zap,
+  Edit,
+  Save,
+  X,
+} from 'lucide-react-native';
+import { collection, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { getAuth, signOut } from 'firebase/auth';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '../../components/firebase/Firebase';
+import { router, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { router, useLocalSearchParams } from 'expo-router';
 
-// Diet types and goals data
-const DIET_TYPES = [
-  { id: 'vegetarian', label: 'Vegetarian' },
-  { id: 'non-vegetarian', label: 'Non-Vegetarian' },
-  { id: 'ketogenic', label: 'Ketogenic' },
-];
-
-const GOALS = [
-  {
-    id: 'weight-loss',
-    title: 'Weight Loss',
-    description: 'Healthy and sustainable weight loss through balanced nutrition',
-    requiresTarget: true,
-  },
-  {
-    id: 'weight-gain',
-    title: 'Weight Gain',
-    description: 'Healthy weight gain with nutrient-dense meal plans',
-    requiresTarget: true,
-  },
-  {
-    id: 'muscle-gain',
-    title: 'Muscle Gain',
-    description: 'Build lean muscle mass with protein-rich meal plans',
-  },
-  {
-    id: 'maintenance',
-    title: 'Maintain Shape',
-    description: 'Keep your current weight while improving overall nutrition',
-  },
-  {
-    id: 'performance',
-    title: 'Athletic Performance',
-    description: 'Optimize your nutrition for better athletic performance',
-  },
-];
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 interface UserData {
   name: string;
@@ -66,85 +56,203 @@ interface UserData {
   height: { feet: number; inches: number };
   weight: number;
   targetWeight: number;
-  streak?: number;
-  totalWorkouts?: number;
-  dateJoined?: string;
-  goals?: Array<{
-    id: string;
-    title: string;
-    createdAt: any;
-    targetWeight?: number;
-  }>;
-  dietType?: string;
+  streak: number;
+  totalWorkouts: number;
+  dateJoined: any;
+  dateOfBirth: { age: number; timestamp?: string };
+  dietaryPreference: string;
+  mealsTrackedToday: number;
+  activityLevel: string;
+  goals: Array<{ id?: string; title?: string; targetWeight?: number }>;
 }
 
-const SettingsScreen: React.FC = () => {
-  const params = useLocalSearchParams();
-  
-  // Parse userData from params - only once on component mount
+const PROFILE_CACHE_KEY = 'profile_data_cache';
+const CACHE_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+const ProfileScreen: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [editedUserData, setEditedUserData] = useState<UserData | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profileImageKey, setProfileImageKey] = useState(Date.now());
+  const lastFetchTimeRef = useRef<number>(0);
 
-  // Goal and diet type state
-  const [showGoalModal, setShowGoalModal] = useState(false);
-  const [showDietTypeModal, setShowDietTypeModal] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState('');
-  const [targetWeight, setTargetWeight] = useState('');
-  const [showTargetWeightModal, setShowTargetWeightModal] = useState(false);
-  const [selectedDietType, setSelectedDietType] = useState('');
+  // Add state for editing
+  const [editMode, setEditMode] = useState<{ [key: string]: boolean }>({});
+  const [editedValues, setEditedValues] = useState<{ [key: string]: any }>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  // Use empty dependency array to run only once on mount
-  useEffect(() => {
-    const initializeUserData = () => {
-      if (params.userData) {
-        try {
-          const parsedData = JSON.parse(params.userData as string) as UserData;
-          setUserData(parsedData);
-          setEditedUserData(parsedData);
-          
-          // Set initial values for goals and diet type if they exist
-          if (parsedData.goals && parsedData.goals.length > 0) {
-            const currentGoal = parsedData.goals[parsedData.goals.length - 1];
-            setSelectedGoal(currentGoal.id);
-            if (currentGoal.targetWeight) {
-              setTargetWeight(String(currentGoal.targetWeight));
-            }
-          }
-          
-          if (parsedData.dietType) {
-            setSelectedDietType(parsedData.dietType);
-          }
-          
-          setIsLoaded(true);
-        } catch (error) {
-          console.error('Error parsing user data:', error);
-          Alert.alert('Error', 'Failed to load user data');
-          router.back();
-        }
-      } else {
-        Alert.alert('Error', 'No user data provided');
-        router.back();
-      }
-    };
-
-    initializeUserData();
-  }, []); // Empty dependency array means this runs once on mount
-
-  const pickImage = async () => {
+  const getCachedUserData = async () => {
     try {
-      // Request permissions
-      if (Platform.OS !== 'web') {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'We need camera roll permissions to upload a profile picture.');
+      const cachedData = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+      if (cachedData) {
+        const { data, timestamp } = JSON.parse(cachedData);
+        const isExpired = Date.now() - timestamp > CACHE_EXPIRY_TIME;
+
+        if (!isExpired && data) {
+          setUserData(data);
+          setProfileImageKey(Date.now());
+          setLoading(false);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.log('Error retrieving cached data:', error);
+      return false;
+    }
+  };
+
+  const cacheUserData = async (data: UserData) => {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now(),
+      };
+      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(cacheData));
+      lastFetchTimeRef.current = Date.now();
+    } catch (error) {
+      console.log('Error caching user data:', error);
+    }
+  };
+
+  const fetchUserData = useCallback(
+    async (forceRefresh = false) => {
+      // Use cache if not forcing refresh and cache isn't expired
+      if (!forceRefresh) {
+        const currentTime = Date.now();
+        const timeSinceLastFetch = currentTime - lastFetchTimeRef.current;
+
+        // Check if we've fetched within the cache period
+        if (timeSinceLastFetch < CACHE_EXPIRY_TIME && userData) {
+          return;
+        }
+
+        // Try to use cached data
+        const usedCache = await getCachedUserData();
+        if (usedCache) {
           return;
         }
       }
+
+      try {
+        setLoading(true);
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          setError('User not authenticated');
+          setLoading(false);
+          return;
+        }
+
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const firestoreData = userDoc.data();
+          const goals = firestoreData.goals || [];
+
+          // Get targetWeight from first goal or fallback to root value
+          const targetWeight =
+            goals[0]?.targetWeight || firestoreData.targetWeight || 100;
+
+          const data = {
+            ...firestoreData,
+            dateOfBirth: firestoreData.dateOfBirth || { age: 25 },
+            dietaryPreference: firestoreData.dietaryPreference || 'Balanced',
+            activityLevel: firestoreData.activityLevel || 'Moderate',
+            goals,
+            targetWeight,
+            weight: firestoreData.weight || 70,
+          } as UserData;
+
+          setUserData(data);
+          setProfileImageKey(Date.now());
+
+          // Cache the fetched data
+          await cacheUserData(data);
+        } else {
+          setError('User data not found');
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError('Error loading user data');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [userData]
+  );
+
+  // Initial load - check cache first, then fetch if needed
+  useEffect(() => {
+    const initializeData = async () => {
+      const usedCache = await getCachedUserData();
+      if (!usedCache) {
+        fetchUserData(true);
+      }
+    };
+
+    initializeData();
+  }, []);
+
+  // When screen comes into focus - use cached data if valid
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserData(false);
+    }, [fetchUserData])
+  );
+
+  // Function to upload image to Firebase Storage
+  const uploadImage = async (uri: string): Promise<string> => {
+    try {
+      // Create a blob from the image URI
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Create a unique filename
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+
+      const filename = `profile_${currentUser.uid}_${Date.now()}`;
+
+      // Upload to Firebase Storage
+      const storage = getStorage();
+      const storageRef = ref(storage, `profileImages/${filename}`);
+
+      await uploadBytes(storageRef, blob);
+
+      // Get download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
+
+  // Function to handle profile image edit
+  const handleProfileImageEdit = async () => {
+    try {
+      // Request permissions (mainly for iOS)
+      if (Platform.OS !== 'web') {
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission Denied',
+            'We need camera roll permissions to change your profile picture.'
+          );
+          return;
+        }
+      }
+
+      setIsUploadingImage(true);
 
       // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -155,749 +263,1197 @@ const SettingsScreen: React.FC = () => {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImageError(false);
-        await uploadImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
-    }
-  };
+        // Get the selected image URI
+        const imageUri = result.assets[0].uri;
 
-  const uploadImage = async (uri: string) => {
-    try {
-      setUploading(true);
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-      
-      if (!currentUser) {
-        Alert.alert('Error', 'You need to be logged in to update your profile.');
-        return;
+        // Create a blob from the image URI
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+
+        // Upload to Firebase Storage
+        const auth = getAuth();
+        if (!auth.currentUser) {
+          throw new Error('User not authenticated');
+        }
+
+        const filename = `profile_${auth.currentUser.uid}_${Date.now()}`;
+        const storage = getStorage();
+        const storageRef = ref(storage, `profileImages/${filename}`);
+
+        await uploadBytes(storageRef, blob);
+
+        // Get download URL
+        const downloadURL = await getDownloadURL(storageRef);
+
+        // Update Firestore document
+        const userDocRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userDocRef, {
+          profileImage: downloadURL,
+        });
+
+        // Update local state
+        if (userData) {
+          const updatedUserData = { ...userData, profileImage: downloadURL };
+          setUserData(updatedUserData);
+          await cacheUserData(updatedUserData);
+        }
+
+        setProfileImageKey(Date.now()); // Force image refresh
+        Alert.alert('Success', 'Profile picture updated successfully');
       }
-  
-      // Convert uri to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      // Create a simpler path structure
-      const storageRef = ref(storage, `profileImages/profile_${currentUser.uid}.jpg`);
-      
-      // Upload the image
-      const snapshot = await uploadBytes(storageRef, blob);
-      
-      // Get the download URL
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      // Update local state
-      if (editedUserData) {
-        setEditedUserData({...editedUserData, profileImage: downloadURL});
-      }
-      
-      Alert.alert('Success', 'Profile picture uploaded successfully!');
     } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image. Please try again.');
+      console.error('Error updating profile picture:', error);
+      Alert.alert(
+        'Error',
+        'Failed to update profile picture. Please try again.'
+      );
     } finally {
-      setUploading(false);
+      setIsUploadingImage(false);
+    }
+  };
+  // Function to toggle edit mode for a specific field
+  const toggleEditMode = (field: string) => {
+    setEditMode((prev) => ({
+      ...prev,
+      [field]: !prev[field],
+    }));
+
+    // Initialize edited value with current value when entering edit mode
+    if (!editMode[field]) {
+      setEditedValues((prev) => ({
+        ...prev,
+        [field]: getFieldCurrentValue(field),
+      }));
     }
   };
 
-  const handleSaveChanges = async () => {
-    if (!editedUserData) return;
-    
+  // Get current value of a field
+  const getFieldCurrentValue = (field: string): any => {
+    if (!userData) return '';
+
+    switch (field) {
+      case 'profileImage':
+        return userData.profileImage;
+      case 'height':
+        return userData.height;
+      case 'weight':
+        return userData.weight;
+      case 'age':
+        return userData.dateOfBirth.age;
+      case 'activityLevel':
+        return userData.activityLevel;
+      case 'dietaryPreference':
+        return userData.dietaryPreference;
+      case 'targetWeight':
+        return userData.targetWeight;
+      default:
+        return '';
+    }
+  };
+
+  // Handle field value changes
+  const handleFieldChange = (field: string, value: any) => {
+    setEditedValues((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // Check if any field is in edit mode
+  const isAnyFieldInEditMode = Object.values(editMode).some((value) => value);
+
+  // Cancel all edits
+  const cancelEdits = () => {
+    setEditMode({});
+    setEditedValues({});
+  };
+
+  // Save changes to Firebase
+  const saveChanges = async () => {
+    if (!userData) return;
+
     try {
-      setUpdating(true);
+      setIsSaving(true);
       const auth = getAuth();
       const currentUser = auth.currentUser;
-      
+
       if (!currentUser) {
-        Alert.alert('Error', 'You need to be logged in to update your profile.');
+        setError('User not authenticated');
+        setIsSaving(false);
         return;
       }
 
-      // Validate inputs
-      if (editedUserData.name?.trim() === '') {
-        Alert.alert('Invalid Input', 'Name cannot be empty');
-        setUpdating(false);
-        return;
-      }
-
-      const targetWeightValue = Number(editedUserData.targetWeight);
-      const weight = Number(editedUserData.weight);
-      
-      if (isNaN(targetWeightValue) || targetWeightValue <= 0) {
-        Alert.alert('Invalid Input', 'Target weight must be a positive number');
-        setUpdating(false);
-        return;
-      }
-
-      if (isNaN(weight) || weight <= 0) {
-        Alert.alert('Invalid Input', 'Weight must be a positive number');
-        setUpdating(false);
-        return;
-      }
-
-      // Get user doc to check existing goals
       const userDocRef = doc(db, 'users', currentUser.uid);
-      
-      // Prepare update data
-      const updateData: any = {
-        name: editedUserData.name,
-        weight: weight,
-        targetWeight: targetWeightValue,
-        height: editedUserData.height,
-        profileImage: editedUserData.profileImage,
-      };
-      
-      // Add diet type if it exists
-      if (selectedDietType) {
-        updateData.dietType = selectedDietType;
+
+      // Create object with updated values
+      const updates: { [key: string]: any } = {};
+
+      if (editMode.profileImage && editedValues.profileImage !== undefined) {
+        updates.profileImage = editedValues.profileImage;
       }
 
-      // Update Firestore document
-      await updateDoc(userDocRef, updateData);
-      
-      // Handle goal updates separately if a goal is selected
-      if (selectedGoal) {
-        // Find the complete goal object
-        const goalObj = GOALS.find(g => g.id === selectedGoal);
-        
-        if (goalObj) {
-          const newGoal = {
-            id: goalObj.id,
-            title: goalObj.title,
-            createdAt: new Date(),
-          };
-          
-          // Add target weight if needed and provided
-          if (goalObj.requiresTarget && targetWeight) {
-            newGoal.targetWeight = parseFloat(targetWeight);
-          }
-          
-          await updateDoc(userDocRef, {
-            goals: arrayUnion(newGoal)
-          });
+      if (editMode.height && editedValues.height !== undefined) {
+        updates.height = editedValues.height;
+      }
+
+      if (editMode.weight && editedValues.weight !== undefined) {
+        updates.weight = parseFloat(editedValues.weight);
+      }
+
+      if (editMode.age && editedValues.age !== undefined) {
+        updates.dateOfBirth = {
+          ...userData.dateOfBirth,
+          age: parseInt(editedValues.age),
+        };
+      }
+
+      if (editMode.activityLevel && editedValues.activityLevel !== undefined) {
+        updates.activityLevel = editedValues.activityLevel;
+      }
+
+      if (
+        editMode.dietaryPreference &&
+        editedValues.dietaryPreference !== undefined
+      ) {
+        updates.dietaryPreference = editedValues.dietaryPreference;
+      }
+
+      if (editMode.targetWeight && editedValues.targetWeight !== undefined) {
+        updates.targetWeight = parseFloat(editedValues.targetWeight);
+
+        // Also update the targetWeight in the goals array if it exists
+        if (userData.goals && userData.goals.length > 0) {
+          const updatedGoals = [...userData.goals];
+          updatedGoals[0].targetWeight = parseFloat(editedValues.targetWeight);
+          updates.goals = updatedGoals;
         }
       }
-      
-      Alert.alert(
-        'Success', 
-        'Profile updated successfully!',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
-    } catch (error) {
-      console.error('Error updating user data:', error);
+
+      // Update Firestore
+      await updateDoc(userDocRef, updates);
+
+      // Clear edit modes and refresh data
+      setEditMode({});
+      setEditedValues({});
+      fetchUserData(true);
+
+      Alert.alert('Success', 'Profile updated successfully');
+    } catch (err) {
+      console.error('Error updating profile:', err);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
-      setUpdating(false);
+      setIsSaving(false);
     }
   };
 
-  const getDefaultProfileImage = () => {
-    // Using an Unsplash image as a default profile picture
-    return 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&h=500&q=80';
-  };
-
-  // Handle profile image source
-  const getProfileImageSource = () => {
-    if (imageError || !editedUserData?.profileImage || editedUserData.profileImage.trim() === '') {
-      return { uri: getDefaultProfileImage() };
-    }
-    return { uri: editedUserData.profileImage };
-  };
-  
-  const handleGoalSelection = (goalId: string) => {
-    setSelectedGoal(goalId);
-    
-    // Check if target weight is required
-    const goal = GOALS.find(g => g.id === goalId);
-    if (goal?.requiresTarget) {
-      setShowGoalModal(false);
-      setShowTargetWeightModal(true);
-    } else {
-      setShowGoalModal(false);
+  const navigateToSettings = () => {
+    if (userData) {
+      router.push({
+        pathname: '/Utils/SettingsScreen',
+        params: { userData: JSON.stringify(userData) },
+      });
     }
   };
 
-  const handleTargetWeightSubmit = () => {
-    if (!targetWeight || isNaN(parseFloat(targetWeight))) {
-      Alert.alert('Error', 'Please enter a valid target weight');
-      return;
+  const handleRegeneratePlan = () => {
+    router.push('/(onboarding)/plan');
+  };
+
+  const handleLogout = async () => {
+    try {
+      // Clear the cache when logging out
+      await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+
+      const auth = getAuth();
+      await signOut(auth);
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Error signing out: ', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
     }
-    
-    setShowTargetWeightModal(false);
   };
 
-  const getCurrentGoalText = () => {
-    if (!selectedGoal) return 'Not set';
-    
-    const goal = GOALS.find(g => g.id === selectedGoal);
-    return goal ? goal.title : 'Not set';
+  const formatHeight = (height: { feet: number; inches: number }) => {
+    return `${height.feet}' ${height.inches}"`;
   };
 
-  const getCurrentDietTypeText = () => {
-    if (!selectedDietType) return 'Not set';
-    
-    const diet = DIET_TYPES.find(d => d.id === selectedDietType);
-    return diet ? diet.label : 'Not set';
+  const calculateAge = () => {
+    if (!userData) return 0;
+    return userData.dateOfBirth?.age || 25;
   };
 
-  if (!isLoaded || !userData || !editedUserData) {
+  const getDaysUntilGoal = () => {
+    if (!userData) return 0;
+
+    const weightDifference = Math.abs(userData.weight - userData.targetWeight);
+    if (weightDifference <= 0) return 0;
+
+    return Math.ceil(weightDifference / 0.5) * 7;
+  };
+
+  const calculateWeightProgress = () => {
+    if (!userData) return 0;
+
+    if (userData.targetWeight > userData.weight) {
+      const progress = (userData.weight / userData.targetWeight) * 100;
+      return Math.min(100, Math.max(0, progress));
+    }
+
+    const progress =
+      100 - ((userData.weight - userData.targetWeight) / userData.weight) * 100;
+    return Math.min(100, Math.max(0, progress));
+  };
+
+  const formatJoinDate = (dateJoined: any) => {
+    if (dateJoined?.seconds) {
+      return new Date(dateJoined.seconds * 1000).toLocaleDateString();
+    }
+    return 'N/A';
+  };
+
+  if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#22c55e" />
-        <Text style={{ marginTop: 12, fontFamily: 'Inter-Regular' }}>Loading settings...</Text>
+        <Text style={{ marginTop: 12, fontFamily: 'Inter-Regular' }}>
+          Loading profile...
+        </Text>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <View style={{ width: 24 }} /> {/* Empty view for balance */}
-      </View>
-      
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Profile Image Section */}
-        <View style={styles.imageSection}>
-          {uploading ? (
-            <View style={styles.uploadingContainer}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={styles.uploadingText}>Uploading...</Text>
-            </View>
-          ) : (
-            <View style={styles.profileImageContainer}>
-              {imageLoading && (
-                <View style={styles.imageLoadingOverlay}>
-                  <ActivityIndicator size="small" color="#22c55e" />
-                </View>
-              )}
-              <Image
-                source={getProfileImageSource()}
-                style={styles.profileImage}
-                onLoadStart={() => setImageLoading(true)}
-                onLoadEnd={() => setImageLoading(false)}
-                onError={() => {
-                  console.warn('Profile image failed to load, using default');
-                  setImageError(true);
-                  setImageLoading(false);
-                }}
-              />
-            </View>
-          )}
-          <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage}>
-            <Camera size={20} color="#FFFFFF" />
-            <Text style={styles.changePhotoText}>Change Photo</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Form Fields */}
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Name</Text>
-          <TextInput
-            style={styles.formInput}
-            value={editedUserData.name}
-            onChangeText={(text) => {
-              setEditedUserData({ ...editedUserData, name: text });
-            }}
-            placeholder="Your name"
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Email</Text>
-          <TextInput
-            style={[styles.formInput, styles.disabledInput]}
-            value={editedUserData.email}
-            editable={false}
-          />
-          <Text style={styles.helperText}>Email cannot be changed</Text>
-        </View>
-
-        <View style={styles.formRow}>
-          <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-            <Text style={styles.formLabel}>Height (feet)</Text>
-            <TextInput
-              style={styles.formInput}
-              value={String(editedUserData.height?.feet || '')}
-              onChangeText={(text) => {
-                const feet = parseInt(text) || 0;
-                setEditedUserData({
-                  ...editedUserData,
-                  height: { ...editedUserData.height, feet }
-                });
-              }}
-              keyboardType="numeric"
-              placeholder="Feet"
-            />
-          </View>
-          <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-            <Text style={styles.formLabel}>Height (inches)</Text>
-            <TextInput
-              style={styles.formInput}
-              value={String(editedUserData.height?.inches || '')}
-              onChangeText={(text) => {
-                const inches = parseInt(text) || 0;
-                setEditedUserData({
-                  ...editedUserData,
-                  height: { ...editedUserData.height, inches }
-                });
-              }}
-              keyboardType="numeric"
-              placeholder="Inches"
-            />
-          </View>
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Current Weight (kg)</Text>
-          <TextInput
-            style={styles.formInput}
-            value={String(editedUserData.weight || '')}
-            onChangeText={(text) => {
-              setEditedUserData({ ...editedUserData, weight: parseFloat(text) || 0 });
-            }}
-            keyboardType="numeric"
-            placeholder="Your current weight"
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Target Weight (kg)</Text>
-          <TextInput
-            style={styles.formInput}
-            value={String(editedUserData.targetWeight || '')}
-            onChangeText={(text) => {
-              setEditedUserData({ ...editedUserData, targetWeight: parseFloat(text) || 0 });
-            }}
-            keyboardType="numeric"
-            placeholder="Your target weight"
-          />
-        </View>
-
-        {/* Fitness Goal Section */}
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Fitness Goal</Text>
-          <TouchableOpacity 
-            style={styles.selectButton}
-            onPress={() => setShowGoalModal(true)}
-          >
-            <Text style={styles.selectButtonText}>
-              {getCurrentGoalText()}
-            </Text>
-            <ChevronLeft size={20} color="#64748b" style={{ transform: [{ rotate: '-90deg' }] }} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Diet Type Section */}
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Diet Preference</Text>
-          <TouchableOpacity 
-            style={styles.selectButton}
-            onPress={() => setShowDietTypeModal(true)}
-          >
-            <Text style={styles.selectButtonText}>
-              {getCurrentDietTypeText()}
-            </Text>
-            <ChevronLeft size={20} color="#64748b" style={{ transform: [{ rotate: '-90deg' }] }} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Save Button */}
-        <TouchableOpacity 
-          style={styles.saveButton}
-          onPress={handleSaveChanges}
-          disabled={updating}
+  if (error || !userData) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <CircleHelp size={48} color="#FF6B6B" />
+        <Text
+          style={{
+            marginTop: 12,
+            fontFamily: 'Inter-Regular',
+            color: '#FF6B6B',
+          }}
         >
-          {updating ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Save size={20} color="#FFFFFF" />
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            </>
-          )}
+          {error || 'Unable to load profile'}
+        </Text>
+      </View>
+    );
+  }
+
+  const weightProgress = calculateWeightProgress();
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.profileHeaderContainer}>
+          <View style={styles.coverImageContainer}>
+            <Image
+              key={profileImageKey}
+              source={{
+                uri:
+                  userData.profileImage ||
+                  'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1742205498/placeholder_for_dp_nsojeb.jpg',
+                cache: 'reload',
+              }}
+              style={styles.coverImage}
+              resizeMode="cover"
+            />
+
+            {/* Profile photo edit button */}
+            <TouchableOpacity
+              style={styles.profileEditButton}
+              onPress={handleProfileImageEdit}
+              disabled={isUploadingImage}
+            >
+              {isUploadingImage ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Camera size={20} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.profileInfoOverlay}>
+              <Text style={styles.nameOverlay}>{userData.name}</Text>
+              <Text style={styles.emailOverlay}>{userData.email}</Text>
+            </View>
+          </View>
+
+          <View style={styles.streakContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {userData.mealsTrackedToday || 0}
+              </Text>
+              <Text style={styles.statLabel}>Meals Scanned</Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.statItem}>
+              <View style={styles.streakValueContainer}>
+                <Text style={styles.statValue}>{userData.streak || 0}</Text>
+                {userData.streak > 0 && (
+                  <Text style={styles.flameIcon}>🔥</Text>
+                )}
+              </View>
+              <Text style={styles.statLabel}>Day Streak</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            <User size={20} color="#22c55e" />
+          </View>
+          <View style={styles.userDetailsGrid}>
+            <View style={styles.detailItem}>
+              <TouchableOpacity
+                style={styles.cardEditIcon}
+                onPress={() => toggleEditMode('age')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
+              <Calendar size={20} color="#6366f1" />
+              <Text style={styles.detailLabel}>Age</Text>
+              {editMode.age ? (
+                <TextInput
+                  style={styles.detailEditInput}
+                  value={String(editedValues.age)}
+                  onChangeText={(text) => handleFieldChange('age', text)}
+                  keyboardType="numeric"
+                  autoFocus
+                />
+              ) : (
+                <Text style={styles.detailValue}>{calculateAge()}</Text>
+              )}
+            </View>
+
+            <View style={styles.detailItem}>
+              <TouchableOpacity
+                style={styles.cardEditIcon}
+                onPress={() => toggleEditMode('height')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
+              <Ruler size={20} color="#f59e0b" />
+              <Text style={styles.detailLabel}>Height</Text>
+              {editMode.height ? (
+                <View style={styles.heightInputContainer}>
+                  <TextInput
+                    style={[styles.heightInput, { width: '45%' }]}
+                    value={String(editedValues.height.feet)}
+                    onChangeText={(text) =>
+                      handleFieldChange('height', {
+                        ...editedValues.height,
+                        feet: parseInt(text) || 0,
+                      })
+                    }
+                    keyboardType="numeric"
+                    placeholder="Feet"
+                  />
+                  <Text style={styles.heightSeparator}>'</Text>
+                  <TextInput
+                    style={[styles.heightInput, { width: '45%' }]}
+                    value={String(editedValues.height.inches)}
+                    onChangeText={(text) =>
+                      handleFieldChange('height', {
+                        ...editedValues.height,
+                        inches: parseInt(text) || 0,
+                      })
+                    }
+                    keyboardType="numeric"
+                    placeholder="Inches"
+                  />
+                  <Text style={styles.heightSeparator}>"</Text>
+                </View>
+              ) : (
+                <Text style={styles.detailValue}>
+                  {formatHeight(userData.height)}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.detailItem}>
+              <TouchableOpacity
+                style={styles.cardEditIcon}
+                onPress={() => toggleEditMode('weight')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
+              <Scale size={20} color="#ef4444" />
+              <Text style={styles.detailLabel}>Weight</Text>
+              {editMode.weight ? (
+                <View style={styles.weightInputContainer}>
+                  <TextInput
+                    style={styles.detailEditInput}
+                    value={String(editedValues.weight)}
+                    onChangeText={(text) => handleFieldChange('weight', text)}
+                    keyboardType="numeric"
+                    autoFocus
+                  />
+                  <Text style={styles.weightUnit}>kg</Text>
+                </View>
+              ) : (
+                <Text style={styles.detailValue}>{userData.weight} kg</Text>
+              )}
+            </View>
+
+            <View style={styles.detailItem}>
+              <TouchableOpacity
+                style={styles.cardEditIcon}
+                onPress={() => toggleEditMode('activityLevel')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
+              <Dumbbell size={20} color="#8b5cf6" />
+              <Text style={styles.detailLabel}>Activity</Text>
+              {editMode.activityLevel ? (
+                <View style={styles.pickerContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.activityOption,
+                      editedValues.activityLevel === 'Low' &&
+                        styles.selectedActivity,
+                    ]}
+                    onPress={() => handleFieldChange('activityLevel', 'Low')}
+                  >
+                    <Text
+                      style={
+                        editedValues.activityLevel === 'Low'
+                          ? styles.selectedActivityText
+                          : styles.activityOptionText
+                      }
+                    >
+                      Low
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.activityOption,
+                      editedValues.activityLevel === 'Moderate' &&
+                        styles.selectedActivity,
+                    ]}
+                    onPress={() =>
+                      handleFieldChange('activityLevel', 'Moderate')
+                    }
+                  >
+                    <Text
+                      style={
+                        editedValues.activityLevel === 'Moderate'
+                          ? styles.selectedActivityText
+                          : styles.activityOptionText
+                      }
+                    >
+                      Moderate
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.activityOption,
+                      editedValues.activityLevel === 'High' &&
+                        styles.selectedActivity,
+                    ]}
+                    onPress={() => handleFieldChange('activityLevel', 'High')}
+                  >
+                    <Text
+                      style={
+                        editedValues.activityLevel === 'High'
+                          ? styles.selectedActivityText
+                          : styles.activityOptionText
+                      }
+                    >
+                      High
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={styles.detailValue}>{userData.activityLevel}</Text>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Diet & Nutrition</Text>
+            <Apple size={20} color="#22c55e" />
+          </View>
+          <View style={styles.dietRow}>
+            <View style={styles.dietaryHeader}>
+              <View style={styles.dietBadge}>
+                <Utensils size={16} color="#22c55e" />
+                {editMode.dietaryPreference ? (
+                  <View style={styles.dietaryOptionsContainer}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                    >
+                      {[
+                        'Vegetarian',
+                        'Non-Vegetarian',
+                        'Vegan',
+                        'Keto',
+                        'Paleo',
+                        'Mediterranean',
+                      ].map((diet) => (
+                        <TouchableOpacity
+                          key={diet}
+                          style={[
+                            styles.dietaryOption,
+                            editedValues.dietaryPreference === diet &&
+                              styles.selectedDietaryOption,
+                          ]}
+                          onPress={() =>
+                            handleFieldChange('dietaryPreference', diet)
+                          }
+                        >
+                          <Text
+                            style={
+                              editedValues.dietaryPreference === diet
+                                ? styles.selectedDietaryOptionText
+                                : styles.dietaryOptionText
+                            }
+                          >
+                            {diet}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : (
+                  <Text style={styles.dietBadgeText}>
+                    {userData.dietaryPreference}
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.dietEditIcon}
+                onPress={() => toggleEditMode('dietaryPreference')}
+              >
+                <Edit size={16} color="grey" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.dietaryInfo}>
+              <Text style={styles.dietaryDescription}>
+                Your preferred diet pattern helps us create meal plans tailored
+                to your needs.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>My Goals</Text>
+            <Target size={20} color="#22c55e" />
+          </View>
+          <View style={styles.goalsContainer}>
+            {userData.goals.length > 0 && (
+              <View style={styles.goalItem}>
+                <Award size={18} color="#22c55e" />
+                <Text style={styles.goalText}>
+                  {userData.goals[userData.goals.length - 1].title + ' ' ||
+                    'Custom Goal'}
+                </Text>
+                {!editMode.targetWeight ? (
+                  <View style={styles.targetWeightContainer}>
+                    <Text style={styles.goalSubText}>
+                      (Target: {userData.targetWeight} kg)
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.smallEditIcon}
+                      onPress={() => toggleEditMode('targetWeight')}
+                    >
+                      <Edit size={14} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.targetWeightEditContainer}>
+                    <TextInput
+                      style={styles.targetWeightInput}
+                      value={String(editedValues.targetWeight)}
+                      onChangeText={(text) =>
+                        handleFieldChange('targetWeight', text)
+                      }
+                      keyboardType="numeric"
+                      placeholder="Target Weight (kg)"
+                      autoFocus
+                    />
+                    <Text style={styles.weightUnit}>kg</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.regenerateButton}
+          onPress={handleRegeneratePlan}
+        >
+          <RefreshCw size={24} color="#22c55e" />
+          <Text style={styles.regenerateText}>Regenerate Plan</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <LogOut size={24} color="#ef4444" />
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Goal Selection Modal */}
-      <Modal
-        visible={showGoalModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowGoalModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Fitness Goal</Text>
-              <TouchableOpacity 
-                style={styles.closeButton} 
-                onPress={() => setShowGoalModal(false)}
-              >
-                <X size={20} color="#64748b" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={{ maxHeight: 400 }}>
-              {GOALS.map((goal) => (
-                <TouchableOpacity
-                  key={goal.id}
-                  style={styles.optionItem}
-                  onPress={() => handleGoalSelection(goal.id)}
-                >
-                  <View style={styles.optionTextContainer}>
-                    <Text style={styles.optionTitle}>{goal.title}</Text>
-                    <Text style={styles.optionDescription}>{goal.description}</Text>
-                  </View>
-                  {selectedGoal === goal.id && (
-                    <Check size={20} color="#22c55e" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      {isAnyFieldInEditMode && (
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity style={styles.cancelButton} onPress={cancelEdits}>
+            <X size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Cancel</Text>
+          </TouchableOpacity>
 
-      {/* Diet Type Modal */}
-      <Modal
-        visible={showDietTypeModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDietTypeModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Diet Type</Text>
-              <TouchableOpacity 
-                style={styles.closeButton} 
-                onPress={() => setShowDietTypeModal(false)}
-              >
-                <X size={20} color="#64748b" />
-              </TouchableOpacity>
-            </View>
-            
-            {DIET_TYPES.map((diet) => (
-              <TouchableOpacity
-                key={diet.id}
-                style={styles.optionItem}
-                onPress={() => {
-                  setSelectedDietType(diet.id);
-                  setShowDietTypeModal(false);
-                }}
-              >
-                <Text style={styles.optionTitle}>{diet.label}</Text>
-                {selectedDietType === diet.id && (
-                  <Check size={20} color="#22c55e" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            style={styles.saveButton}
+            onPress={saveChanges}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Save size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Save Changes</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
-      </Modal>
-
-      {/* Target Weight Modal */}
-      <Modal
-        visible={showTargetWeightModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowTargetWeightModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {selectedGoal === 'weight-loss' ? 'Target Weight (kg)' : 'Goal Weight (kg)'}
-            </Text>
-            <Text style={styles.modalSubtitle}>
-              {selectedGoal === 'weight-loss' 
-                ? 'What weight would you like to achieve?' 
-                : 'What weight would you like to gain to?'}
-            </Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              value={targetWeight}
-              onChangeText={setTargetWeight}
-              placeholder="Enter weight in kg"
-              placeholderTextColor="#94a3b8"
-            />
-            <View style={styles.modalButtons}>
-              <Pressable 
-                style={styles.modalCancelButton} 
-                onPress={() => setShowTargetWeightModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable 
-                style={styles.modalSubmitButton}
-                onPress={handleTargetWeightSubmit}
-              >
-                <Text style={styles.modalSubmitText}>Confirm</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+      )}
+    </KeyboardAvoidingView>
   );
 };
 
+// Extended styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 16,
-    paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter-SemiBold',
-    color: '#2D2D2D',
-  },
-  backButton: {
-    padding: 8,
-  },
   scrollView: {
-    flex: 1,
+    backgroundColor: '#ffffff',
   },
   scrollContent: {
     paddingBottom: 30,
   },
-  imageSection: {
+  loadingContainer: {
+    justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 24,
   },
-  profileImageContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  profileHeaderContainer: {
     marginBottom: 16,
+  },
+  coverImageContainer: {
+    height: 320,
+    width: '100%',
     position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: '#f3f4f6',
+    marginTop: -StatusBar.currentHeight || 0,
   },
-  imageLoadingOverlay: {
+  coverImage: {
+    height: '100%',
+    width: '100%',
+  },
+  profileInfoOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
+    bottom: 20,
+    left: 20,
   },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  uploadingContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(34, 197, 94, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  uploadingText: {
+  nameOverlay: {
+    fontSize: 28,
+    fontFamily: 'Inter-Bold',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    marginTop: 8,
+    marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  changePhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#22c55e',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  emailOverlay: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  profileEditButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
-  changePhotoText: {
-    color: '#FFFFFF',
-    marginLeft: 6,
-    fontFamily: 'Inter-Medium',
-    fontSize: 14,
-  },
-  formGroup: {
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  formRow: {
+  streakContainer: {
     flexDirection: 'row',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#64748b',
-    marginBottom: 6,
-  },
-  formInput: {
-    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 2,
+    marginHorizontal: 16,
+    marginTop: -10,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#1e293b',
   },
-  disabledInput: {
-    backgroundColor: '#f1f5f9',
-    color: '#94a3b8',
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
   },
-  helperText: {
-    fontSize: 12,
-    color: '#94a3b8',
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#666',
     marginTop: 4,
   },
-  selectButton: {
+  divider: {
+    width: 1,
+    height: '70%',
+    backgroundColor: '#ddd',
+  },
+  section: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  streakValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  flameIcon: {
+    fontSize: 20,
+    marginLeft: 4,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#2D2D2D',
+  },
+  userDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  detailItem: {
+    width: '48%',
     backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  cardEditIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    zIndex: 1,
+  },
+  detailLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    marginTop: 8,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#2D2D2D',
+    marginTop: 4,
+  },
+  dietRow: {
+    flexDirection: 'column',
+  },
+  dietBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  dietBadgeText: {
+    color: '#22c55e',
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    marginLeft: 6,
+  },
+  dietaryInfo: {
+    marginTop: 8,
+  },
+  dietaryDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    lineHeight: 20,
+  },
+  goalsContainer: {
+    marginTop: 4,
+  },
+  goalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  goalText: {
+    marginLeft: 12,
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#333',
+  },
+  targetWeightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  targetWeightEditContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  targetWeightInput: {
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 60,
+    color: '#333',
+  },
+  weightStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  weightStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  weightLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
+  },
+  weightValue: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: '#333',
+  },
+  progressBarContainer: {
+    marginBottom: 12,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#EEE',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#22c55e',
+    borderRadius: 4,
+  },
+  progressPercentage: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    textAlign: 'right',
+  },
+  estimatedTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  estimatedTimeText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    marginLeft: 8,
+  },
+  workoutStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  workoutStat: {
+    width: '33%',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  workoutStatValue: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  workoutStatLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    textAlign: 'center',
+  },
+  regenerateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#f0fdf4',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+  },
+  regenerateText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#22c55e',
+    marginLeft: 8,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#FFF1F1',
+    marginHorizontal: 16,
+    marginBottom: 30,
+    borderRadius: 12,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ef4444',
+    marginLeft: 8,
+  },
+  // Edit mode styles
+  editableFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smallEditIcon: {
+    marginLeft: 5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dietEditIcon: {
+    marginLeft: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 11,
+  },
+  detailEditInput: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#2D2D2D',
+    textAlign: 'center',
+    padding: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 12,
+    marginTop: 4,
+    width: '80%',
   },
-  selectButtonText: {
+  heightInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  heightInput: {
     fontSize: 16,
-    color: '#1e293b',
+    fontFamily: 'Inter-SemiBold',
+    color: '#2D2D2D',
+    textAlign: 'center',
+    padding: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  heightSeparator: {
+    marginHorizontal: 2,
+    fontSize: 16,
+    color: '#2D2D2D',
+  },
+  weightInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  weightUnit: {
+    marginLeft: 4,
+    fontSize: 16,
+    color: '#2D2D2D',
+  },
+  dietaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dietaryOptionsContainer: {
+    marginLeft: 6,
+  },
+  dietaryOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+  selectedDietaryOption: {
+    backgroundColor: '#22c55e',
+  },
+  dietaryOptionText: {
+    fontSize: 14,
+    color: '#22c55e',
+  },
+  selectedDietaryOptionText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  buttonsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 5,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   saveButton: {
     flexDirection: 'row',
+    backgroundColor: '#22c55e',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#22c55e',
-    padding: 16,
-    borderRadius: 12,
-    marginVertical: 24,
-    marginHorizontal: 20,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
     marginLeft: 8,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  cancelButton: {
+    flexDirection: 'row',
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    maxWidth: 500,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 20,
-    color: '#1a1a1a',
-  },
-  modalSubtitle: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 16,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  optionTextContainer: {
+    paddingVertical: 12,
+    borderRadius: 8,
     flex: 1,
-    marginRight: 16,
+    marginRight: 8,
   },
-  optionTitle: {
-    fontFamily: 'Inter-SemiBold',
+  buttonText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    color: '#1e293b',
-    marginBottom: 2,
+    fontWeight: '600',
+    marginLeft: 8,
   },
-  optionDescription: {
-    fontFamily: 'Inter-Regular',
+  goalSubText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#666',
+    marginLeft: 6,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    marginBottom: 16,
-  },
-  modalButtons: {
+  pickerContainer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
+    marginTop: 4,
   },
-  modalCancelButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+  activityOption: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginHorizontal: 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#8b5cf6',
   },
-  modalCancelText: {
-    color: '#64748b',
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+  selectedActivity: {
+    backgroundColor: '#8b5cf6',
   },
-  modalSubmitButton: {
-    backgroundColor: '#22c55e',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+  activityOptionText: {
+    fontSize: 12,
+    color: '#8b5cf6',
   },
-  modalSubmitText: {
-    color: '#fff',
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+  selectedActivityText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
 });
 
-export default SettingsScreen;
+export default ProfileScreen;
