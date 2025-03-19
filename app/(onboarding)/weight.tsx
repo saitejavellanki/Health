@@ -6,14 +6,13 @@ import {
   TextInput,
   Pressable,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  SafeAreaView,
   Animated,
   Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from '../../components/firebase/Firebase';
 
 export default function Weight() {
@@ -42,20 +41,20 @@ export default function Weight() {
     try {
       setIsLoading(true);
       const currentUser = auth.currentUser;
-
+      
       if (!currentUser) {
         Alert.alert('Error', 'You must be logged in to save your weight.');
         return;
       }
 
-      const userRef = doc(db, 'users', currentUser.uid);
+      const userRef = doc(db, "users", currentUser.uid);
       await updateDoc(userRef, {
         weight: parseInt(weight),
-        updatedAt: new Date(),
+        updatedAt: new Date()
       });
 
-      console.log(`Weight saved: ${weight} kgs`);
-      router.push('/gender');
+      console.log(`Weight saved: ${weight} lbs`);
+      router.push('/(onboarding)/gender');
     } catch (error) {
       console.error('Error saving weight:', error);
       Alert.alert('Error', 'Failed to save your weight. Please try again.');
@@ -75,70 +74,82 @@ export default function Weight() {
   });
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.push('/height')}
-        >
-          <ChevronLeft size={24} color="#000" />
-        </Pressable>
-      </View>
-
-      <View style={styles.contentContainer}>
-        <View style={styles.stepProgressContainer}>
-          <View style={styles.progressBarContainer}>
-            <Animated.View
-              style={[styles.progressBar, { width: progressWidth }]}
-            />
-          </View>
-          <Text style={styles.stepText}>
-            Step {currentStep} of {totalSteps}
-          </Text>
-        </View>
-
-        <Text style={styles.title}>Enter your weight</Text>
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={weight}
-            onChangeText={handleNumericInput}
-            keyboardType="number-pad"
-            maxLength={3}
-          />
-          <Text style={styles.unitText}>kgs</Text>
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <Pressable
-          style={[
-            styles.button,
-            !weight && styles.buttonDisabled,
-            isLoading && styles.buttonLoading,
-          ]}
-          disabled={!weight || isLoading}
-          onPress={handleContinue}
-        >
-          <Text
-            style={[styles.buttonText, !weight && styles.buttonTextDisabled]}
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => router.push('/(onboarding)/height')}
           >
-            {isLoading ? 'Saving...' : 'Continue'}
+            <ChevronLeft size={24} color="#000" />
+          </Pressable>
+        </View>
+
+        <View style={styles.contentContainer}>
+          <View style={styles.stepProgressContainer}>
+            <View style={styles.progressBarContainer}>
+              <Animated.View style={[styles.progressBar, { width: progressWidth }]} />
+            </View>
+            <Text style={styles.stepText}>Step {currentStep} of {totalSteps}</Text>
+          </View>
+
+          <Text style={styles.title}>Enter your weight</Text>
+
+          <View style={styles.inputContainer}>
+            <View style={styles.inputGroup}>
+              <TextInput
+                style={styles.input}
+                value={weight}
+                onChangeText={handleNumericInput}
+                keyboardType="number-pad"
+                maxLength={3}
+                placeholder="0"
+              />
+              <Text style={styles.unitText}>Kgs</Text>
+            </View>
+          </View>
+
+          <Text style={styles.helperText}>
+            *Enter your current weight in Kgs
           </Text>
-          {!isLoading && (
-            <ArrowRight size={20} color={!weight ? '#94a3b8' : '#fff'} />
-          )}
-        </Pressable>
+        </View>
+
+        <View style={styles.footer}>
+          <Pressable
+            style={[
+              styles.button,
+              !weight && styles.buttonDisabled,
+              isLoading && styles.buttonLoading,
+            ]}
+            disabled={!weight || isLoading}
+            onPress={handleContinue}
+          >
+            <Text
+              style={[
+                styles.buttonText,
+                !weight && styles.buttonTextDisabled,
+              ]}
+            >
+              {isLoading ? 'Saving...' : 'Continue'}
+            </Text>
+            {!isLoading && (
+              <ArrowRight
+                size={20}
+                color={!weight ? '#94a3b8' : '#fff'}
+              />
+            )}
+          </Pressable>
+        </View>
       </View>
-    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -198,10 +209,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
     marginBottom: 16,
   },
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   input: {
-    width: 140,
+    width: 120,
     height: 60,
     borderWidth: 2,
     borderColor: '#e2e8f0',
@@ -215,9 +232,16 @@ const styles = StyleSheet.create({
   },
   unitText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 28,
+    fontSize: 18,
     color: '#1a1a1a',
-    marginLeft: 12,
+    marginLeft: 8,
+  },
+  helperText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#999999',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   footer: {
     paddingHorizontal: 24,

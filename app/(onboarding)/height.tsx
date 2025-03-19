@@ -62,7 +62,7 @@ export default function Height() {
       });
 
       console.log(`Height saved: ${heightFeet} ft ${heightInches} in`);
-      router.push('/weight');
+      router.push('/(onboarding)/weight');
     } catch (error) {
       console.error('Error saving height:', error);
       Alert.alert('Error', 'Failed to save your height. Please try again.');

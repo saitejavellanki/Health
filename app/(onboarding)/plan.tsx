@@ -40,8 +40,6 @@ import { db, auth } from '../../components/firebase/Firebase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Checkbox } from 'expo-checkbox';
-// import { doc, updateDoc } from 'firebase/firestore';
-// import { auth, db } from '../../components/firebase/Firebase';
 
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
 const GEMINI_API_URL =
@@ -91,7 +89,6 @@ const parseDailyPlan = (planText) => {
         lunch: [],
         snack: [],
         dinner: [],
-
         tracking: [],
       };
     } else if (currentDay && currentPlan) {
@@ -163,7 +160,6 @@ const parseDailyPlan = (planText) => {
         lunch: ['Details not available'],
         snack: ['Details not available'],
         dinner: ['Details not available'],
-
         tracking: ['Details not available'],
       },
     }));
@@ -173,26 +169,64 @@ const parseDailyPlan = (planText) => {
 };
 
 const createPrompt = (userData) => {
+  // Default values for userData to prevent undefined errors
+  const userDataDefaults = {
+    goals: [],
+    preferences: {
+      diet: 'balanced',
+      allergies: [],
+      state: 'general South Indian'
+    },
+    weight: 70,
+    height: { totalInches: 65 },
+    dateOfBirth: { age: 30 },
+    gender: 'male',
+    workoutFrequency: 'moderate',
+    budget: { amount: 5000 }
+  };
+
+  // Merge defaults with provided userData
+  const safeUserData = {
+    ...userDataDefaults,
+    ...userData,
+    preferences: {
+      ...userDataDefaults.preferences,
+      ...userData?.preferences
+    },
+    height: {
+      ...userDataDefaults.height,
+      ...userData?.height
+    },
+    dateOfBirth: {
+      ...userDataDefaults.dateOfBirth,
+      ...userData?.dateOfBirth
+    },
+    budget: {
+      ...userDataDefaults.budget,
+      ...userData?.budget
+    }
+  };
+
   const goal =
-    userData.goals && userData.goals.length > 0
-      ? userData.goals[0]?.title
+    safeUserData.goals && safeUserData.goals.length > 0
+      ? safeUserData.goals[0]?.title
       : 'health improvement';
 
   const targetWeight =
-    userData.goals &&
-    userData.goals.length > 0 &&
-    userData.goals[0]?.targetWeight
-      ? userData.goals[0]?.targetWeight
+    safeUserData.goals &&
+    safeUserData.goals.length > 0 &&
+    safeUserData.goals[0]?.targetWeight
+      ? safeUserData.goals[0]?.targetWeight
       : null;
 
   const weightGoalText = targetWeight
     ? `with a target weight of ${targetWeight}kg`
     : '';
 
-  const diet = userData.preferences?.diet || 'balanced';
-  const allergies = userData.preferences?.allergies?.join(',') || 'none';
-  const state = userData.preferences?.state || 'general South Indian';
-  const currentWeight = userData.weight || null;
+  const diet = safeUserData.preferences?.diet || 'balanced';
+  const allergies = safeUserData.preferences?.allergies?.join(',') || 'none';
+  const state = safeUserData.preferences?.state || 'general South Indian';
+  const currentWeight = safeUserData.weight || null;
 
   const weightContext =
     currentWeight && targetWeight
@@ -200,63 +234,57 @@ const createPrompt = (userData) => {
       : '';
 
   let bmr = 0;
-  if (userData.gender === 'female') {
+  if (safeUserData.gender === 'female') {
     bmr =
       655.1 +
-      9.563 * userData.weight +
-      1.85 * userData.height['totalInches'] * 2.54 -
-      4.676 * userData.dateOfBirth['age'];
+      9.563 * safeUserData.weight +
+      1.85 * safeUserData.height['totalInches'] * 2.54 -
+      4.676 * safeUserData.dateOfBirth['age'];
   } else {
     bmr =
       66.47 +
-      13.75 * userData.weight +
-      5.003 * userData.height['totalInches'] * 2.54 -
-      6.755 * userData.dateOfBirth['age'];
+      13.75 * safeUserData.weight +
+      5.003 * safeUserData.height['totalInches'] * 2.54 -
+      6.755 * safeUserData.dateOfBirth['age'];
   }
 
-  let act_fac = 0;
-  if (userData.workoutFrequency === 'none') {
-    act_fac += 1.2;
-  } else if (userData.workoutFrequency === 'light') {
+  let act_fac = 1.2; // Default value
+  if (safeUserData.workoutFrequency === 'none') {
+    act_fac = 1.2;
+  } else if (safeUserData.workoutFrequency === 'light') {
     act_fac = 1.375;
-  } else if (userData.workoutFrequency === 'moderate') {
+  } else if (safeUserData.workoutFrequency === 'moderate') {
     act_fac = 1.55;
-  } else if (userData.workoutFrequency === 'active') {
+  } else if (safeUserData.workoutFrequency === 'active') {
     act_fac = 1.725;
-  } else if (userData.workoutFrequency === 'intense') {
+  } else if (safeUserData.workoutFrequency === 'intense') {
     act_fac = 1.9;
   }
 
   let tdde = bmr * act_fac;
-  let new_tdde = 0;
-  if (userData.goals[0]['title'] === 'Weight Gain') {
-    new_tdde = tdde + 200;
-  } else if (userData.goals[0]['title'] === 'Weight Gain') {
-    new_tdde = tdde - 500;
-    if (new_tdde < 1500 && userData.gender === 'male') {
-      new_tdde = 1500;
-    } else if (new_tdde < 1200 && userData.gender === 'female') {
-      new_tdde = 1200;
+  let new_tdde = tdde; // Default to tdde
+
+  // Check if goals exist before accessing
+  if (safeUserData.goals && safeUserData.goals.length > 0) {
+    if (safeUserData.goals[0].title === 'Weight Gain') {
+      new_tdde = tdde + 200;
+    } else if (safeUserData.goals[0].title === 'Weight Loss') { // Fixed from 'Weight Gain'
+      new_tdde = tdde - 500;
+      if (new_tdde < 1500 && safeUserData.gender === 'male') {
+        new_tdde = 1500;
+      } else if (new_tdde < 1200 && safeUserData.gender === 'female') {
+        new_tdde = 1200;
+      }
     }
   }
+
   console.log('tdde: ' + tdde);
   console.log('new_tdde: ' + new_tdde);
-
-  // updateDoc(useRef, {
-  //   tdde: new_tdde,
-  // });
-  //check if this new_tdde is getting updated to firebase.
-  // const currentUser = auth.currentUser;
-
-  // const userRef = doc(db, 'users', currentUser.uid);
-  // await updateDoc(userRef, {
-  //   tdde: tdde,
-  // });
 
   return `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} 
   with Indian food specific to ${state} region. Allergies: ${allergies}. 
   Calorie intake target per day should be almost equal to: ${new_tdde}, the difference between the total given calories per day and ${new_tdde} should not exceed 100 calories. 
-  Monthly budget: ${userData.budget.amount} INR. 
+  Monthly budget: ${safeUserData.budget.amount} INR. 
 
 DO NOT include ragi, jowar, quinoa or any foods that are not found/user much in metro cities, in any meal suggestions.
 
@@ -272,7 +300,7 @@ Tracking: [simple tip for monitoring progress]
 
 Keep each section brief - 1-2 sentences maximum. Focus on actionable items. All suggestions should be familiar, common, and easy-to-eat ${state}-style South Indian cuisine options that locals regularly consume. Only include dishes and ingredients that are widely available and commonly prepared in households in the ${state} region, tailored to the user's diet and allergies.
 
-The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${tdde}, and all recommendations fit within the monthly budget (${userData.budget.amount}), though no pricing information should be included in the output.`;
+The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${tdde}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.`;
 };
 
 const { width } = Dimensions.get('window');
@@ -486,7 +514,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         createdAt: new Date().toISOString(),
         goal:
           userData.goals && userData.goals.length > 0
-            ? userData.goals[0]?.title
+            ? userData.goals[0]?.title || 'health improvement'
             : 'health improvement',
       });
 
@@ -519,7 +547,6 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         return <Coffee size={20} color="#22c55e" />;
       case 'dinner':
         return <Moon size={20} color="#22c55e" />;
-
       case 'tracking':
         return <CheckCircle size={20} color="#22c55e" />;
       default:
@@ -539,7 +566,6 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         return 'Snacks';
       case 'dinner':
         return 'Dinner';
-
       case 'tracking':
         return 'Daily Tracking';
       case 'overview':
