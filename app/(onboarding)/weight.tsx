@@ -9,16 +9,21 @@ import {
   SafeAreaView,
   Animated,
   Easing,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, ChevronLeft } from 'lucide-react-native';
 import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from '../../components/firebase/Firebase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Weight() {
   const [weight, setWeight] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [progressAnimation] = useState(new Animated.Value(0));
+  const insets = useSafeAreaInsets();
 
   const totalSteps = 9;
   const currentStep = 2;
@@ -30,7 +35,24 @@ export default function Weight() {
       easing: Easing.inOut(Easing.ease),
       useNativeDriver: false,
     }).start();
+
+    // Add keyboard listeners to adjust the UI when keyboard appears/disappears
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        // Scroll to bottom when keyboard shows
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        }
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+    };
   }, []);
+
+  const scrollViewRef = React.useRef();
 
   const handleContinue = async () => {
     if (!weight) {
@@ -75,72 +97,81 @@ export default function Weight() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Pressable
-            style={styles.backButton}
-            onPress={() => router.push('/(onboarding)/height')}
-          >
-            <ChevronLeft size={24} color="#000" />
-          </Pressable>
-        </View>
-
-        <View style={styles.contentContainer}>
-          <View style={styles.stepProgressContainer}>
-            <View style={styles.progressBarContainer}>
-              <Animated.View style={[styles.progressBar, { width: progressWidth }]} />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.scrollContent}
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <Pressable
+                style={styles.backButton}
+                onPress={() => router.push('/(onboarding)/height')}
+              >
+                <ChevronLeft size={24} color="#000" />
+              </Pressable>
             </View>
-            <Text style={styles.stepText}>Step {currentStep} of {totalSteps}</Text>
-          </View>
 
-          <Text style={styles.title}>Enter your weight</Text>
+            <View style={styles.contentContainer}>
+              <View style={styles.stepProgressContainer}>
+                <View style={styles.progressBarContainer}>
+                  <Animated.View style={[styles.progressBar, { width: progressWidth }]} />
+                </View>
+                <Text style={styles.stepText}>Step {currentStep} of {totalSteps}</Text>
+              </View>
 
-          <View style={styles.inputContainer}>
-            <View style={styles.inputGroup}>
-              <TextInput
-                style={styles.input}
-                value={weight}
-                onChangeText={handleNumericInput}
-                keyboardType="number-pad"
-                maxLength={3}
-                placeholder="0"
-              />
-              <Text style={styles.unitText}>Kgs</Text>
+              <Text style={styles.title}>Enter your weight</Text>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputGroup}>
+                  <TextInput
+                    style={styles.input}
+                    value={weight}
+                    onChangeText={handleNumericInput}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    placeholder="0"
+                  />
+                  <Text style={styles.unitText}>Kgs</Text>
+                </View>
+              </View>
+
+              <Text style={styles.helperText}>
+                *Enter your current weight in Kgs
+              </Text>
+            </View>
+
+            <View style={[styles.footer, { paddingBottom: Math.max(32, insets.bottom + 16) }]}>
+              <Pressable
+                style={[
+                  styles.button,
+                  !weight && styles.buttonDisabled,
+                  isLoading && styles.buttonLoading,
+                ]}
+                disabled={!weight || isLoading}
+                onPress={handleContinue}
+              >
+                <Text
+                  style={[
+                    styles.buttonText,
+                    !weight && styles.buttonTextDisabled,
+                  ]}
+                >
+                  {isLoading ? 'Saving...' : 'Continue'}
+                </Text>
+                {!isLoading && (
+                  <ArrowRight
+                    size={20}
+                    color={!weight ? '#94a3b8' : '#fff'}
+                  />
+                )}
+              </Pressable>
             </View>
           </View>
-
-          <Text style={styles.helperText}>
-            *Enter your current weight in Kgs
-          </Text>
-        </View>
-
-        <View style={styles.footer}>
-          <Pressable
-            style={[
-              styles.button,
-              !weight && styles.buttonDisabled,
-              isLoading && styles.buttonLoading,
-            ]}
-            disabled={!weight || isLoading}
-            onPress={handleContinue}
-          >
-            <Text
-              style={[
-                styles.buttonText,
-                !weight && styles.buttonTextDisabled,
-              ]}
-            >
-              {isLoading ? 'Saving...' : 'Continue'}
-            </Text>
-            {!isLoading && (
-              <ArrowRight
-                size={20}
-                color={!weight ? '#94a3b8' : '#fff'}
-              />
-            )}
-          </Pressable>
-        </View>
-      </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
@@ -149,6 +180,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   container: {
     flex: 1,

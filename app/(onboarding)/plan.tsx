@@ -285,10 +285,7 @@ const createPrompt = (userData) => {
 
   adjustedTdee = Math.round(adjustedTdee);
   // Update the user's targetCalories field
-  if (userData && userData.uid) {
-    updateUserCalories(userData.uid, adjustedTdee);
-  }
-
+ 
   console.log('Calculated TDEE:', tdee);
   console.log('Adjusted TDEE:', adjustedTdee);
   
@@ -309,13 +306,18 @@ const createPrompt = (userData) => {
     }
   }
   
-  // Ensure minimum 2000 calories as requested
-  if (adjustedTdee < 2000) {
-    adjustedTdee = 2000;
-  }
+  // // Ensure minimum 2000 calories as requested
+  // if (adjustedTdee < 2000) {
+  //   adjustedTdee = 2000;
+  // }
   
   // Round to nearest whole number for cleaner display
   adjustedTdee = Math.round(adjustedTdee);
+
+  if (userData && userData.uid) {
+    updateUserCalories(userData.uid, adjustedTdee);
+  }
+
   
   console.log('Final adjusted TDEE:', adjustedTdee);
 
