@@ -23,29 +23,37 @@ const ActiveOrders = () => {
       try {
         const auth = getAuth();
         const currentUser = auth.currentUser;
-
+  
         if (!currentUser) {
           console.log('No user logged in');
           setLoading(false);
           return;
         }
-
+  
         const db = getFirestore();
         const ordersRef = collection(db, 'orders');
         
-        // Query for orders including completed status
+        // Base query for user's orders
         const q = query(
           ordersRef,
           where('userId', '==', currentUser.uid),
-          where('deliveryStatus', 'in', ['pending', 'processing', 'shipped', 'out_for_delivery']),
           orderBy('createdAt', 'desc')
         );
-
+  
         // Set up real-time listener for orders
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
           const orders = [];
           querySnapshot.forEach((doc) => {
-            orders.push({ id: doc.id, ...doc.data() });
+            const orderData = { id: doc.id, ...doc.data() };
+            // Only add orders that meet all criteria
+            if (
+              orderData.status !== 'pending' && 
+              orderData.status !== 'cancelled' && 
+              orderData.deliveryStatus !== 'completed' && 
+              orderData.deliveryStatus !== 'cancelled'
+            ) {
+              orders.push(orderData);
+            }
           });
           
           setActiveOrders(orders);
@@ -54,7 +62,7 @@ const ActiveOrders = () => {
           console.error('Error listening to orders:', error);
           setLoading(false);
         });
-
+        
         // Clean up listener on unmount
         return () => unsubscribe();
       } catch (error) {
@@ -62,7 +70,7 @@ const ActiveOrders = () => {
         setLoading(false);
       }
     };
-
+  
     fetchActiveOrders();
   }, []);
 

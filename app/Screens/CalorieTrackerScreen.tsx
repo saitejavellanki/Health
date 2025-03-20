@@ -9,6 +9,7 @@ import {
   ScrollView,
   Animated,
   Pressable,
+  BackHandler,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Feather from 'react-native-vector-icons/Feather';
@@ -56,6 +57,29 @@ export default function CalorieTrackerScreen() {
   const nutritionScaleAnim = useRef(new Animated.Value(0.8)).current;
   const tickScaleAnim = useRef(new Animated.Value(0)).current;
   const tickOpacityAnim = useRef(new Animated.Value(0)).current;
+
+  // Add Android back button handler
+  useEffect(() => {
+    const backAction = () => {
+      // If we're viewing an image analysis, close it
+      if (image) {
+        closeAnalysis();
+        return true; // Prevent default behavior
+      }
+      // Otherwise, navigate to the tabs screen
+      router.push('/(tabs)');
+      return true; // Prevent default behavior
+    };
+
+    // Add the event listener
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    // Clean up the event listener on component unmount
+    return () => backHandler.remove();
+  }, [image]);
 
   // Run animations when results are loaded
   useEffect(() => {
