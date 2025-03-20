@@ -18,6 +18,7 @@ export default function OrderComponent() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [productCategories, setProductCategories] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [isInServiceArea, setIsInServiceArea] = useState(false);
   
   // Define default styles as a fallback
   const defaultStyles = StyleSheet.create({
@@ -30,6 +31,29 @@ export default function OrderComponent() {
   
   // Use imported styles with fallback to default styles
   const styleToUse = styles || defaultStyles;
+  
+  // Gachibowli, Hyderabad coordinates
+  const GACHIBOWLI_COORDS = {
+    latitude: 17.4400,
+    longitude: 78.3489
+  };
+  
+  // Service radius in kilometers
+  const SERVICE_RADIUS = 10;
+  
+  // Function to calculate distance between two coordinates in km (using Haversine formula)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c; // Distance in km
+    return distance;
+  };
   
   // ======== DATA FETCHING WITH CACHE ========
   useEffect(() => {
@@ -125,6 +149,18 @@ export default function OrderComponent() {
         let location = await Location.getCurrentPositionAsync({});
         setLocation(location);
         
+        // Check if user is within service area
+        const distance = calculateDistance(
+          location.coords.latitude,
+          location.coords.longitude,
+          GACHIBOWLI_COORDS.latitude,
+          GACHIBOWLI_COORDS.longitude
+        );
+        
+        setIsInServiceArea(distance <= SERVICE_RADIUS);
+        console.log(`Distance from Gachibowli: ${distance.toFixed(2)} km`);
+        console.log(`In service area: ${distance <= SERVICE_RADIUS}`);
+        
         // Reverse geocode to get address
         let geocode = await Location.reverseGeocodeAsync({
           latitude: location.coords.latitude,
@@ -159,6 +195,18 @@ export default function OrderComponent() {
     try {
       let location = await Location.getCurrentPositionAsync({});
       setLocation(location);
+      
+      // Check if user is within service area
+      const distance = calculateDistance(
+        location.coords.latitude,
+        location.coords.longitude,
+        GACHIBOWLI_COORDS.latitude,
+        GACHIBOWLI_COORDS.longitude
+      );
+      
+      setIsInServiceArea(distance <= SERVICE_RADIUS);
+      console.log(`Distance from Gachibowli: ${distance.toFixed(2)} km`);
+      console.log(`In service area: ${distance <= SERVICE_RADIUS}`);
       
       let geocode = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
@@ -237,7 +285,7 @@ export default function OrderComponent() {
   };
   
   const priceInfo = calculateTotal();
-  const canProceed = totalItems > 0;
+  const canProceed = totalItems > 0 && isInServiceArea;
   
   let locationText = 'Fetching your location...';
   if (errorMsg) {
@@ -282,6 +330,7 @@ export default function OrderComponent() {
             <Pressable
               style={styleToUse.addButton}
               onPress={() => handleAddToCart(item.id)}
+              disabled={!isInServiceArea}
             >
               <Plus size={16} color="#fff" />
             </Pressable>
@@ -309,13 +358,52 @@ export default function OrderComponent() {
     }
   };
 
+  // ======== COMING SOON MESSAGE ========
+  const renderComingSoonMessage = () => (
+    <View style={{
+      padding: 20,
+      margin: 20,
+      backgroundColor: '#f8fafc',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#cbd5e1',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <Text style={{
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#22c55e',
+        marginBottom: 10,
+        textAlign: 'center'
+      }}>
+        Coming Soon!
+      </Text>
+      <Text style={{
+        fontSize: 16,
+        color: '#64748b',
+        textAlign: 'center',
+        marginBottom: 15
+      }}>
+        We're not yet available in your area. Currently, we're only serving within a 10 km radius of Gachibowli, Hyderabad.
+      </Text>
+      <Text style={{
+        fontSize: 14,
+        color: '#94a3b8',
+        textAlign: 'center'
+      }}>
+        We're expanding soon! Stay tuned for updates.
+      </Text>
+    </View>
+  );
+
   // ======== MAIN RENDER ========
   return (
     <ScrollView style={styleToUse.container}>
       {/* Real-time Location Header */}
       <View style={styleToUse.locationContainer}>
         <View style={styleToUse.locationHeader}>
-          <MapPin size={20} color="#22c55e" />
+          <MapPin size={20} color={isInServiceArea ? "#22c55e" : "#ef4444"} />
           <View style={styleToUse.locationInfo}>
             <Text style={styleToUse.locationTitle}>
               {loading ? 'Detecting location...' : 'Deliver to current location'}
@@ -348,82 +436,89 @@ export default function OrderComponent() {
         </Text>
       </View>
       
-      {/* Items Section */}
-      <View style={styleToUse.section}>
-        <View style={styleToUse.sectionHeaderRow}>
-          <Text style={styleToUse.sectionTitle}>Items</Text>
-          <Text style={styleToUse.itemsSelectedText}>
-            {totalItems} items selected
-          </Text>
-        </View>
-        
-        {loadingProducts ? (
-          <View style={styleToUse.loadingProductsContainer}>
-            <ActivityIndicator size="large" color="#22c55e" />
-            <Text style={styleToUse.loadingText}>Loading products...</Text>
-          </View>
-        ) : (
-          productCategories.map((category) => (
-            <View key={category.id} style={styleToUse.categoryContainer}>
-              <Text style={styleToUse.categoryTitle}>{category.title}</Text>
-              <FlatList
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                data={category.products}
-                renderItem={renderProductItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styleToUse.productList}
-              />
+      {/* Service Area Check */}
+      {!loading && !isInServiceArea ? (
+        renderComingSoonMessage()
+      ) : (
+        <>
+          {/* Items Section */}
+          <View style={styleToUse.section}>
+            <View style={styleToUse.sectionHeaderRow}>
+              <Text style={styleToUse.sectionTitle}>Items</Text>
+              <Text style={styleToUse.itemsSelectedText}>
+                {totalItems} items selected
+              </Text>
             </View>
-          ))
-        )}
-      </View>
-
-      {/* Order Summary - Only show if items in cart */}
-      {totalItems > 0 && (
-        <View style={styleToUse.summaryContainer}>
-          <Text style={styleToUse.summaryTitle}>Order Summary</Text>
-          <View style={styleToUse.summaryRow}>
-            <Text style={styleToUse.summaryLabel}>Subtotal ({totalItems} items)</Text>
-            <Text style={styleToUse.summaryValue}>₹{priceInfo.subtotal}</Text>
+            
+            {loadingProducts ? (
+              <View style={styleToUse.loadingProductsContainer}>
+                <ActivityIndicator size="large" color="#22c55e" />
+                <Text style={styleToUse.loadingText}>Loading products...</Text>
+              </View>
+            ) : (
+              productCategories.map((category) => (
+                <View key={category.id} style={styleToUse.categoryContainer}>
+                  <Text style={styleToUse.categoryTitle}>{category.title}</Text>
+                  <FlatList
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    data={category.products}
+                    renderItem={renderProductItem}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styleToUse.productList}
+                  />
+                </View>
+              ))
+            )}
           </View>
-          
-          {parseFloat(priceInfo.savings) > 0 && (
-            <View style={styleToUse.summaryRow}>
-              <Text style={styleToUse.savingsLabel}>Savings</Text>
-              <Text style={styleToUse.savingsValue}>-₹{priceInfo.savings}</Text>
+
+          {/* Order Summary - Only show if items in cart */}
+          {totalItems > 0 && (
+            <View style={styleToUse.summaryContainer}>
+              <Text style={styleToUse.summaryTitle}>Order Summary</Text>
+              <View style={styleToUse.summaryRow}>
+                <Text style={styleToUse.summaryLabel}>Subtotal ({totalItems} items)</Text>
+                <Text style={styleToUse.summaryValue}>₹{priceInfo.subtotal}</Text>
+              </View>
+              
+              {parseFloat(priceInfo.savings) > 0 && (
+                <View style={styleToUse.summaryRow}>
+                  <Text style={styleToUse.savingsLabel}>Savings</Text>
+                  <Text style={styleToUse.savingsValue}>-₹{priceInfo.savings}</Text>
+                </View>
+              )}
+              
+              <View style={[styleToUse.summaryRow, styleToUse.totalRow]}>
+                <Text style={styleToUse.totalLabel}>Total</Text>
+                <Text style={styleToUse.totalValue}>₹{priceInfo.total}</Text>
+              </View>
             </View>
           )}
-          
-          <View style={[styleToUse.summaryRow, styleToUse.totalRow]}>
-            <Text style={styleToUse.totalLabel}>Total</Text>
-            <Text style={styleToUse.totalValue}>₹{priceInfo.total}</Text>
-          </View>
-        </View>
-      )}
 
-      {/* Footer with Order Button */}
-      <View style={styleToUse.footer}>
-        <Pressable
-          style={[
-            styleToUse.button, 
-            !canProceed && styleToUse.buttonDisabled
-          ]}
-          disabled={!canProceed}
-          onPress={handleOrderNow}
-        >
-          <Text style={[
-            styleToUse.buttonText, 
-            !canProceed && styleToUse.buttonTextDisabled
-          ]}>
-            Order Now (₹{priceInfo.total})
-          </Text>
-          <ChevronRight 
-            size={20} 
-            color={canProceed ? '#fff' : '#94a3b8'} 
-          />
-        </Pressable>
-      </View>
+          {/* Footer with Order Button */}
+          <View style={styleToUse.footer}>
+            <Pressable
+              style={[
+                styleToUse.button, 
+                !canProceed && styleToUse.buttonDisabled
+              ]}
+              disabled={!canProceed}
+              onPress={handleOrderNow}
+            >
+              <Text style={[
+                styleToUse.buttonText, 
+                !canProceed && styleToUse.buttonTextDisabled
+              ]}>
+                {isInServiceArea ? `Order Now (₹${priceInfo.total})` : "Not Available In Your Area"}
+              </Text>
+              <ChevronRight 
+                size={20} 
+                color={canProceed ? '#fff' : '#94a3b8'} 
+              />
+            </Pressable>
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }

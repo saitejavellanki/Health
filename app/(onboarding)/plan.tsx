@@ -169,6 +169,9 @@ const parseDailyPlan = (planText) => {
 };
 
 const createPrompt = (userData) => {
+  // Log the raw userData coming in
+  console.log('createPrompt received userData:', JSON.stringify(userData, null, 2));
+  
   // Default values for userData to prevent undefined errors
   const userDataDefaults = {
     goals: [],
@@ -191,25 +194,28 @@ const createPrompt = (userData) => {
     ...userData,
     preferences: {
       ...userDataDefaults.preferences,
-      ...userData?.preferences
+      ...(userData?.preferences || {})
     },
     height: {
       ...userDataDefaults.height,
-      ...userData?.height
+      ...(userData?.height || {})
     },
     dateOfBirth: {
       ...userDataDefaults.dateOfBirth,
-      ...userData?.dateOfBirth
+      ...(userData?.dateOfBirth || {})
     },
     budget: {
       ...userDataDefaults.budget,
-      ...userData?.budget
+      ...(userData?.budget || {})
     }
   };
+  
+  // Log the processed safeUserData after defaults are applied
+  console.log('After applying defaults:', JSON.stringify(safeUserData, null, 2));
 
   const goal =
     safeUserData.goals && safeUserData.goals.length > 0
-      ? safeUserData.goals[0]?.title
+      ? safeUserData.goals[0]?.title || 'health improvement'
       : 'health improvement';
 
   const targetWeight =
@@ -226,67 +232,99 @@ const createPrompt = (userData) => {
   const diet = safeUserData.preferences?.diet || 'balanced';
   const allergies = safeUserData.preferences?.allergies?.join(',') || 'none';
   const state = safeUserData.preferences?.state || 'general South Indian';
-  const currentWeight = safeUserData.weight || null;
+  const currentWeight = safeUserData.weight || 70;
 
   const weightContext =
     currentWeight && targetWeight
       ? `Current weight: ${currentWeight}kg, target: ${targetWeight}kg. `
       : '';
 
+  // Calculate BMR (Basal Metabolic Rate)
   let bmr = 0;
   if (safeUserData.gender === 'female') {
     bmr =
       655.1 +
-      9.563 * safeUserData.weight +
-      1.85 * safeUserData.height['totalInches'] * 2.54 -
-      4.676 * safeUserData.dateOfBirth['age'];
+      9.563 * currentWeight +
+      1.85 * (safeUserData.height?.totalInches || 65) * 2.54 -
+      4.676 * (safeUserData.dateOfBirth?.age || 30);
   } else {
     bmr =
       66.47 +
-      13.75 * safeUserData.weight +
-      5.003 * safeUserData.height['totalInches'] * 2.54 -
-      6.755 * safeUserData.dateOfBirth['age'];
+      13.75 * currentWeight +
+      5.003 * (safeUserData.height?.totalInches || 65) * 2.54 -
+      6.755 * (safeUserData.dateOfBirth?.age || 30);
   }
 
-  let act_fac = 1.2; // Default value
-  if (safeUserData.workoutFrequency === 'none') {
-    act_fac = 1.2;
-  } else if (safeUserData.workoutFrequency === 'light') {
-    act_fac = 1.375;
-  } else if (safeUserData.workoutFrequency === 'moderate') {
-    act_fac = 1.55;
-  } else if (safeUserData.workoutFrequency === 'active') {
-    act_fac = 1.725;
-  } else if (safeUserData.workoutFrequency === 'intense') {
-    act_fac = 1.9;
+  // Activity factor based on workout frequency
+  const activityFactors = {
+    none: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    active: 1.725,
+    intense: 1.9
+  };
+  
+  const activityFactor = activityFactors[safeUserData.workoutFrequency] || 1.2;
+  
+  // Calculate TDEE (Total Daily Energy Expenditure)
+  let tdee = bmr * activityFactor;
+  let adjustedTdee = tdee;
+
+  // After calculating adjustedTdee
+  const updateUserCalories = async (userId, adjustedTdee) => {
+    try {
+      const userDocRef = doc(db, 'users', userId);
+      await updateDoc(userDocRef, {
+        targetCalories: adjustedTdee
+      });
+      console.log('Target calories updated successfully!');
+    } catch (error) {
+      console.error('Error updating target calories:', error);
+    }
+  };
+
+  adjustedTdee = Math.round(adjustedTdee);
+  // Update the user's targetCalories field
+  if (userData && userData.uid) {
+    updateUserCalories(userData.uid, adjustedTdee);
   }
 
-  let tdde = bmr * act_fac;
-  let new_tdde = tdde; // Default to tdde
-
-  // Check if goals exist before accessing
+  console.log('Calculated TDEE:', tdee);
+  console.log('Adjusted TDEE:', adjustedTdee);
+  
+  // Adjust TDEE based on goals
   if (safeUserData.goals && safeUserData.goals.length > 0) {
+    console.log('Goal for TDEE adjustment:', safeUserData.goals[0].title);
     if (safeUserData.goals[0].title === 'Weight Gain') {
-      new_tdde = tdde + 200;
-    } else if (safeUserData.goals[0].title === 'Weight Loss') { // Fixed from 'Weight Gain'
-      new_tdde = tdde - 500;
-      if (new_tdde < 1500 && safeUserData.gender === 'male') {
-        new_tdde = 1500;
-      } else if (new_tdde < 1200 && safeUserData.gender === 'female') {
-        new_tdde = 1200;
+      adjustedTdee = tdee + 200;
+    } else if (safeUserData.goals[0].title === 'Weight Loss') {
+      adjustedTdee = tdee - 500;
+      
+      // Ensure minimum healthy calorie intake
+      if (safeUserData.gender === 'male' && adjustedTdee < 1500) {
+        adjustedTdee = 1500;
+      } else if (safeUserData.gender === 'female' && adjustedTdee < 1200) {
+        adjustedTdee = 1200;
       }
     }
   }
+  
+  // Ensure minimum 2000 calories as requested
+  if (adjustedTdee < 2000) {
+    adjustedTdee = 2000;
+  }
+  
+  // Round to nearest whole number for cleaner display
+  adjustedTdee = Math.round(adjustedTdee);
+  
+  console.log('Final adjusted TDEE:', adjustedTdee);
 
-  console.log('tdde: ' + tdde);
-  console.log('new_tdde: ' + new_tdde);
-
-  return `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} 
+  const finalPrompt = `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} 
   with Indian food specific to ${state} region. Allergies: ${allergies}. 
-  Calorie intake target per day should be almost equal to: ${new_tdde}, the difference between the total given calories per day and ${new_tdde} should not exceed 100 calories. 
+  Calorie intake target per day should be almost equal to: ${adjustedTdee}, the difference between the total given calories per day and ${adjustedTdee} should not exceed 100 calories. 
   Monthly budget: ${safeUserData.budget.amount} INR. 
 
-DO NOT include ragi, jowar, quinoa or any foods that are not found/user much in metro cities, in any meal suggestions.
+DO NOT include ragi, jowar, quinoa, puttu or any foods that are not found/used much in metro cities, in any meal suggestions.
 
 For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
 
@@ -300,8 +338,13 @@ Tracking: [simple tip for monitoring progress]
 
 Keep each section brief - 1-2 sentences maximum. Focus on actionable items. All suggestions should be familiar, common, and easy-to-eat ${state}-style South Indian cuisine options that locals regularly consume. Only include dishes and ingredients that are widely available and commonly prepared in households in the ${state} region, tailored to the user's diet and allergies.
 
-The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${tdde}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.`;
+The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${adjustedTdee}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.`;
+
+  console.log('Generated prompt:', finalPrompt);
+  
+  return finalPrompt;
 };
+
 
 const { width } = Dimensions.get('window');
 const isMobile = width < 768;
@@ -333,6 +376,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
 
             if (userDoc.exists()) {
               const userData = userDoc.data();
+              console.log('Firebase user data:', JSON.stringify(userData));
               setUserData({
                 ...userData,
                 uid: user.uid,
@@ -382,8 +426,16 @@ const PlanScreen = ({ userData: propUserData, route }) => {
   }, [rawPlan]);
 
   const generatePlan = async () => {
+
+    console.log('Generating plan with userData:', JSON.stringify(userData));
+
     if (!userData) {
       setErrorMessage('User data not available. Please try again later.');
+      return;
+    }
+
+    if (!userData.goals || !userData.preferences) {
+      setErrorMessage('Your profile is incomplete. Please update your profile first.');
       return;
     }
 

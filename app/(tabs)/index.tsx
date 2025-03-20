@@ -11,6 +11,7 @@ import {
   Timestamp,
   updateDoc,
   doc,
+  getDoc,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { router } from 'expo-router';
@@ -133,6 +134,25 @@ export default function Home() {
         }
 
         const db = getFirestore();
+        
+        // First, fetch the user document to get targetCalories
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          
+          // Check if targetCalories exists in the user document
+          if (userData.targetCalories) {
+            console.log('Using target calories from user collection:', userData.targetCalories);
+            setTargetCalories(userData.targetCalories);
+          } else {
+            console.log('No targetCalories found in user document, will calculate later');
+          }
+        } else {
+          console.log('User document not found');
+        }
+
         const userPlansRef = collection(db, 'userplans');
         const q = query(userPlansRef, where('userId', '==', currentUser.uid));
 
@@ -151,64 +171,67 @@ export default function Home() {
         setUserPlanDocId(userPlanDoc.id);
         setUserGoal(userPlanData.goal || '');
 
-        // Get or set target calories
-        if (userPlanData.targetCalories) {
-          console.log(
-            'Using existing target calories:',
-            userPlanData.targetCalories
-          );
-          setTargetCalories(userPlanData.targetCalories);
-        } else {
-          try {
-            console.log('Getting personalized calorie recommendation');
-            // Get personalized calorie recommendation
-            const personalizedCalories = await getPersonalizedCalories({
-              goal: userPlanData.goal,
-              gender: userPlanData.gender,
-              age: userPlanData.age,
-              weight: userPlanData.weight,
-              weightUnit: userPlanData.weightUnit,
-              height: userPlanData.height,
-              heightUnit: userPlanData.heightUnit,
-              activityLevel: userPlanData.activityLevel || 'Moderate',
-            });
-
+        // If targetCalories wasn't found in the user document, calculate it
+        if (!userDocSnap.exists() || !userDocSnap.data().targetCalories) {
+          // Get or set target calories
+          if (userPlanData.targetCalories) {
             console.log(
-              'Personalized calories recommended:',
-              personalizedCalories
+              'Using existing target calories from userplan:',
+              userPlanData.targetCalories
             );
-            setTargetCalories(personalizedCalories);
-
-            // Update the user plan with personalized target calories
+            setTargetCalories(userPlanData.targetCalories);
+          } else {
             try {
-              await updateDoc(doc(db, 'userplans', userPlanDoc.id), {
-                targetCalories: personalizedCalories,
+              console.log('Getting personalized calorie recommendation');
+              // Get personalized calorie recommendation
+              const personalizedCalories = await getPersonalizedCalories({
+                goal: userPlanData.goal,
+                gender: userPlanData.gender,
+                age: userPlanData.age,
+                weight: userPlanData.weight,
+                weightUnit: userPlanData.weightUnit,
+                height: userPlanData.height,
+                heightUnit: userPlanData.heightUnit,
+                activityLevel: userPlanData.activityLevel || 'Moderate',
               });
+
               console.log(
-                'Updated user plan with personalized target calories'
+                'Personalized calories recommended:',
+                personalizedCalories
               );
-            } catch (error) {
-              console.error('Error updating target calories:', error);
-            }
-          } catch (error) {
-            // Fallback to default calculation
-            console.error(
-              'Error in personalized calorie calculation, falling back to default:',
-              error
-            );
-            const goalBasedCalories = getDefaultCaloriesForGoal(
-              userPlanData.goal
-            );
-            setTargetCalories(goalBasedCalories);
+              setTargetCalories(personalizedCalories);
 
-            // Update with default values
-            try {
-              await updateDoc(doc(db, 'userplans', userPlanDoc.id), {
-                targetCalories: goalBasedCalories,
-              });
-              console.log('Updated user plan with default target calories');
+              // Update the user document with personalized target calories
+              try {
+                await updateDoc(userDocRef, {
+                  targetCalories: personalizedCalories,
+                });
+                console.log(
+                  'Updated user document with personalized target calories'
+                );
+              } catch (error) {
+                console.error('Error updating target calories in user document:', error);
+              }
             } catch (error) {
-              console.error('Error updating target calories:', error);
+              // Fallback to default calculation
+              console.error(
+                'Error in personalized calorie calculation, falling back to default:',
+                error
+              );
+              const goalBasedCalories = getDefaultCaloriesForGoal(
+                userPlanData.goal
+              );
+              setTargetCalories(goalBasedCalories);
+
+              // Update user document with default values
+              try {
+                await updateDoc(userDocRef, {
+                  targetCalories: goalBasedCalories,
+                });
+                console.log('Updated user document with default target calories');
+              } catch (error) {
+                console.error('Error updating target calories in user document:', error);
+              }
             }
           }
         }
@@ -393,7 +416,7 @@ export default function Home() {
         calories: nutritionData.calories.toString(),
         protein: nutritionData.protein.toString(),
         fat: nutritionData.fat.toString(),
-        carbohydrates: nutritionData.carbohydrates.toString(), // Add this line
+        carbohydrates: nutritionData.carbohydrates.toString(),
         targetCalories: targetCalories.toString(),
       },
     });
@@ -489,7 +512,6 @@ export default function Home() {
       )}
 
       {/* Nutrition Stats */}
-      {/* Nutrition Stats */}
       <Pressable
         style={[
           styles.statsContainer,
@@ -522,7 +544,7 @@ export default function Home() {
       {/* Track Button */}
       <View style={styles.trackButtonContainer}>
         <Pressable
-          style={[styles.trackButton, { width: '75%' }]} // Add width: '75%' here
+          style={[styles.trackButton, { width: '75%' }]}
           onPress={navigateToTracker}
           android_ripple={{ color: '#e6f7ef' }}
         >
@@ -536,19 +558,13 @@ export default function Home() {
         </Pressable>
 
         <Pressable
-          style={[styles.trackButton, { width: '22%' }]} // Create memory button with remaining space
+          style={[styles.trackButton, { width: '22%' }]}
           onPress={() => router.push('/Screens/MemoryGalleryScreen')}
           android_ripple={{ color: '#e6f7ef' }}
         >
           <Feather name="image" size={18} color="#ffffff" />
         </Pressable>
       </View>
-      {/* <View style={styles.StreakContainer}>
-        <StreakComp />
-      </View> */}
-
-      {/* Diet & Exercise Section - Only show when not in nutrition-only mode */}
-      {/*  */}
 
       {/* Tracking Section - Always show regardless of mode */}
       <View style={styles.section}>
