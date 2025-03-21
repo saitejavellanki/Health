@@ -1,18 +1,117 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, Easing } from 'react-native';
+import { doc, getDoc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { db, auth } from '../../components/firebase/Firebase';
 
-// Simplified version without external dependencies
+// Simplified version with Firebase integration
 const WaterTrackingComponent = () => {
   const [waterIntake, setWaterIntake] = useState(0);
   const [waterGoal, setWaterGoal] = useState(8); // Default 8 glasses
+  const [userId, setUserId] = useState(null);
+  const [lastUpdatedDate, setLastUpdatedDate] = useState('');
   const waveAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  
+  // Local cache to reduce Firestore reads
+  const waterDataRef = useRef({
+    intake: 0,
+    goal: 8,
+    lastUpdated: ''
+  });
+  
+  // Unsubscribe reference for cleanup
+  const unsubscribeRef = useRef(null);
 
   useEffect(() => {
-    // Initialize with mock data
-    setWaterIntake(3); // Mock initial data
-    startWaveAnimation();
+    // Check if user is logged in
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      setUserId(currentUser.uid);
+      
+      // Get today's date in YYYY-MM-DD format for date comparison
+      const today = new Date().toISOString().split('T')[0];
+      setLastUpdatedDate(today);
+      
+      // Initial fetch of water data from Firestore
+      fetchWaterData(currentUser.uid, today);
+    }
+    
+    return () => {
+      // Clean up listener when component unmounts
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
   }, []);
+
+  // Fetch water tracking data and set up listener for the current day only
+  const fetchWaterData = async (uid, today) => {
+    try {
+      const userDocRef = doc(db, 'users', uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        // Check if water tracking data exists and if it's from today
+        if (userData.waterTracking && userData.waterTracking.lastUpdated === today) {
+          // Use today's data
+          waterDataRef.current = userData.waterTracking;
+          setWaterIntake(userData.waterTracking.intake);
+          setWaterGoal(userData.waterTracking.goal || 8);
+        } else {
+          // It's a new day, reset the water intake but keep the goal
+          const newWaterData = {
+            intake: 0,
+            goal: userData.waterTracking?.goal || 8,
+            lastUpdated: today
+          };
+          
+          // Update Firestore with the reset data for new day
+          await updateDoc(userDocRef, { waterTracking: newWaterData });
+          waterDataRef.current = newWaterData;
+          setWaterIntake(0);
+          setWaterGoal(newWaterData.goal);
+        }
+      } else {
+        // Create new user document with default water tracking data
+        const newWaterData = {
+          intake: 0,
+          goal: 8,
+          lastUpdated: today
+        };
+        
+        await setDoc(userDocRef, { 
+          waterTracking: newWaterData,
+          createdAt: new Date()
+        });
+        
+        waterDataRef.current = newWaterData;
+      }
+      
+      // Set up real-time listener for changes (only during active sessions)
+      // This is useful if the user has multiple devices
+      unsubscribeRef.current = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          const userData = doc.data();
+          // Only update state if data is different to avoid unnecessary renders
+          if (userData.waterTracking && 
+              (userData.waterTracking.intake !== waterDataRef.current.intake ||
+               userData.waterTracking.goal !== waterDataRef.current.goal)) {
+            waterDataRef.current = userData.waterTracking;
+            setWaterIntake(userData.waterTracking.intake);
+            setWaterGoal(userData.waterTracking.goal || 8);
+          }
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error fetching water data:', error);
+    }
+    
+    // Start animation regardless of data fetch result
+    startWaveAnimation();
+  };
 
   useEffect(() => {
     // Trigger wave and scale animation when water intake changes
@@ -51,12 +150,73 @@ const WaterTrackingComponent = () => {
     ).start();
   };
 
+  // Debounce timer to batch Firestore updates
+  const updateTimerRef = useRef(null);
+  
   const updateWaterIntake = (amount) => {
+    if (!userId) return;
+    
+    // Get today's date to check if we need to reset
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Check if the date has changed since last update
+    if (lastUpdatedDate !== today) {
+      // It's a new day, reset the intake
+      setWaterIntake(amount > 0 ? amount : 0);
+      setLastUpdatedDate(today);
+      
+      // Update Firestore with reset data
+      const newWaterData = {
+        intake: amount > 0 ? amount : 0,
+        goal: waterGoal,
+        lastUpdated: today
+      };
+      
+      updateFirestore(newWaterData);
+      return;
+    }
+    
+    // Calculate new intake value with bounds
     const newIntake = Math.max(0, Math.min(waterGoal + 2, waterIntake + amount));
+    
+    // Update local state immediately for UI responsiveness
     setWaterIntake(newIntake);
     
-    // In a real app, this is where you would save to AsyncStorage or another local storage option
-    console.log('Water intake updated:', newIntake);
+    // Batch Firestore updates using debounce pattern
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
+    }
+    
+    updateTimerRef.current = setTimeout(() => {
+      // Update Firestore after a delay to batch frequent updates
+      const waterData = {
+        intake: newIntake,
+        goal: waterGoal,
+        lastUpdated: today
+      };
+      
+      updateFirestore(waterData);
+    }, 1500); // Debounce for 1.5 seconds
+  };
+  
+  // Function to update Firestore with minimal writes
+  const updateFirestore = async (waterData) => {
+    try {
+      // Only update if data has changed
+      if (waterDataRef.current.intake !== waterData.intake || 
+          waterDataRef.current.goal !== waterData.goal ||
+          waterDataRef.current.lastUpdated !== waterData.lastUpdated) {
+        
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, { waterTracking: waterData });
+        
+        // Update local cache
+        waterDataRef.current = waterData;
+        console.log('Water intake updated in Firestore:', waterData);
+      }
+    } catch (error) {
+      console.error('Error updating water data:', error);
+    }
   };
 
   // Calculate water percentage
