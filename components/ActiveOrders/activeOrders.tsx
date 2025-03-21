@@ -11,7 +11,8 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import {setupActiveOrderNotifications} from '../Notification/OrderStatus-notification-service'
+import {setupActiveOrderNotifications} from '../Notification/OrderStatus-notification-service';
+import * as Notifications from 'expo-notifications'; 
 
 const ActiveOrders = () => {
   const [activeOrders, setActiveOrders] = useState([]);

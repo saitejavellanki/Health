@@ -12,7 +12,7 @@ const AFTERNOON_REMINDER_TASK = 'AFTERNOON_REMINDER_TASK';
 
 // Define the morning and afternoon hours in 24-hour format
 const MORNING_HOUR = 9; // 9 AM
-const AFTERNOON_HOUR = 15; // 3 PM
+const AFTERNOON_HOUR = 19; // 3 PM
 
 /**
  * Register background tasks for meal tracking reminders

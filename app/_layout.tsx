@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Stack, SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, StyleSheet, Platform } from 'react-native';
+
 import {
   useFonts,
   Inter_400Regular,
@@ -18,6 +18,9 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../components/firebase/Firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { app } from '../components/firebase/Firebase';
+
+import * as Notifications from 'expo-notifications';
+import { View, Text, StyleSheet } from 'react-native';
 
 console.log("Firebase app initialized status:", !!app);
 // Prevent auto-hiding the splash screen
@@ -210,43 +213,3 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({
-  debugOverlay: {
-    position: 'absolute',
-    bottom: 50,
-    left: 10,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    padding: 10,
-    borderRadius: 8,
-    zIndex: 9999,
-  },
-  debugTitle: {
-    color: 'white',
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  debugStatus: {
-    color: '#00ff00',
-    marginBottom: 5,
-  },
-  debugToken: {
-    color: '#ffffff',
-    fontSize: 10,
-    marginTop: 5,
-  },
-  debugNoToken: {
-    color: '#ff6666',
-    fontStyle: 'italic',
-  },
-  debugDeviceId: {
-    color: '#aaaaff',
-    fontSize: 10,
-    marginTop: 5,
-  },
-  debugMealNotifications: {
-    color: '#ffaa00',
-    fontSize: 10,
-    marginTop: 5,
-  }
-});
