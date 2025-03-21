@@ -83,6 +83,20 @@ const ProfileScreen: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  // Helper function to check if user data is complete
+  const isUserDataComplete = (data: UserData | null): boolean => {
+    if (!data) return false;
+
+    // Check if essential profile data exists
+    return (
+      !!data.height?.feet &&
+      !!data.height?.inches &&
+      !!data.weight &&
+      !!data.targetWeight &&
+      !!data.dateOfBirth?.age
+    );
+  };
+
   const getCachedUserData = async () => {
     try {
       const cachedData = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
@@ -152,6 +166,13 @@ const ProfileScreen: React.FC = () => {
 
         if (userDoc.exists()) {
           const firestoreData = userDoc.data();
+
+          // Check if essential data is missing
+          const isIncomplete =
+            !firestoreData.height ||
+            !firestoreData.weight ||
+            !firestoreData.targetWeight;
+
           const goals = firestoreData.goals || [];
 
           // Get targetWeight from first goal or fallback to root value
@@ -166,6 +187,7 @@ const ProfileScreen: React.FC = () => {
             goals,
             targetWeight,
             weight: firestoreData.weight || 70,
+            height: firestoreData.height || { feet: 0, inches: 0 },
           } as UserData;
 
           setUserData(data);
@@ -305,7 +327,7 @@ const ProfileScreen: React.FC = () => {
       setIsUploadingImage(false);
     }
   };
-
+  console.log(userData);
   // Function to toggle edit mode for a specific field
   const toggleEditMode = (field: string) => {
     setEditMode((prev) => ({
@@ -458,6 +480,9 @@ const ProfileScreen: React.FC = () => {
   const handleRegeneratePlan = () => {
     router.push('/(onboarding)/plan');
   };
+  const handleOnboarding = () => {
+    router.push('/(onboarding)');
+  };
 
   const handleLogout = async () => {
     try {
@@ -522,7 +547,7 @@ const ProfileScreen: React.FC = () => {
     );
   }
 
-  if (error || !userData) {
+  if (error || !userData || !isUserDataComplete(userData)) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <CircleHelp size={48} color="#FF6B6B" />
@@ -531,10 +556,24 @@ const ProfileScreen: React.FC = () => {
             marginTop: 12,
             fontFamily: 'Inter-Regular',
             color: '#FF6B6B',
+            textAlign: 'center',
+            paddingHorizontal: 20,
           }}
         >
-          {error || 'Unable to load profile'}
+          {error || 'Complete onboarding steps to view your profile'}
         </Text>
+        <TouchableOpacity
+          style={styles.completeOnboardingButton}
+          onPress={handleOnboarding}
+        >
+          <Text style={styles.completeOnboardingText}>
+            Complete Profile Setup
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <LogOut size={24} color="#ef4444" />
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -560,14 +599,16 @@ const ProfileScreen: React.FC = () => {
             <Image
               key={`profile-image-${profileImageKey}-${Date.now()}`}
               source={{
-                uri: userData.profileImage 
-                  ? `${userData.profileImage}?timestamp=${Date.now()}` 
+                uri: userData.profileImage
+                  ? `${userData.profileImage}?timestamp=${Date.now()}`
                   : 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1742205498/placeholder_for_dp_nsojeb.jpg',
                 cache: 'reload',
               }}
               style={styles.coverImage}
               resizeMode="cover"
-              onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
+              onError={(e) =>
+                console.log('Image loading error:', e.nativeEvent.error)
+              }
             />
 
             {/* Profile photo edit button */}
@@ -1478,6 +1519,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FFFFFF',
     fontWeight: '500',
+  },
+  // New styles for the onboarding prompt
+  completeOnboardingButton: {
+    backgroundColor: '#22c55e',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  completeOnboardingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
