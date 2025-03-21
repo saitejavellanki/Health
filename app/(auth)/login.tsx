@@ -105,8 +105,23 @@ export default function Login() {
       
       // Don't navigate here - let the AuthContext handle it
     } catch (err) {
-      setError(err.message || 'Failed to login. Please try again.');
-      Alert.alert('Login Error', err.message);
+      // Customize error message based on Firebase error code
+      let errorMessage = 'Failed to login. Please try again.';
+      
+      if (err.code === 'auth/invalid-credential' || 
+          err.code === 'auth/user-not-found' || 
+          err.code === 'auth/wrong-password') {
+        errorMessage = 'Invalid email or password. Please try again.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed login attempts. Please try again later.';
+      } else if (err.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled. Please contact support.';
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      setError(errorMessage);
+      Alert.alert('Login Failed', errorMessage);
     } finally {
       setLoading(false);
     }

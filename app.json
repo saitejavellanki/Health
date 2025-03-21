@@ -22,8 +22,15 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
-    ],
+  "expo-router",
+  [
+    "expo-notifications",
+    {
+      "icon": "./assets/images/icon.png",
+      "color": "#ffffff"
+    }
+  ]
+],
     "experiments": {
       "typedRoutes": true
     },
@@ -38,7 +45,7 @@
     "android": {
       "package": "com.tejvellank.boltexponativewind",
       "versionCode": 2,
-      
+      "googleServicesFile": "./google-services (4).json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"

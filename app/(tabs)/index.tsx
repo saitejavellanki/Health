@@ -20,6 +20,8 @@ import StreakComp from '@/components/UserStats/StreakComp';
 import NoPlanScreen from '../Utils/NoPlanScreen';
 import CrunchXLogo from '../Utils/Logo';
 import ActiveOrders from '@/components/ActiveOrders/activeOrders';
+import WaterTrackingComponent from '@/components/UserStats/WaterTrackingComponent';
+import React from 'react';
 
 // API configuration for Gemini
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -566,9 +568,12 @@ export default function Home() {
         </Pressable>
       </View>
 
+
       {/* Tracking Section - Always show regardless of mode */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tracking Focus</Text>
+        
+        <WaterTrackingComponent/>
 
         {!nutritionOnlyMode && (
           <View style={styles.trackingCard}>
