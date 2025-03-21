@@ -717,7 +717,7 @@ console.log('Sugars:', sugars);
                     color="#ffffff"
                     style={{ marginRight: 8 }}
                   />
-                  <Text style={styles.analyzeButtonText}>Analyze Food</Text>
+                  <Text style={styles.analyzeButtonText}>Retry</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
