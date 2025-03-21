@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, Modal, StyleSheet, FlatList } from 'react-native';
+import { View, Text, ScrollView, Pressable, Modal, StyleSheet, FlatList, Platform } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { useState, useEffect } from 'react';
 import {
@@ -11,6 +11,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import {setupActiveOrderNotifications} from '../Notification/OrderStatus-notification-service'
 
 const ActiveOrders = () => {
   const [activeOrders, setActiveOrders] = useState([]);
@@ -19,6 +20,8 @@ const ActiveOrders = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let notificationUnsubscribers = [];
+    
     const fetchActiveOrders = async () => {
       try {
         const auth = getAuth();
@@ -27,7 +30,7 @@ const ActiveOrders = () => {
         if (!currentUser) {
           console.log('No user logged in');
           setLoading(false);
-          return;
+          return () => {};
         }
   
         const db = getFirestore();
@@ -58,20 +61,53 @@ const ActiveOrders = () => {
           
           setActiveOrders(orders);
           setLoading(false);
+          
+          // Clean up previous notification listeners before setting up new ones
+          notificationUnsubscribers.forEach(unsubscribe => unsubscribe());
+          notificationUnsubscribers = setupActiveOrderNotifications(orders);
         }, (error) => {
           console.error('Error listening to orders:', error);
           setLoading(false);
         });
         
         // Clean up listener on unmount
-        return () => unsubscribe();
+        return unsubscribe;
       } catch (error) {
         console.error('Error fetching active orders:', error);
         setLoading(false);
+        return () => {};
       }
     };
   
-    fetchActiveOrders();
+    // Create Android notification channel if needed
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('order_updates', {
+        name: 'Order Updates',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#059669',
+      });
+    }
+  
+    const unsubscribePromise = fetchActiveOrders();
+    
+    return () => {
+      // Clean up order listener
+      if (unsubscribePromise && typeof unsubscribePromise.then === 'function') {
+        unsubscribePromise.then(unsubscribe => {
+          if (unsubscribe && typeof unsubscribe === 'function') {
+            unsubscribe();
+          }
+        });
+      }
+      
+      // Clean up notification listeners
+      notificationUnsubscribers.forEach(unsubscribe => {
+        if (unsubscribe && typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
+    };
   }, []);
 
   const getStatusColor = (status) => {

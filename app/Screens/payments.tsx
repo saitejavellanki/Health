@@ -10,6 +10,7 @@ import WebView from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { sendOrderConfirmationNotification } from '../../components/Notification/order-notification-service.js';
 
 // PayU configuration remains the same
 const PAYU_CONFIG = {
@@ -430,6 +431,21 @@ export default function PaymentScreen() {
         // Update order status in Firestore
         updateOrderStatus(paymentFormData.txnid, 'completed', response);
         
+        const orderDetails = {
+          orderId: paymentFormData.txnid,
+          orderNumber: paymentFormData.txnid.substring(4, 10), // Extract shorter version for notification
+          amount: paymentFormData.amount
+        };
+        
+        sendOrderConfirmationNotification(auth.currentUser.uid, orderDetails)
+          .then(success => {
+            if (!success) {
+              console.warn('Failed to send notification, but payment was successful');
+            }
+          })
+          .catch(error => {
+            console.error('Error sending notification:', error);
+          });
         // Redirect to confirmation after success
         setTimeout(() => {
           router.replace({
@@ -454,24 +470,37 @@ export default function PaymentScreen() {
   };
   
   // Update order status function
-  const updateOrderStatus = async (orderId, status, paymentDetails) => {
-    try {
-      // Find order by transaction ID
-      const ordersRef = collection(db, 'orders');
-      const querySnapshot = await getDocs(query(ordersRef, where('orderId', '==', orderId)));
+  // Update order status function
+const updateOrderStatus = async (orderId, status, paymentDetails) => {
+  try {
+    // Find order by transaction ID
+    const ordersRef = collection(db, 'orders');
+    const querySnapshot = await getDocs(query(ordersRef, where('orderId', '==', orderId)));
+    
+    if (!querySnapshot.empty) {
+      const orderDoc = querySnapshot.docs[0];
+      await updateDoc(orderDoc.ref, {
+        status,
+        paymentDetails,
+        updatedAt: new Date()
+      });
       
-      if (!querySnapshot.empty) {
-        const orderDoc = querySnapshot.docs[0];
-        await updateDoc(orderDoc.ref, {
-          status,
-          paymentDetails,
-          updatedAt: new Date()
-        });
+      // Send notification if payment completed
+      if (status === 'completed') {
+        const orderData = orderDoc.data();
+        const orderDetails = {
+          orderId: orderId,
+          orderNumber: orderId.substring(4, 10), // Extract shorter version for notification
+          amount: orderData.priceInfo.total
+        };
+        
+        await sendOrderConfirmationNotification(orderData.userId, orderDetails);
       }
-    } catch (error) {
-      console.error('Error updating order status:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error updating order status:', error);
+  }
+};
   
   const getDeliveryDetailsText = () => {
     if (orderType === 'one-time') {
