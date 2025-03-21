@@ -825,7 +825,7 @@ const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Diet & Nutrition</Text>
             <Apple size={20} color="#22c55e" />
@@ -892,7 +892,7 @@ const ProfileScreen: React.FC = () => {
               </Text>
             </View>
           </View>
-        </View>
+        </View> */}
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
