@@ -170,22 +170,25 @@ const parseDailyPlan = (planText) => {
 
 const createPrompt = (userData) => {
   // Log the raw userData coming in
-  console.log('createPrompt received userData:', JSON.stringify(userData, null, 2));
-  
+  console.log(
+    'createPrompt received userData:',
+    JSON.stringify(userData, null, 2)
+  );
+
   // Default values for userData to prevent undefined errors
   const userDataDefaults = {
     goals: [],
     preferences: {
       diet: 'balanced',
       allergies: [],
-      state: 'general South Indian'
+      state: 'general South Indian',
     },
     weight: 70,
     height: { totalInches: 65 },
     dateOfBirth: { age: 30 },
     gender: 'male',
     workoutFrequency: 'moderate',
-    budget: { amount: 5000 }
+    budget: { amount: 5000 },
   };
 
   // Merge defaults with provided userData
@@ -194,24 +197,27 @@ const createPrompt = (userData) => {
     ...userData,
     preferences: {
       ...userDataDefaults.preferences,
-      ...(userData?.preferences || {})
+      ...(userData?.preferences || {}),
     },
     height: {
       ...userDataDefaults.height,
-      ...(userData?.height || {})
+      ...(userData?.height || {}),
     },
     dateOfBirth: {
       ...userDataDefaults.dateOfBirth,
-      ...(userData?.dateOfBirth || {})
+      ...(userData?.dateOfBirth || {}),
     },
     budget: {
       ...userDataDefaults.budget,
-      ...(userData?.budget || {})
-    }
+      ...(userData?.budget || {}),
+    },
   };
-  
+
   // Log the processed safeUserData after defaults are applied
-  console.log('After applying defaults:', JSON.stringify(safeUserData, null, 2));
+  console.log(
+    'After applying defaults:',
+    JSON.stringify(safeUserData, null, 2)
+  );
 
   const goal =
     safeUserData.goals && safeUserData.goals.length > 0
@@ -261,11 +267,11 @@ const createPrompt = (userData) => {
     light: 1.375,
     moderate: 1.55,
     active: 1.725,
-    intense: 1.9
+    intense: 1.9,
   };
-  
+
   const activityFactor = activityFactors[safeUserData.workoutFrequency] || 1.2;
-  
+
   // Calculate TDEE (Total Daily Energy Expenditure)
   let tdee = bmr * activityFactor;
   let adjustedTdee = tdee;
@@ -275,7 +281,7 @@ const createPrompt = (userData) => {
     try {
       const userDocRef = doc(db, 'users', userId);
       await updateDoc(userDocRef, {
-        targetCalories: adjustedTdee
+        targetCalories: adjustedTdee,
       });
       console.log('Target calories updated successfully!');
     } catch (error) {
@@ -285,10 +291,10 @@ const createPrompt = (userData) => {
 
   adjustedTdee = Math.round(adjustedTdee);
   // Update the user's targetCalories field
- 
+
   console.log('Calculated TDEE:', tdee);
   console.log('Adjusted TDEE:', adjustedTdee);
-  
+
   // Adjust TDEE based on goals
   if (safeUserData.goals && safeUserData.goals.length > 0) {
     console.log('Goal for TDEE adjustment:', safeUserData.goals[0].title);
@@ -296,7 +302,7 @@ const createPrompt = (userData) => {
       adjustedTdee = tdee + 200;
     } else if (safeUserData.goals[0].title === 'Weight Loss') {
       adjustedTdee = tdee - 500;
-      
+
       // Ensure minimum healthy calorie intake
       if (safeUserData.gender === 'male' && adjustedTdee < 1500) {
         adjustedTdee = 1500;
@@ -305,12 +311,12 @@ const createPrompt = (userData) => {
       }
     }
   }
-  
+
   // // Ensure minimum 2000 calories as requested
   // if (adjustedTdee < 2000) {
   //   adjustedTdee = 2000;
   // }
-  
+
   // Round to nearest whole number for cleaner display
   adjustedTdee = Math.round(adjustedTdee);
 
@@ -318,12 +324,32 @@ const createPrompt = (userData) => {
     updateUserCalories(userData.uid, adjustedTdee);
   }
 
-  
   console.log('Final adjusted TDEE:', adjustedTdee);
+
+  //   const finalPrompt = `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet}
+  //   with Indian food specific to ${state} region. Allergies: ${allergies}.
+  //   Calorie intake target per day should be almost equal to: ${adjustedTdee}, the difference between the total given calories per day and ${adjustedTdee} should not exceed 100 calories.
+  //   Monthly budget: ${safeUserData.budget.amount} INR.
+
+  // DO NOT include ragi, jowar, quinoa, puttu or any foods that are not found/used much in metro cities, in any meal suggestions.
+
+  // For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
+
+  // Start with just the day name (e.g., "Monday")
+  // Exercise: [brief workout plan]
+  // Breakfast: [suggest additional food items to take along with breakfast, specifying how many calories (kcal) they provide at the end of the line]
+  // Snack: [suggest food items to take as snacks, specifying how many calories (kcal) they provide at the end of the line]
+  // Lunch: [suggest food items for lunch, specifying how many calories (kcal) they provide at the end of the line]
+  // Dinner: [suggest additional food items to take along with dinner, specifying how many calories (kcal) they provide at the end of the line]
+  // Tracking: [simple tip for monitoring progress]
+
+  // Keep each section brief - 1-2 sentences maximum. Focus on actionable items. All suggestions should be familiar, common, and easy-to-eat ${state}-style South Indian cuisine options that locals regularly consume. Only include dishes and ingredients that are widely available and commonly prepared in households in the ${state} region, tailored to the user's diet and allergies.
+
+  // The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${adjustedTdee}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.`;
 
   const finalPrompt = `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} 
   with Indian food specific to ${state} region. Allergies: ${allergies}. 
-  Calorie intake target per day should be almost equal to: ${adjustedTdee}, the difference between the total given calories per day and ${adjustedTdee} should not exceed 100 calories. 
+  Calorie intake target per day MUST be within 50 calories of ${adjustedTdee}. Ensure that the total calories from all meals and snacks add up to this target.
   Monthly budget: ${safeUserData.budget.amount} INR. 
 
 DO NOT include ragi, jowar, quinoa, puttu or any foods that are not found/used much in metro cities, in any meal suggestions.
@@ -332,21 +358,25 @@ For each day (Monday-Sunday), structure as follows with EXACTLY these section he
 
 Start with just the day name (e.g., "Monday")
 Exercise: [brief workout plan]
-Breakfast: [suggest additional food items to take along with breakfast, specifying how many calories (kcal) they provide at the end of the line]
-Snack: [suggest food items to take as snacks, specifying how many calories (kcal) they provide at the end of the line]
-Lunch: [suggest food items for lunch, specifying how many calories (kcal) they provide at the end of the line]
-Dinner: [suggest additional food items to take along with dinner, specifying how many calories (kcal) they provide at the end of the line]
+Breakfast : [suggest additional food items to take along with breakfast, specifying how many calories (kcal) they provide at the end of the line]
+Snack : [suggest food items to take as snacks, specifying how many calories (kcal) they provide at the end of the line]
+Lunch : [suggest food items for lunch, specifying how many calories (kcal) they provide at the end of the line]
+Dinner : [suggest additional food items to take along with dinner, specifying how many calories (kcal) they provide at the end of the line]
 Tracking: [simple tip for monitoring progress]
+
 
 Keep each section brief - 1-2 sentences maximum. Focus on actionable items. All suggestions should be familiar, common, and easy-to-eat ${state}-style South Indian cuisine options that locals regularly consume. Only include dishes and ingredients that are widely available and commonly prepared in households in the ${state} region, tailored to the user's diet and allergies.
 
-The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${adjustedTdee}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.`;
+The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${adjustedTdee}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.
+
+After the 7-day meal plan, include a "Weekly Summary" section that shows the total calories for each day and the average for the week, ensuring it aligns with the ${adjustedTdee} target.
+
+Remember to adhere strictly to the specified diet preferences, allergies, and budget constraints while meeting the calorie target.`;
 
   console.log('Generated prompt:', finalPrompt);
-  
+
   return finalPrompt;
 };
-
 
 const { width } = Dimensions.get('window');
 const isMobile = width < 768;
@@ -428,7 +458,6 @@ const PlanScreen = ({ userData: propUserData, route }) => {
   }, [rawPlan]);
 
   const generatePlan = async () => {
-
     console.log('Generating plan with userData:', JSON.stringify(userData));
 
     if (!userData) {
@@ -437,7 +466,9 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     }
 
     if (!userData.goals || !userData.preferences) {
-      setErrorMessage('Your profile is incomplete. Please update your profile first.');
+      setErrorMessage(
+        'Your profile is incomplete. Please update your profile first.'
+      );
       return;
     }
 
