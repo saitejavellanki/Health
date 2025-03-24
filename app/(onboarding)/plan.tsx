@@ -45,128 +45,120 @@ const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-const parseDailyPlan = (planText) => {
-  const days = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
-  const dailyPlans = [];
-
-  const lines = planText.split('\n');
-
-  let currentDay = null;
-  let currentPlan = null;
-
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    if (!trimmedLine) continue;
-
-    const dayMatch = days.find(
-      (day) =>
-        trimmedLine.startsWith(day) ||
-        trimmedLine.startsWith(`**${day}**`) ||
-        trimmedLine.startsWith(`# ${day}`)
-    );
-
-    if (dayMatch) {
-      if (currentDay && currentPlan) {
-        dailyPlans.push({
-          day: currentDay,
-          sections: currentPlan,
-        });
-      }
-
-      currentDay = dayMatch.replace(/[*#]/g, '').trim();
-      currentPlan = {
-        overview: [],
-        exercise: [],
-        breakfast: [],
-        lunch: [],
-        snack: [],
-        dinner: [],
-        tracking: [],
-      };
-    } else if (currentDay && currentPlan) {
-      if (
-        /^[-•*]?\s*(Exercise|Workout|Physical Activity|Fitness):/i.test(
-          trimmedLine
-        )
-      ) {
-        currentPlan.exercise.push(
-          trimmedLine
-            .replace(
-              /^[-•*]?\s*(Exercise|Workout|Physical Activity|Fitness):/i,
-              ''
-            )
-            .trim()
-        );
-      } else if (/^[-•*]?\s*(Breakfast|Morning):/i.test(trimmedLine)) {
-        currentPlan.breakfast.push(
-          trimmedLine.replace(/^[-•*]?\s*(Breakfast|Morning):/i, '').trim()
-        );
-      } else if (/^[-•*]?\s*(Lunch|Midday):/i.test(trimmedLine)) {
-        currentPlan.lunch.push(
-          trimmedLine.replace(/^[-•*]?\s*(Lunch|Midday):/i, '').trim()
-        );
-      } else if (/^[-•*]?\s*(Dinner|Evening):/i.test(trimmedLine)) {
-        currentPlan.dinner.push(
-          trimmedLine.replace(/^[-•*]?\s*(Dinner|Evening):/i, '').trim()
-        );
-      } else if (/^[-•*]?\s*(Snack|Snacks):/i.test(trimmedLine)) {
-        currentPlan.snack.push(
-          trimmedLine.replace(/^[-•*]?\s*(Snack|Snacks):/i, '').trim()
-        );
-      } else if (
-        /^[-•*]?\s*(Tracking|Monitoring|Progress|Tips|Mindfulness|Self-care):/i.test(
-          trimmedLine
-        )
-      ) {
-        currentPlan.tracking.push(
-          trimmedLine
-            .replace(
-              /^[-•*]?\s*(Tracking|Monitoring|Progress|Tips|Mindfulness|Self-care):/i,
-              ''
-            )
-            .trim()
-        );
-      } else {
-        currentPlan.overview.push(trimmedLine);
+  const parseDailyPlan = (planText) => {
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const dailyPlans = [];
+  
+    const lines = planText.split('\n');
+  
+    let currentDay = null;
+    let currentPlan = null;
+    let currentSection = 'overview';
+  
+    // Define sections to look for
+    const sectionHeaders = {
+      exercise: /^[-•*]?\s*Exercise\s*:/i,
+      breakfast: /^[-•*]?\s*Breakfast\s*:/i,
+      lunch: /^[-•*]?\s*Lunch\s*:/i,
+      snack: /^[-•*]?\s*Snack\s*:/i,
+      dinner: /^[-•*]?\s*Dinner\s*:/i,
+      tracking: /^[-•*]?\s*Tracking\s*:/i,
+    };
+  
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
+  
+      // Check if line is a day header
+      const dayMatch = days.find(
+        (day) =>
+          trimmedLine === day ||
+          trimmedLine === `**${day}**` ||
+          trimmedLine === `# ${day}` ||
+          trimmedLine.match(new RegExp(`^${day}$`, 'i'))
+      );
+  
+      if (dayMatch) {
+        // Save the previous day plan if exists
+        if (currentDay && currentPlan) {
+          dailyPlans.push({
+            day: currentDay,
+            sections: currentPlan,
+          });
+        }
+  
+        // Start a new day
+        currentDay = dayMatch;
+        currentPlan = {
+          overview: [],
+          exercise: [],
+          breakfast: [],
+          lunch: [],
+          snack: [],
+          dinner: [],
+          tracking: [],
+        };
+        currentSection = 'overview';
+      } else if (currentDay && currentPlan) {
+        // Check if line is a section header
+        let sectionFound = false;
+        for (const [section, pattern] of Object.entries(sectionHeaders)) {
+          if (pattern.test(trimmedLine)) {
+            currentSection = section;
+            // Extract the content after the section header
+            const content = trimmedLine.replace(pattern, '').trim();
+            if (content) {
+              currentPlan[currentSection].push(content);
+            }
+            sectionFound = true;
+            break;
+          }
+        }
+  
+        // If no section header found, add to current section
+        if (!sectionFound) {
+          currentPlan[currentSection].push(trimmedLine);
+        }
       }
     }
-  }
-
-  if (currentDay && currentPlan) {
-    dailyPlans.push({
-      day: currentDay,
-      sections: currentPlan,
-    });
-  }
-
-  if (dailyPlans.length === 0) {
-    const weekdayIndex = new Date().getDay();
-    const startDayIndex = weekdayIndex === 0 ? 6 : weekdayIndex - 1;
-
-    return days.map((day, index) => ({
-      day,
-      sections: {
-        overview: [index === startDayIndex ? "Today's plan" : 'Plan details'],
-        exercise: ['Details not available'],
-        breakfast: ['Details not available'],
-        lunch: ['Details not available'],
-        snack: ['Details not available'],
-        dinner: ['Details not available'],
-        tracking: ['Details not available'],
-      },
-    }));
-  }
-
-  return dailyPlans;
-};
+  
+    // Don't forget to add the last day
+    if (currentDay && currentPlan) {
+      dailyPlans.push({
+        day: currentDay,
+        sections: currentPlan,
+      });
+    }
+  
+    // If no plans parsed, create default structure
+    if (dailyPlans.length === 0) {
+      const weekdayIndex = new Date().getDay();
+      const startDayIndex = weekdayIndex === 0 ? 6 : weekdayIndex - 1;
+  
+      return days.map((day, index) => ({
+        day,
+        sections: {
+          overview: [index === startDayIndex ? "Today's plan" : 'Plan details'],
+          exercise: ['Details not available'],
+          breakfast: ['Details not available'],
+          lunch: ['Details not available'],
+          snack: ['Details not available'],
+          dinner: ['Details not available'],
+          tracking: ['Details not available'],
+        },
+      }));
+    }
+  
+    return dailyPlans;
+  };
 
 const createPrompt = (userData) => {
   // Log the raw userData coming in
