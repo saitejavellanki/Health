@@ -13,7 +13,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider } from './context/AuthContext';
 import { registerForPushNotificationsAsync, setupNotificationListeners } from '../components/Notification/notification-service';
 import { saveTokenToFirebase, getOrCreateDeviceId, saveDeviceTokenToFirebase } from '../components/Notification/notification-firebase-service';
-import { registerMealTrackingTasks } from '../components/Notification/meal-tracking-notification-service';
+import { registerMealTrackingTasks, resetNotificationFlagsIfNewDay } from '../components/Notification/meal-tracking-notification-service';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../components/firebase/Firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -64,7 +64,7 @@ export default function RootLayout() {
           saveDeviceTokenToFirebase(expoPushToken, deviceId, user.uid);
         }
         
-        // If user is logged in and meal notifications aren't initialized yet, initialize them
+        // Only initialize meal notifications once
         if (!mealNotificationsInitialized) {
           initializeMealNotifications();
         }
@@ -74,14 +74,24 @@ export default function RootLayout() {
     return unsubscribe;
   }, [expoPushToken, deviceId, mealNotificationsInitialized]);
 
-  // Initialize meal tracking notifications
+  // Initialize meal tracking notifications (only once)
   const initializeMealNotifications = async () => {
     try {
+      // Check if notifications already initialized
+      const initialized = await AsyncStorage.getItem('mealNotificationsInitialized');
+      if (initialized === 'true') {
+        console.log('Meal notifications were already initialized, skipping');
+        setMealNotificationsInitialized(true);
+        return;
+      }
+      
       // Register the meal tracking notification tasks
       const success = await registerMealTrackingTasks();
       setMealNotificationsInitialized(success);
       
       if (success) {
+        // Mark as initialized to prevent duplicate initialization
+        await AsyncStorage.setItem('mealNotificationsInitialized', 'true');
         console.log('Meal tracking notifications initialized successfully');
       } else {
         console.error('Failed to initialize meal tracking notifications');
@@ -116,7 +126,7 @@ export default function RootLayout() {
                 if (success) {
                   setTokenGenerationStatus('Token saved to Firebase!');
                   
-                  // Initialize meal notifications after token is saved
+                  // Only initialize meal notifications once
                   if (!mealNotificationsInitialized) {
                     initializeMealNotifications();
                   }
@@ -159,6 +169,18 @@ export default function RootLayout() {
         // router.push(screen);
       }
     );
+
+    // Reset notification flags (important to prevent multiple notifications)
+    const resetFlags = async () => {
+      try {
+        await AsyncStorage.removeItem('lastMorningNotification');
+        await AsyncStorage.removeItem('lastAfternoonNotification');
+      } catch (error) {
+        console.error('Error resetting notification flags:', error);
+      }
+    };
+    
+    resetFlags();
 
     // Clean up listeners when component unmounts
     return () => {
@@ -213,3 +235,41 @@ export default function RootLayout() {
   );
 }
 
+const styles = StyleSheet.create({
+  debugOverlay: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 10,
+    borderRadius: 5,
+  },
+  debugTitle: {
+    color: 'white',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  debugStatus: {
+    color: '#4CAF50',
+    marginBottom: 2,
+  },
+  debugToken: {
+    color: '#2196F3',
+    fontSize: 10,
+    marginVertical: 2,
+  },
+  debugNoToken: {
+    color: '#FF9800',
+    fontStyle: 'italic',
+  },
+  debugDeviceId: {
+    color: '#E91E63',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  debugMealNotifications: {
+    color: '#00BCD4',
+    marginTop: 2,
+  }
+});

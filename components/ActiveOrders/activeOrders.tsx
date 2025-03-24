@@ -284,9 +284,9 @@ const ActiveOrders = () => {
         <Text style={styles.orderDate}>
           {formatDate(item.createdAt)}
         </Text>
-        <Pressable style={styles.viewDetailsButton}>
+        {/* <Pressable style={styles.viewDetailsButton}>
           <Text style={styles.viewDetails}>View Details</Text>
-        </Pressable>
+        </Pressable> */}
       </View>
     </Pressable>
   );
