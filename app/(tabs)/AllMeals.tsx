@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { ArrowLeft, Calendar as CalendarIcon, Bell } from 'lucide-react-native';
+import { ArrowLeft, Calendar as CalendarIcon } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import {
@@ -18,7 +18,6 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { Calendar } from 'react-native-calendars';
-import { forceTestMealNotification } from '../../components/Notification/meal-tracking-notification-service'; // Update this path to the correct location
 
 export default function AllMeals() {
   const router = useRouter();
@@ -28,7 +27,6 @@ export default function AllMeals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [markedDates, setMarkedDates] = useState({});
-  const [sendingNotification, setSendingNotification] = useState(false);
 
   // Format date for calendar
   const formatDate = (date) => {
@@ -126,19 +124,6 @@ export default function AllMeals() {
     setShowCalendar(false);
   };
 
-  // Function to test notifications
-  const testNotification = async (type) => {
-    try {
-      setSendingNotification(true);
-      // Call the function to send a test notification
-      await forceTestMealNotification(type);
-      setSendingNotification(false);
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      setSendingNotification(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -184,30 +169,12 @@ export default function AllMeals() {
       <View style={styles.dateSelector}>
         <View style={styles.dateDisplay}>
           <Text style={styles.dateText}>{day}</Text>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={styles.calendarButton}
-              onPress={() => setShowCalendar(!showCalendar)}
-            >
-              <CalendarIcon size={20} color="#22c55e" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.notificationButton, sendingNotification && styles.disabledButton]}
-              onPress={() => testNotification('morning')}
-              disabled={sendingNotification}
-            >
-              <Bell size={20} color="#22c55e" />
-              <Text style={styles.notificationText}>AM</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.notificationButton, sendingNotification && styles.disabledButton]}
-              onPress={() => testNotification('afternoon')}
-              disabled={sendingNotification}
-            >
-              <Bell size={20} color="#22c55e" />
-              <Text style={styles.notificationText}>PM</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.calendarButton}
+            onPress={() => setShowCalendar(!showCalendar)}
+          >
+            <CalendarIcon size={20} color="#22c55e" />
+          </TouchableOpacity>
         </View>
         
         {showCalendar && (
@@ -316,32 +283,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#15803d',
   },
-  buttonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   calendarButton: {
     padding: 8,
     backgroundColor: '#dcfce7',
     borderRadius: 8,
-    marginRight: 8,
-  },
-  notificationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    backgroundColor: '#dcfce7',
-    borderRadius: 8,
-    marginLeft: 4,
-  },
-  notificationText: {
-    marginLeft: 4,
-    color: '#15803d',
-    fontFamily: 'Inter-Medium',
-    fontSize: 12,
-  },
-  disabledButton: {
-    opacity: 0.5,
   },
   calendarContainer: {
     marginTop: 12,
