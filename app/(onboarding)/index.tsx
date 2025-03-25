@@ -28,7 +28,7 @@ export default function Welcome() {
       //     onboarded: false
       //   });
       // }
-      router.push('/(tabs)');
+      router.push('/(tabs)/subscription');
     } catch (error) {
       console.error('Error updating onboarded status:', error);
     }

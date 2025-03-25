@@ -22,6 +22,7 @@ import CrunchXLogo from '../Utils/Logo';
 import ActiveOrders from '@/components/ActiveOrders/activeOrders';
 import WaterTrackingComponent from '@/components/UserStats/WaterTrackingComponent';
 import React from 'react';
+import HabitTracker from '@/components/HabitTracker/Habit';
 
 // API configuration for Gemini
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -601,6 +602,8 @@ export default function Home() {
           </Text>
         </View>
       </View>
+
+      {/* <HabitTracker/> */}
 
       <CrunchXLogo />
       {/* Bottom padding */}
