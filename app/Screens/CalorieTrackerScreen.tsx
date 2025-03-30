@@ -29,6 +29,7 @@ import styles from '../Utils/CalorieTrackerScreenStyles';
 import { router } from 'expo-router';
 import CrunchXFacts from '@/components/Loaders/CrunchXFacts';
 import { ChevronLeft } from 'lucide-react-native';
+import React from 'react';
 
 // Gemini API credentials
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -49,6 +50,7 @@ export default function CalorieTrackerScreen() {
   const [loggedMeal, setLoggedMeal] = useState(false);
   const [showTickAnimation, setShowTickAnimation] = useState(false);
   const [isJunkFood, setIsJunkFood] = useState(0);
+  const [scanMode, setScanMode] = useState('food'); // 'food' or 'barcode'
   const cameraRef = useRef(null);
 
   // Animation values
@@ -139,9 +141,13 @@ export default function CalorieTrackerScreen() {
   // Effect to automatically analyze image after capture
   useEffect(() => {
     if (image && !analyzing && !calories) {
-      sendImageToGemini(image);
+      if (scanMode === 'food') {
+        sendImageToGemini(image);
+      } else {
+        scanBarcodeFromImage(image);
+      }
     }
-  }, [image]);
+  }, [image, scanMode]);
 
   if (!permission) {
     // Camera permissions are still loading.
@@ -202,23 +208,27 @@ export default function CalorieTrackerScreen() {
     setFacing((current) => (current === 'back' ? 'front' : 'back'));
   }
 
-  // Function to send the image to Gemini AI
-  const sendImageToGemini = async (imageUri) => {
+  function toggleScanMode() {
+    setScanMode((current) => (current === 'food' ? 'barcode' : 'food'));
+  }
+
+  // Function to scan barcode from image
+  const scanBarcodeFromImage = async (imageUri) => {
     try {
       setAnalyzing(true);
-
+      
       // Convert image to base64
       const base64Image = await convertImageToBase64(imageUri);
       // Extract just the base64 data without the prefix
       const base64Data = base64Image.split(',')[1];
-
-      // Prepare request for Gemini - Updated to include carbs and sugars
+      
+      // Prepare request for Gemini with a barcode scanning prompt
       const requestBody = {
         contents: [
           {
             parts: [
               {
-                text: 'This is an image of food. Analyze this image and tell me what food items are in it. I need to know: 1) The name of the dish or food items, 2) The total estimated calories, 3) The estimated grams of protein, 4) The estimated grams of fat, 5) The estimated grams of carbohydrates, 6) The estimated grams of sugar, and 7) Whether this is considered junk food (yes or no). Format your response in plain text with only these details.',
+                text: 'This is an image of a barcode or packaged food product. Extract the barcode number if visible or read the nutrition facts from the package. Respond ONLY with the following numbered format:\n\n1) [Name of product]\n2) [Number] calories\n3) [Number] g protein\n4) [Number] g fat\n5) [Number] g carbohydrates\n6) [Number] g sugar\n7) [Yes/No] for whether this is considered junk food\n\nDo not include any other text, explanations, or formatting.',
               },
               {
                 inline_data: {
@@ -230,7 +240,131 @@ export default function CalorieTrackerScreen() {
           },
         ],
         generation_config: {
-          temperature: 0.4,
+          temperature: 0.2,
+          top_p: 0.95,
+          max_output_tokens: 2048,
+        },
+      };
+      
+      // Send request to Gemini API
+      const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      
+      // Process the response the same way as food analysis
+      if (data.candidates && data.candidates.length > 0) {
+        const textResponse = data.candidates[0].content.parts[0].text;
+        setResult(textResponse);
+        
+        // Extract data using the same regex patterns as food analysis
+        const foodNameMatch = textResponse.match(/1\)[ \t]*([^\n]+)/);
+        if (foodNameMatch && foodNameMatch[1]) {
+          setFoodName(foodNameMatch[1].trim());
+        } else {
+          console.log('Product name extraction failed');
+          setFoodName('Unknown product');
+        }
+        
+        const calorieMatch = textResponse.match(/2\)[ \t]*(\d+(?:\.\d+)?)/);
+        if (calorieMatch && calorieMatch[1]) {
+          setCalories(calorieMatch[1]);
+        } else {
+          console.log('Calorie extraction failed');
+          setCalories('0');
+        }
+        
+        const proteinMatch = textResponse.match(/3\)[ \t]*(\d+(?:\.\d+)?)/);
+        if (proteinMatch && proteinMatch[1]) {
+          setProtein(proteinMatch[1]);
+        } else {
+          console.log('Protein extraction failed');
+          setProtein('0');
+        }
+        
+        const fatMatch = textResponse.match(/4\)[ \t]*(\d+(?:\.\d+)?)/);
+        if (fatMatch && fatMatch[1]) {
+          setFat(fatMatch[1]);
+        } else {
+          console.log('Fat extraction failed');
+          setFat('0');
+        }
+        
+        const carbohydrateMatch = textResponse.match(/5\)[ \t]*(\d+(?:\.\d+)?)/);
+        if (carbohydrateMatch && carbohydrateMatch[1]) {
+          setCarbohydrates(carbohydrateMatch[1]);
+        } else {
+          console.log('Carbohydrates extraction failed');
+          setCarbohydrates('0');
+        }
+        
+        const sugarMatch = textResponse.match(/6\)[ \t]*(\d+(?:\.\d+)?)/);
+        if (sugarMatch && sugarMatch[1]) {
+          setSugars(sugarMatch[1]);
+        } else {
+          console.log('Sugar extraction failed');
+          setSugars('0');
+        }
+        
+        const junkFoodMatch = textResponse.match(/7\)[ \t]*(\w+)/i);
+        if (junkFoodMatch && junkFoodMatch[1]) {
+          setIsJunkFood(junkFoodMatch[1].toLowerCase().includes('yes') ? 1 : 0);
+        } else {
+          console.log('Junk food classification failed');
+          setIsJunkFood(0);
+        }
+      } else {
+        console.error('No response from Gemini API or invalid response format');
+        setResult('Error analyzing barcode. Please try again.');
+        setFoodName('Unknown product');
+        setCalories('0');
+        setProtein('0');
+        setFat('0');
+        setCarbohydrates('0');
+        setSugars('0');
+        setIsJunkFood(0);
+      }
+    } catch (error) {
+      console.error('Error scanning barcode with Gemini:', error);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // Function to send the image to Gemini AI
+  const sendImageToGemini = async (imageUri) => {
+    try {
+      setAnalyzing(true);
+
+      // Convert image to base64
+      const base64Image = await convertImageToBase64(imageUri);
+      // Extract just the base64 data without the prefix
+      const base64Data = base64Image.split(',')[1];
+
+      // Prepare request for Gemini with a more structured prompt
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              {
+                text: 'This is an image of food. Analyze this image and respond ONLY with the following numbered format:\n\n1) [Name of food]\n2) [Number] calories\n3) [Number] g protein\n4) [Number] g fat\n5) [Number] g carbohydrates\n6) [Number] g sugar\n7) [Yes/No] for whether this is considered junk food\n\nDo not include any other text, explanations, or formatting.',
+              },
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: base64Data,
+                },
+              },
+            ],
+          },
+        ],
+        generation_config: {
+          temperature: 0.2, // Lower temperature for more consistent formatting
           top_p: 0.95,
           max_output_tokens: 2048,
         },
@@ -251,64 +385,96 @@ export default function CalorieTrackerScreen() {
       if (data.candidates && data.candidates.length > 0) {
         const textResponse = data.candidates[0].content.parts[0].text;
         setResult(textResponse);
-
-        // Extract food name
-        // Extract food name
-        const foodNameMatch = textResponse.match(/(?:1[\.\)])\s*([^\n.]+)/i);
+        
+        // Improved regex patterns with better error handling
+        
+        // Extract food name - more permissive pattern
+        const foodNameMatch = textResponse.match(/1\)[ \t]*([^\n]+)/);
         if (foodNameMatch && foodNameMatch[1]) {
           setFoodName(foodNameMatch[1].trim());
+        } else {
+          console.log('Food name extraction failed');
+          setFoodName('Unknown food');
         }
         
-        // Extract calories - Updated regex to handle both formats and optional text
-        const calorieMatch = textResponse.match(/(?:2[\.\)])\s*(\d+(?:\.\d+)?)\s*(?:calories|kcal)/i);
+        // Extract calories - handles decimal values and optional units
+        const calorieMatch = textResponse.match(/2\)[ \t]*(\d+(?:\.\d+)?)/);
         if (calorieMatch && calorieMatch[1]) {
           setCalories(calorieMatch[1]);
+        } else {
+          console.log('Calorie extraction failed');
+          setCalories('0');
         }
         
-        // Extract protein - Updated regex to be more flexible
-        const proteinMatch = textResponse.match(/(?:3[\.\)])\s*(\d+(?:\.\d+)?)\s*(?:g|grams?)/i);
+        // Extract protein - more robust pattern
+        const proteinMatch = textResponse.match(/3\)[ \t]*(\d+(?:\.\d+)?)/);
         if (proteinMatch && proteinMatch[1]) {
           setProtein(proteinMatch[1]);
+        } else {
+          console.log('Protein extraction failed');
+          setProtein('0');
         }
         
-        // Extract fat - Updated regex to be more flexible
-        const fatMatch = textResponse.match(/(?:4[\.\)])\s*(\d+(?:\.\d+)?)\s*(?:g|grams?)/i);
+        // Extract fat
+        const fatMatch = textResponse.match(/4\)[ \t]*(\d+(?:\.\d+)?)/);
         if (fatMatch && fatMatch[1]) {
           setFat(fatMatch[1]);
+        } else {
+          console.log('Fat extraction failed');
+          setFat('0');
         }
         
-        // Extract carbohydrates - Updated regex to be more flexible
-        const carbohydrateMatch = textResponse.match(/(?:5[\.\)])\s*(\d+(?:\.\d+)?)\s*(?:g|grams?)/i);
+        // Extract carbohydrates
+        const carbohydrateMatch = textResponse.match(/5\)[ \t]*(\d+(?:\.\d+)?)/);
         if (carbohydrateMatch && carbohydrateMatch[1]) {
           setCarbohydrates(carbohydrateMatch[1]);
+        } else {
+          console.log('Carbohydrates extraction failed');
+          setCarbohydrates('0');
         }
         
-        // Extract sugars - Updated regex to be more flexible
-        const sugarMatch = textResponse.match(/(?:6[\.\)])\s*(\d+(?:\.\d+)?)\s*(?:g|grams?)/i);
+        // Extract sugars
+        const sugarMatch = textResponse.match(/6\)[ \t]*(\d+(?:\.\d+)?)/);
         if (sugarMatch && sugarMatch[1]) {
           setSugars(sugarMatch[1]);
+        } else {
+          console.log('Sugar extraction failed');
+          setSugars('0');
         }
         
-        // Check for junk food classification - Updated to handle both formats
-        const junkFoodMatch = textResponse.match(/(?:7[\.\)])\s*(\w+)/i);
+        // Check for junk food classification
+        const junkFoodMatch = textResponse.match(/7\)[ \t]*(\w+)/i);
         if (junkFoodMatch && junkFoodMatch[1]) {
-          setIsJunkFood(junkFoodMatch[1].toLowerCase() === 'yes' ? 1 : 0);
+          setIsJunkFood(junkFoodMatch[1].toLowerCase().includes('yes') ? 1 : 0);
+        } else {
+          console.log('Junk food classification failed');
+          setIsJunkFood(0);
         }
 
         console.log('Extracted values:');
-console.log('Calories:', calories);
-console.log('Protein:', protein);
-console.log('Fat:', fat);
-console.log('Carbohydrates:', carbohydrates);
-console.log('Sugars:', sugars);
-
-        console.log('Analysis result:', textResponse);
+        console.log('Food name:', foodName);
+        console.log('Calories:', calories);
+        console.log('Protein:', protein);
+        console.log('Fat:', fat);
+        console.log('Carbohydrates:', carbohydrates);
+        console.log('Sugars:', sugars);
+        console.log('Is junk food:', isJunkFood);
+        console.log('Full analysis result:', textResponse);
       } else {
-        throw new Error('No response from Gemini API');
+        console.error('No response from Gemini API or invalid response format');
+        setResult('Error analyzing image. Please try again.');
+        // Set default values when analysis fails
+        setFoodName('Unknown food');
+        setCalories('0');
+        setProtein('0');
+        setFat('0');
+        setCarbohydrates('0');
+        setSugars('0');
+        setIsJunkFood(0);
       }
     } catch (error) {
       console.error('Error analyzing image with Gemini:', error);
-      setResult('Error analyzing image. Please try again.');
+      
     } finally {
       setAnalyzing(false);
     }
@@ -452,8 +618,8 @@ console.log('Sugars:', sugars);
 
       {!image ? (
         <View style={styles.cameraContainer}>
-                    {/* Header - Changed from NutriLens to Powered by Gemini */}
-                    <View style={styles.cameraHeader}>
+          {/* Header - Changed from NutriLens to Powered by Gemini */}
+          <View style={styles.cameraHeader}>
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle}>
                 Crunch<Text style={styles.redX}>X</Text>
@@ -480,19 +646,59 @@ console.log('Sugars:', sugars);
                 <View style={[styles.scanCorner, styles.bottomRight]} />
               </View>
               <Text style={styles.instructionText}>
-                Position your food in frame
+                {scanMode === 'food' 
+                  ? 'Position your food in frame'
+                  : 'Position barcode or package in frame'}
               </Text>
             </View>
           </CameraView>
 
           <View style={styles.controlsPortion}>
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={takePicture}
-            >
-              <View style={styles.captureButtonInner} />
-            </TouchableOpacity>
-          </View>
+  {/* Barcode scan button */}
+  <TouchableOpacity
+    style={[
+      styles.scanModeButton,
+      scanMode === 'barcode' && styles.scanModeButtonActive
+    ]}
+    onPress={toggleScanMode}
+  >
+    <Feather 
+      name="maximize" 
+      size={20} 
+      color={scanMode === 'barcode' ? "#22c55e" : "#ffffff"} 
+    />
+    <Text style={[
+      styles.scanModeButtonText,
+      scanMode === 'barcode' && styles.scanModeButtonTextActive
+    ]}>
+      {scanMode === 'food' ? 'Barcode' : 'Food'}
+    </Text>
+  </TouchableOpacity>
+  
+  {/* Camera shutter button */}
+  <TouchableOpacity
+    style={styles.captureButton}
+    onPress={takePicture}
+  >
+    <View style={styles.captureButtonInner} />
+  </TouchableOpacity>
+  
+  {/* Replace the spacer with an option change button */}
+  {/* <TouchableOpacity
+    style={styles.scanModeButton}
+    onPress={toggleCameraFacing}
+  >
+    <Feather 
+      name="refresh-cw" 
+      size={20} 
+      color="#ffffff" 
+    />
+    <Text style={styles.scanModeButtonText}>
+      Camera
+    </Text>
+  </TouchableOpacity> */}
+</View>
+
         </View>
       ) : (
         <ScrollView
@@ -572,159 +778,122 @@ console.log('Sugars:', sugars);
                 {foodName && (
                   <View style={styles.foodNameContainer}>
                     <Text style={styles.foodNameText}>{foodName}</Text>
+                    {scanMode === 'barcode' && (
+                      <Text style={styles.scanModeIndicator}>
+                        Package Scan
+                      </Text>
+                    )}
                   </View>
                 )}
 
-<View style={styles.nutritionGrid}>
-  <Animated.View
-    style={[
-      styles.nutritionItem,
-      { transform: [{ scale: nutritionScaleAnim }] },
-    ]}
-  >
-    <View style={styles.nutritionIconCircle}>
-      <Feather name="zap" size={20} color="#22c55e" />
-    </View>
-    <Text style={styles.nutritionValue}>{calories || "0"}</Text>
-    <Text style={styles.nutritionLabel}>calories</Text>
-  </Animated.View>
-
-  <Animated.View
-    style={[
-      styles.nutritionItem,
-      { transform: [{ scale: nutritionScaleAnim }] },
-    ]}
-  >
-    <View style={styles.nutritionIconCircle}>
-      <Feather name="activity" size={20} color="#22c55e" />
-    </View>
-    <Text style={styles.nutritionValue}>
-      {protein || "0"}
-      <Text style={styles.nutritionUnit}>g</Text>
-    </Text>
-    <Text style={styles.nutritionLabel}>protein</Text>
-  </Animated.View>
-
-  <Animated.View
-    style={[
-      styles.nutritionItem,
-      { transform: [{ scale: nutritionScaleAnim }] },
-    ]}
-  >
-    <View style={styles.nutritionIconCircle}>
-      <Feather name="droplet" size={20} color="#22c55e" />
-    </View>
-    <Text style={styles.nutritionValue}>
-      {fat || "0"}
-      <Text style={styles.nutritionUnit}>g</Text>
-    </Text>
-    <Text style={styles.nutritionLabel}>fat</Text>
-  </Animated.View>
-  
-  <Animated.View
-    style={[
-      styles.nutritionItem,
-      { transform: [{ scale: nutritionScaleAnim }] },
-    ]}
-  >
-    <View style={styles.nutritionIconCircle}>
-      <Feather name="cube" size={20} color="#22c55e" />
-    </View>
-    <Text style={styles.nutritionValue}>
-      {carbohydrates || "0"}
-      <Text style={styles.nutritionUnit}>g</Text>
-    </Text>
-    <Text style={styles.nutritionLabel}>carbs</Text>
-  </Animated.View>
-  
-  <Animated.View
-    style={[
-      styles.nutritionItem,
-      { transform: [{ scale: nutritionScaleAnim }] },
-    ]}
-  >
-    <View style={styles.nutritionIconCircle}>
-      <Feather name="coffee" size={20} color="#22c55e" />
-    </View>
-    <Text style={styles.nutritionValue}>
-      {sugars || "0"}
-      <Text style={styles.nutritionUnit}>g</Text>
-    </Text>
-    <Text style={styles.nutritionLabel}>sugar</Text>
-  </Animated.View>
-</View>
-
-
-
-                {!loggedMeal ? (
-                  <TouchableOpacity
-                    style={styles.logMealButton}
-                    onPress={logMealToFirebase}
+                <View style={styles.nutritionGrid}>
+                  <Animated.View
+                    style={[
+                      styles.nutritionItem,
+                      { transform: [{ scale: nutritionScaleAnim }] },
+                    ]}
                   >
-                    <Feather
-                      name="check-circle"
-                      size={18}
-                      color="#ffffff"
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text style={styles.logMealButtonText}>Log Meal</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.mealLoggedContainer}>
-                    <Feather
-                      name="check-circle"
-                      size={18}
-                      color="#22c55e"
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text style={styles.mealLoggedText}>
-                      Meal Logged Successfully
+                    <View style={styles.nutritionIconCircle}>
+                      <Feather name="zap" size={20} color="#22c55e" />
+                    </View>
+                    <Text style={styles.nutritionValue}>{calories || "0"}</Text>
+                    <Text style={styles.nutritionLabel}>calories</Text>
+                  </Animated.View>
+
+                  <Animated.View
+                    style={[
+                      styles.nutritionItem,
+                      { transform: [{ scale: nutritionScaleAnim }] },
+                    ]}
+                  >
+                    <View style={styles.nutritionIconCircle}>
+                      <Feather name="activity" size={20} color="#22c55e" />
+                    </View>
+                    <Text style={styles.nutritionValue}>
+                      {protein || "0"}
+                      <Text style={styles.nutritionUnit}>g</Text>
+                    </Text>
+                    <Text style={styles.nutritionLabel}>protein</Text>
+                  </Animated.View>
+
+                  <Animated.View
+                    style={[
+                      styles.nutritionItem,
+                      { transform: [{ scale: nutritionScaleAnim }] },
+                    ]}
+                  >
+                    <View style={styles.nutritionIconCircle}>
+                      <Feather name="droplet" size={20} color="#22c55e" />
+                    </View>
+                    <Text style={styles.nutritionValue}>
+                      {fat || "0"}
+                      <Text style={styles.nutritionUnit}>g</Text>
+                    </Text>
+                    <Text style={styles.nutritionLabel}>fat</Text>
+                  </Animated.View>
+                  
+                  <Animated.View
+  style={[
+    styles.nutritionItem,
+    { transform: [{ scale: nutritionScaleAnim }] },
+  ]}
+>
+
+                    <View style={styles.nutritionIconCircle}>
+                      <Feather name="pie-chart" size={20} color="#22c55e" />
+                    </View>
+                    <Text style={styles.nutritionValue}>
+                      {carbohydrates || "0"}
+                      <Text style={styles.nutritionUnit}>g</Text>
+                    </Text>
+                    <Text style={styles.nutritionLabel}>carbs</Text>
+                  </Animated.View>
+
+                  <Animated.View
+                    style={[
+                      styles.nutritionItem,
+                      { transform: [{ scale: nutritionScaleAnim }] },
+                    ]}
+                  >
+                    <View style={styles.nutritionIconCircle}>
+                      <Feather name="coffee" size={20} color="#22c55e" />
+                    </View>
+                    <Text style={styles.nutritionValue}>
+                      {sugars || "0"}
+                      <Text style={styles.nutritionUnit}>g</Text>
+                    </Text>
+                    <Text style={styles.nutritionLabel}>sugars</Text>
+                  </Animated.View>
+                </View>
+
+                {/* Junk food indicator */}
+                {isJunkFood > 0 && (
+                  <View style={styles.junkFoodIndicator}>
+                    <Feather name="alert-triangle" size={16} color="#f97316" />
+                    <Text style={styles.junkFoodText}>
+                      This may not be the healthiest choice
                     </Text>
                   </View>
                 )}
 
-                <TouchableOpacity
-                  style={styles.newPhotoButton}
-                  onPress={closeAnalysis}
-                >
-                  <Text style={styles.newPhotoButtonText}>New Photo</Text>
-                </TouchableOpacity>
+                {/* Log meal button */}
+                {!loggedMeal && (
+                  <TouchableOpacity
+                    style={styles.logMealButton}
+                    onPress={logMealToFirebase}
+                  >
+                    <Text style={styles.logMealButtonText}>Log Meal</Text>
+                  </TouchableOpacity>
+                )}
               </Animated.View>
             )}
 
             {analyzing && (
-              <View>
+              <View style={styles.loadingContainer}>
                 <CrunchXFacts />
-                <View style={styles.analyzerStatus}>
-                  <ActivityIndicator size="small" color="#22c55e" />
-                  <Text style={styles.analyzingText}>
-                    Analyzing your meal...
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {!calories && !protein && !analyzing && (
-              <View style={styles.actionContainer}>
-                <TouchableOpacity
-                  style={styles.analyzeButton}
-                  onPress={() => sendImageToGemini(image)}
-                >
-                  <Feather
-                    name="search"
-                    size={18}
-                    color="#ffffff"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={styles.analyzeButtonText}>Retry</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={closeAnalysis}
-                >
-                  <Text style={styles.cancelButtonText}>Retake Photo</Text>
-                </TouchableOpacity>
+                <Text style={styles.loadingText}>
+                  Analyzing your {scanMode === 'food' ? 'food' : 'product'}...
+                </Text>
               </View>
             )}
           </View>
@@ -734,14 +903,17 @@ console.log('Sugars:', sugars);
   );
 }
 
-// Helper function to convert image to base64
-async function convertImageToBase64(uri) {
+// Function to convert image URI to base64
+const convertImageToBase64 = async (uri) => {
   try {
     const response = await fetch(uri);
     const blob = await response.blob();
+    
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
+      reader.onload = () => {
+        resolve(reader.result);
+      };
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
@@ -749,4 +921,4 @@ async function convertImageToBase64(uri) {
     console.error('Error converting image to base64:', error);
     throw error;
   }
-}
+};

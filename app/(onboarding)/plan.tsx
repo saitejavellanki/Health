@@ -11,6 +11,7 @@ import {
   Dimensions,
   Platform,
   StatusBar,
+  TextInput,
 } from 'react-native';
 import CrunchXLogo from '../Utils/Logo';
 import {
@@ -160,7 +161,7 @@ const GEMINI_API_URL =
     return dailyPlans;
   };
 
-const createPrompt = (userData) => {
+const createPrompt = (userData, healthCondition = '') => {
   // Log the raw userData coming in
   console.log(
     'createPrompt received userData:',
@@ -304,11 +305,6 @@ const createPrompt = (userData) => {
     }
   }
 
-  // // Ensure minimum 2000 calories as requested
-  // if (adjustedTdee < 2000) {
-  //   adjustedTdee = 2000;
-  // }
-
   // Round to nearest whole number for cleaner display
   adjustedTdee = Math.round(adjustedTdee);
 
@@ -318,29 +314,14 @@ const createPrompt = (userData) => {
 
   console.log('Final adjusted TDEE:', adjustedTdee);
 
-  //   const finalPrompt = `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet}
-  //   with Indian food specific to ${state} region. Allergies: ${allergies}.
-  //   Calorie intake target per day should be almost equal to: ${adjustedTdee}, the difference between the total given calories per day and ${adjustedTdee} should not exceed 100 calories.
-  //   Monthly budget: ${safeUserData.budget.amount} INR.
-
-  // DO NOT include ragi, jowar, quinoa, puttu or any foods that are not found/used much in metro cities, in any meal suggestions.
-
-  // For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
-
-  // Start with just the day name (e.g., "Monday")
-  // Exercise: [brief workout plan]
-  // Breakfast: [suggest additional food items to take along with breakfast, specifying how many calories (kcal) they provide at the end of the line]
-  // Snack: [suggest food items to take as snacks, specifying how many calories (kcal) they provide at the end of the line]
-  // Lunch: [suggest food items for lunch, specifying how many calories (kcal) they provide at the end of the line]
-  // Dinner: [suggest additional food items to take along with dinner, specifying how many calories (kcal) they provide at the end of the line]
-  // Tracking: [simple tip for monitoring progress]
-
-  // Keep each section brief - 1-2 sentences maximum. Focus on actionable items. All suggestions should be familiar, common, and easy-to-eat ${state}-style South Indian cuisine options that locals regularly consume. Only include dishes and ingredients that are widely available and commonly prepared in households in the ${state} region, tailored to the user's diet and allergies.
-
-  // The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${adjustedTdee}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.`;
+  // Add health condition to the prompt if provided
+  const healthConditionText = healthCondition ? 
+    `Health condition: ${healthCondition}. Please tailor recommendations to be appropriate for someone with this condition. ` : 
+    '';
 
   const finalPrompt = `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} 
   with Indian food specific to ${state} region. Allergies: ${allergies}. 
+  ${healthConditionText}
   Calorie intake target per day MUST be within 50 calories of ${adjustedTdee}. Ensure that the total calories from all meals and snacks add up to this target.
   Monthly budget: ${safeUserData.budget.amount} INR. 
 
@@ -349,7 +330,7 @@ DO NOT include ragi, jowar, quinoa, puttu or any foods that are not found/used m
 For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
 
 Start with just the day name (e.g., "Monday")
-Exercise: [brief workout plan]
+Exercise: [brief workout plan that is appropriate for someone with ${healthCondition ? 'the mentioned health condition' : 'the user\'s profile'}]
 Breakfast : [suggest additional food items to take along with breakfast, specifying how many calories (kcal) they provide at the end of the line]
 Snack : [suggest food items to take as snacks, specifying how many calories (kcal) they provide at the end of the line]
 Lunch : [suggest food items for lunch, specifying how many calories (kcal) they provide at the end of the line]
@@ -383,6 +364,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
   const [isChecked, setChecked] = useState(false);
+  const [healthCondition, setHealthCondition] = useState('');
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -469,7 +451,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     console.log('Starting plan generation with user data');
 
     try {
-      const prompt = createPrompt(userData);
+      const prompt = createPrompt(userData, healthCondition);
 
       console.log('Sending optimized prompt to Gemini API');
 
@@ -593,6 +575,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
           userData.goals && userData.goals.length > 0
             ? userData.goals[0]?.title || 'health improvement'
             : 'health improvement',
+        healthCondition: healthCondition || null,
       });
 
       Alert.alert('Success', 'Your plan has been saved successfully!');
@@ -711,6 +694,19 @@ const PlanScreen = ({ userData: propUserData, route }) => {
               Generate a personalized 7-day meal and exercise plan based on your
               fitness goals and preferences.
             </Text>
+
+            <View style={styles.healthConditionContainer}>
+              <Text style={styles.healthConditionLabel}>
+                Do you have any health conditions? (Optional)
+              </Text>
+              <TextInput
+                style={styles.healthConditionInput}
+                placeholder="E.g., diabetes, hypertension, pregnancy"
+                value={healthCondition}
+                onChangeText={setHealthCondition}
+                multiline={false}
+              />
+            </View>
 
             <View style={styles.checkboxContainer}>
               <Checkbox
@@ -904,13 +900,46 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    // backgroundColor:"red",
   },
   errorBannerText: {
     color: '#fff',
     marginLeft: 8,
     flex: 1,
     fontSize: 14,
+  },
+  healthConditionContainer: {
+    width: '100%',
+    marginBottom: 24,
+    alignItems: 'center',  // Center children horizontally
+    justifyContent: 'center',
+    maxWidth: 300,
+    alignSelf: 'center',  // Center this container itself
+  },
+  healthConditionLabel: {
+    fontSize: isMobile ? 14 : 16,
+    fontWeight: '500',
+    color: '#1a1a1a',
+    marginBottom: 8,
+    textAlign: 'center',  // Center the text
+    width: '100%',
+  },
+  healthConditionInput: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#ffffff',
+    color: '#334155',
+    width: '100%',  // Take full width of parent container
+    height: 48,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+    textAlign: 'center',  // Center the input text
   },
   dayTabsWrapper: {
     paddingVertical: 12,

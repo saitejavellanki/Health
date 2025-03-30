@@ -292,6 +292,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '85%',
   },
+  // Add these to the styles object
+  scanModeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    marginBottom:10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  scanModeButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    marginLeft: 6,
+  },
+  
+
+scanModeButtonTextActive: {
+  color: '#22c55e',
+  fontWeight: '600',
+},
+scanModeIndicator: {
+  fontSize: 12,
+  color: '#9ca3af',
+  marginTop: 4,
+},
+junkFoodIndicator: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(249, 115, 22, 0.1)',
+  padding: 12,
+  borderRadius: 8,
+  marginBottom: 24,
+},
+junkFoodText: {
+  color: '#f97316',
+  marginLeft: 8,
+  fontSize: 14,
+  fontWeight: '500',
+},
+
   loadingText: {
     marginTop: 20,
     fontSize: 16,

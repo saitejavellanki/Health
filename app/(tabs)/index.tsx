@@ -23,6 +23,7 @@ import ActiveOrders from '@/components/ActiveOrders/activeOrders';
 import WaterTrackingComponent from '@/components/UserStats/WaterTrackingComponent';
 import React from 'react';
 import HabitTracker from '@/components/HabitTracker/Habit';
+import SnackRecommendations from '../Utils/SnackRecomendation';
 
 // API configuration for Gemini
 const GEMINI_API_KEY = 'AIzaSyAucRYgtPspGpF9vuHh_8VzrRwzIfNqv0M';
@@ -450,6 +451,14 @@ export default function Home() {
 
   const currentMeal = getCurrentMeal();
 
+  const handleAddToCart = (productId) => {
+    // Navigate to the OrderComponent screen with the selected product
+    router.push({
+      pathname: '/Screens/OrderScreen',
+      params: { selectedProductId: productId }
+    });
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Profile Header */}
@@ -513,6 +522,13 @@ export default function Home() {
           </View>
         </View>
       )}
+
+{!nutritionOnlyMode && (
+  <SnackRecommendations 
+    todaysPlan={todaysPlan} 
+    addToCart={handleAddToCart}
+  />
+)}
 
       {/* Nutrition Stats */}
       <Pressable

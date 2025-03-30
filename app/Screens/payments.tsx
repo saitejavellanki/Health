@@ -72,21 +72,45 @@ export default function PaymentScreen() {
   // Handle UPI deep links
   const handleUpiDeepLink = async (url) => {
     try {
-      console.log("Attempting to open URL:", url);
+      console.log("Attempting to open UPI URL:", url);
+      
+      // Check if the URL is supported
       const canOpen = await Linking.canOpenURL(url);
       
       if (canOpen) {
-        await Linking.openURL(url);
+        // Try to open the URL
+        const opened = await Linking.openURL(url);
+        console.log("URL opened successfully");
       } else {
         console.log("Cannot open URL: " + url);
+        
+        // Try to extract UPI ID and amount to create a generic UPI intent
+        let genericUpiUrl = null;
+        
+        // Extract necessary parameters if available
+        const match = url.match(/pa=([^&]+).*&am=([^&]+)/);
+        if (match) {
+          const payeeAddress = match[1];
+          const amount = match[2];
+          genericUpiUrl = `upi://pay?pa=${payeeAddress}&am=${amount}&cu=INR`;
+          
+          // Try with the generic URL
+          const canOpenGeneric = await Linking.canOpenURL(genericUpiUrl);
+          if (canOpenGeneric) {
+            await Linking.openURL(genericUpiUrl);
+            return;
+          }
+        }
+        
+        // If all attempts fail, show error to user
         Alert.alert(
           "Payment App Required",
-          "The payment app needed is not installed. Please install it or use another payment method.",
+          "The payment app needed is not installed. Please install a UPI app or choose another payment method.",
           [{ text: "OK" }]
         );
       }
     } catch (error) {
-      console.error("Error opening URL:", error);
+      console.error("Error opening UPI URL:", error);
       Alert.alert(
         "Error",
         "There was a problem opening the payment app. Please try another payment method.",
@@ -229,7 +253,7 @@ export default function PaymentScreen() {
     const productinfo = `Order - ${orderType === 'one-time' ? 'One-Time' : 'Subscription'}`;
     const firstname = userData.firstName || userData.displayName || 'Customer';
     const email = userData.email || 'customer@example.com';
-    const phone = userData.phone || '9999999999';
+    const phone = phoneNumber || '9999999999';
     const surl = 'https://yourapp.com/success'; // Replace with your success URL
     const furl = 'https://yourapp.com/failure'; // Replace with your failure URL
     
@@ -250,10 +274,14 @@ export default function PaymentScreen() {
       surl,
       furl,
       hash,
-      pg: 'UPI', // Specify UPI as payment gateway
-      preferred_payment_method: 'UPI', // Set UPI as preferred method
-      enforce_paymethod: 'UPI', // Enforce UPI payment method
-      bankcode: 'UPI' // Additional parameter to enforce UPI
+      pg: 'UPI',                    // Force UPI payment method
+      preferred_payment_method: 'UPI',
+      enforce_paymethod: 'UPI',
+      bankcode: 'UPI',
+      drop_category: 'UPI',         // Additional parameter to prioritize UPI 
+      user_credentials: `${PAYU_CONFIG.key}:${email}`, // Add user credentials
+      instrument_id: 'UPI',         // Another way to force UPI
+      instrument_type: 'UPI'        // And another
     };
   };
   
@@ -704,108 +732,146 @@ const updateOrderStatus = async (orderId, status, paymentDetails) => {
           </View>
           
           <WebView
-            ref={webViewRef}
-            source={{ html: formHtml }}
-            injectedJavaScript={`
-              (function() {
-                function interceptClickEvent(e) {
-                  var href = e.target.getAttribute('href') || (e.target.parentNode ? e.target.parentNode.getAttribute('href') : null);
-                  if (href) {
-                    if (href.startsWith('phonepe://') || 
-                        href.startsWith('gpay://') || 
-                        href.startsWith('upi://') ||
-                        href.startsWith('paytm://')) {
-                      e.preventDefault();
-                      window.ReactNativeWebView.postMessage(href);
-                      return false;
-                    }
-                  }
-                }
-                document.addEventListener('click', interceptClickEvent);
-                
-                // Monitor for changes in the DOM
-                var observer = new MutationObserver(function(mutations) {
-                  mutations.forEach(function(mutation) {
-                    if (mutation.type === 'childList') {
-                      var upiLinks = document.querySelectorAll('a[href^="upi://"], a[href^="phonepe://"], a[href^="gpay://"], a[href^="paytm://"]');
-                      upiLinks.forEach(function(link) {
-                        link.addEventListener('click', function(e) {
-                          e.preventDefault();
-                          window.ReactNativeWebView.postMessage(link.href);
-                          return false;
-                        });
-                      });
-                    }
-                  });
-                });
-                
-                observer.observe(document, { childList: true, subtree: true });
-              })();
-            `}
-            onMessage={(event) => {
-              const url = event.nativeEvent.data;
-              if (url.startsWith('phonepe://') || 
-                  url.startsWith('gpay://') || 
-                  url.startsWith('upi://') ||
-                  url.startsWith('paytm://')) {
-                handleUpiDeepLink(url);
-              }
-            }}
-            onNavigationStateChange={(navState) => {
-              console.log("Navigation state changed:", navState.url);
-              
-              // Handle UPI deep links
-              if (navState.url.startsWith('phonepe://') || 
-                  navState.url.startsWith('gpay://') || 
-                  navState.url.startsWith('upi://') ||
-                  navState.url.startsWith('paytm://')) {
-                
-                if (webViewRef.current) {
-                  webViewRef.current.stopLoading();
-                }
-                
-                handleUpiDeepLink(navState.url);
-                return;
-              }
-              
-              // Handle success and failure URLs
-              if (navState.url.includes('success') || navState.url.includes('failure')) {
-                // Extract response data from URL
-                const urlParams = new URLSearchParams(navState.url.split('?')[1] || '');
-                const response = {};
-                
-                for (const [key, value] of urlParams.entries()) {
-                  response[key] = value;
-                }
-                
-                response.status = navState.url.includes('success') ? 'success' : 'failed';
-                handlePaymentResponse(JSON.stringify(response));
-              }
-            }}
-            onShouldStartLoadWithRequest={(request) => {
-              console.log("Should start load:", request.url);
-              
-              // Check if this is a UPI app deep link
-              if (request.url.startsWith('phonepe://') || 
-                  request.url.startsWith('gpay://') || 
-                  request.url.startsWith('upi://') ||
-                  request.url.startsWith('paytm://')) {
-                
-                handleUpiDeepLink(request.url);
-                return false; // Prevent WebView from trying to load this URL
-              }
-              return true; // Allow WebView to load other URLs
-            }}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            renderLoading={() => (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#22c55e" />
-                <Text style={styles.loadingText}>Initializing payment gateway...</Text>
-              </View>
-            )}
-          />
+  ref={webViewRef}
+  source={{ html: formHtml }}
+  injectedJavaScript={`
+    (function() {
+      // More aggressive interception of UPI links
+      function interceptLinks() {
+        // All possible UPI app URI schemes
+        const upiSchemes = ['upi://', 'phonepe://', 'gpay://', 'paytm://', 'bhim://', 'tez://'];
+        
+        // Intercept all anchor tags
+        const links = document.getElementsByTagName('a');
+        for (let i = 0; i < links.length; i++) {
+          links[i].addEventListener('click', function(e) {
+            const href = this.getAttribute('href');
+            if (href && upiSchemes.some(scheme => href.startsWith(scheme))) {
+              e.preventDefault();
+              e.stopPropagation();
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'upi_deeplink',
+                url: href
+              }));
+              return false;
+            }
+          });
+        }
+        
+        // Add direct observer for buttons that might trigger UPI apps
+        const payButtons = document.querySelectorAll('.upi-option, .upi-button, [data-payment="UPI"]');
+        payButtons.forEach(button => {
+          button.addEventListener('click', function() {
+            console.log('UPI payment option clicked');
+          });
+        });
+      }
+      
+      // Run interceptor on load and periodically to catch dynamically added elements
+      interceptLinks();
+      setInterval(interceptLinks, 1000);
+      
+      // Watch for DOM changes more aggressively
+      const observer = new MutationObserver(function(mutations) {
+        interceptLinks();
+      });
+      
+      observer.observe(document.body, { 
+        childList: true, 
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['href']
+      });
+      
+      // Additional instrumentation to debug
+      console.log = function(message) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'console',
+          message: message
+        }));
+      };
+    })();
+  `}
+  onMessage={(event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'upi_deeplink') {
+        handleUpiDeepLink(data.url);
+      } else if (data.type === 'console') {
+        console.log("WebView console:", data.message);
+      }
+    } catch (e) {
+      // Handle direct URL string format for backward compatibility
+      const url = event.nativeEvent.data;
+      if (url.startsWith('phonepe://') || 
+          url.startsWith('gpay://') || 
+          url.startsWith('upi://') ||
+          url.startsWith('paytm://') ||
+          url.startsWith('bhim://')) {
+        handleUpiDeepLink(url);
+      }
+    }
+  }}
+  onNavigationStateChange={(navState) => {
+    console.log("Navigation state changed:", navState.url);
+    
+    // More comprehensive check for UPI deep links
+    const isUpiUrl = navState.url.startsWith('upi://') || 
+                      navState.url.startsWith('phonepe://') || 
+                      navState.url.startsWith('gpay://') || 
+                      navState.url.startsWith('paytm://') ||
+                      navState.url.startsWith('bhim://') ||
+                      navState.url.startsWith('tez://');
+    
+    if (isUpiUrl) {
+      if (webViewRef.current) {
+        webViewRef.current.stopLoading();
+      }
+      handleUpiDeepLink(navState.url);
+      return;
+    }
+    
+    // Handle success and failure URLs
+    if (navState.url.includes('success') || navState.url.includes('failure')) {
+      // Extract response data from URL
+      const urlParams = new URLSearchParams(navState.url.split('?')[1] || '');
+      const response = {};
+      
+      for (const [key, value] of urlParams.entries()) {
+        response[key] = value;
+      }
+      
+      response.status = navState.url.includes('success') ? 'success' : 'failed';
+      handlePaymentResponse(JSON.stringify(response));
+    }
+  }}
+  onShouldStartLoadWithRequest={(request) => {
+    console.log("Should start load:", request.url);
+    
+    // More comprehensive check for UPI deep links
+    const isUpiUrl = request.url.startsWith('upi://') || 
+                      request.url.startsWith('phonepe://') || 
+                      request.url.startsWith('gpay://') || 
+                      request.url.startsWith('paytm://') ||
+                      request.url.startsWith('bhim://') ||
+                      request.url.startsWith('tez://');
+    
+    if (isUpiUrl) {
+      handleUpiDeepLink(request.url);
+      return false; // Prevent WebView from trying to load this URL
+    }
+    return true; // Allow WebView to load other URLs
+  }}
+  javaScriptEnabled={true}
+  domStorageEnabled={true}
+  startInLoadingState={true}
+  renderLoading={() => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#22c55e" />
+      <Text style={styles.loadingText}>Initializing payment gateway...</Text>
+    </View>
+  )}
+/>
         </View>
       </Modal>
     );
