@@ -3,7 +3,6 @@ import { View, Text, Pressable, StyleSheet, Animated, Easing } from 'react-nativ
 import { doc, getDoc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../components/firebase/Firebase';
 
-// Simplified version with Firebase integration
 const WaterTrackingComponent = () => {
   const [waterIntake, setWaterIntake] = useState(0);
   const [waterGoal, setWaterGoal] = useState(8); // Default 8 glasses
@@ -11,6 +10,8 @@ const WaterTrackingComponent = () => {
   const [lastUpdatedDate, setLastUpdatedDate] = useState('');
   const waveAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const bubbleAnim1 = useRef(new Animated.Value(0)).current;
+  const bubbleAnim2 = useRef(new Animated.Value(0)).current;
   
   // Local cache to reduce Firestore reads
   const waterDataRef = useRef({
@@ -90,7 +91,6 @@ const WaterTrackingComponent = () => {
       }
       
       // Set up real-time listener for changes (only during active sessions)
-      // This is useful if the user has multiple devices
       unsubscribeRef.current = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
           const userData = doc.data();
@@ -109,24 +109,26 @@ const WaterTrackingComponent = () => {
       console.error('Error fetching water data:', error);
     }
     
-    // Start animation regardless of data fetch result
+    // Start animations
     startWaveAnimation();
+    startBubbleAnimations();
   };
 
+  // Enhanced animation effects
   useEffect(() => {
     // Trigger wave and scale animation when water intake changes
     Animated.sequence([
       Animated.timing(scaleAnim, {
         toValue: 1.05,
-        duration: 200,
+        duration: 300,
         useNativeDriver: true,
-        easing: Easing.ease,
+        easing: Easing.elastic(1),
       }),
       Animated.timing(scaleAnim, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
-        easing: Easing.ease,
+        easing: Easing.bounce,
       }),
     ]).start();
   }, [waterIntake]);
@@ -136,18 +138,56 @@ const WaterTrackingComponent = () => {
       Animated.sequence([
         Animated.timing(waveAnim, {
           toValue: 1,
-          duration: 1500,
+          duration: 2000,
           useNativeDriver: true,
           easing: Easing.sin,
         }),
         Animated.timing(waveAnim, {
           toValue: 0,
-          duration: 1500,
+          duration: 2000,
           useNativeDriver: true,
           easing: Easing.sin,
         }),
       ])
     ).start();
+  };
+  
+  const startBubbleAnimations = () => {
+    // Animate first bubble
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bubbleAnim1, {
+          toValue: 1,
+          duration: 3000,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.cubic),
+        }),
+        Animated.timing(bubbleAnim1, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+    
+    // Animate second bubble with delay
+    setTimeout(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(bubbleAnim2, {
+            toValue: 1,
+            duration: 4000,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.cubic),
+          }),
+          Animated.timing(bubbleAnim2, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }, 1500);
   };
 
   // Debounce timer to batch Firestore updates
@@ -196,7 +236,7 @@ const WaterTrackingComponent = () => {
       };
       
       updateFirestore(waterData);
-    }, 1500); // Debounce for 1.5 seconds
+    }, 1000); // Reduced debounce to 1 second for better responsiveness
   };
   
   // Function to update Firestore with minimal writes
@@ -222,16 +262,16 @@ const WaterTrackingComponent = () => {
   // Calculate water percentage
   const waterPercentage = Math.min(Math.round((waterIntake / waterGoal) * 100), 100);
   
-  // Determine message based on percentage
+  // Enhanced motivational messages based on percentage
   const getMessage = () => {
     if (waterPercentage < 25) return "Stay hydrated!";
-    if (waterPercentage < 50) return "Keep drinking!";
-    if (waterPercentage < 75) return "Halfway there!";
+    if (waterPercentage < 50) return "Keep it up!";
+    if (waterPercentage < 75) return "More than halfway!";
     if (waterPercentage < 100) return "Almost there!";
-    return "Goal reached!";
+    return "Goal achieved! 💦";
   };
 
-  // Get color theme based on percentage
+  // Enhanced color gradient based on percentage
   const getColors = () => {
     if (waterPercentage < 25) return ['#93c5fd', '#3b82f6'];
     if (waterPercentage < 50) return ['#7dd3fc', '#0ea5e9'];
@@ -243,39 +283,80 @@ const WaterTrackingComponent = () => {
   const primaryColor = getColors()[1];
   const translateX = waveAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [-20, 20],
+    outputRange: [-30, 30], // Wider wave movement
+  });
+  
+  // Bubble animations
+  const bubble1TranslateY = bubbleAnim1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -100],
+  });
+  
+  const bubble2TranslateY = bubbleAnim2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -80],
+  });
+  
+  const bubble1Scale = bubbleAnim1.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0.7, 1, 0.5],
+  });
+  
+  const bubble2Scale = bubbleAnim2.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.5, 0.8, 0.3],
+  });
+  
+  const bubble1Opacity = bubbleAnim1.interpolate({
+    inputRange: [0, 0.2, 0.8, 1],
+    outputRange: [0, 0.7, 0.5, 0],
+  });
+  
+  const bubble2Opacity = bubbleAnim2.interpolate({
+    inputRange: [0, 0.2, 0.8, 1],
+    outputRange: [0, 0.5, 0.3, 0],
   });
 
-  // Create a function to render mock icons (without emojis)
+  // Create icons with clean, professional look
   const renderIcon = (iconName, size, color) => {
-    // Basic icon replacements using text
-    const icons = {
-      'droplet': '●', // Using a filled circle instead of 'O'
-      'minus': '-',
-      'plus': '+',
-      'zap': 'Z',
-    };
-    
-    return (
-      <Text style={{fontSize: size, color: color}}>{icons[iconName] || '•'}</Text>
-    );
+    switch(iconName) {
+      case 'droplet':
+        return (
+          <View style={[styles.iconDroplet, {borderColor: color}]}>
+            <View style={[styles.iconDropletFill, {backgroundColor: color}]} />
+          </View>
+        );
+      case 'minus':
+        return <View style={[styles.iconBar, {backgroundColor: color}]} />;
+      case 'plus':
+        return (
+          <View style={styles.iconPlusContainer}>
+            <View style={[styles.iconBar, {backgroundColor: color}]} />
+            <View style={[styles.iconBarVertical, {backgroundColor: color}]} />
+          </View>
+        );
+      default:
+        return <Text style={{fontSize: size, color: color}}>•</Text>;
+    }
   };
 
   // Calculate the water height percentage for the bottle
-  const waveHeight = `${waterPercentage}%`;
+  const waveHeight = `${Math.max(5, waterPercentage)}%`;
+  
+  // Calculate progress percentage for display
+  const progressText = `${Math.round((waterIntake / waterGoal) * 100)}%`;
 
   return (
     <View style={styles.outerContainer}>
       <View style={[styles.container, {backgroundColor: '#f0f9ff'}]}>
         <View style={styles.headerRow}>
           <View style={styles.titleContainer}>
-            <Animated.View 
-              style={{opacity: 1}}
-            >
+            <View style={styles.iconWrapper}>
               {renderIcon('droplet', 20, primaryColor)}
-            </Animated.View>
-            <Text style={[styles.title, { color: primaryColor }]}>Water Tracker</Text>
+            </View>
+            <Text style={[styles.title, { color: primaryColor }]}>Hydration Tracker</Text>
           </View>
+          <Text style={[styles.progressText, { color: primaryColor }]}>{progressText}</Text>
         </View>
 
         <View style={styles.waterTracker}>
@@ -299,21 +380,41 @@ const WaterTrackingComponent = () => {
                 </Animated.View>
               </View>
               
-              {/* Simple animated bubble replacement */}
-              {waterPercentage > 20 && (
+              {/* Enhanced animated bubbles */}
+              {waterPercentage > 0 && (
                 <Animated.View 
                   style={[
                     styles.bubble, 
-                    { left: '20%', bottom: '20%', opacity: 0.7 }
+                    { 
+                      left: '30%', 
+                      bottom: '20%',
+                      transform: [
+                        { translateY: bubble1TranslateY },
+                        { scale: bubble1Scale }
+                      ],
+                      opacity: bubble1Opacity,
+                      backgroundColor: 'rgba(255, 255, 255, 0.8)'
+                    }
                   ]}
                 />
               )}
               
-              {waterPercentage > 40 && (
+              {waterPercentage > 0 && (
                 <Animated.View 
                   style={[
                     styles.bubble, 
-                    { left: '60%', bottom: '40%', width: 8, height: 8, opacity: 0.5 }
+                    { 
+                      left: '55%', 
+                      bottom: '35%',
+                      width: 8, 
+                      height: 8,
+                      transform: [
+                        { translateY: bubble2TranslateY },
+                        { scale: bubble2Scale }
+                      ],
+                      opacity: bubble2Opacity,
+                      backgroundColor: 'rgba(255, 255, 255, 0.7)'
+                    }
                   ]}
                 />
               )}
@@ -321,49 +422,72 @@ const WaterTrackingComponent = () => {
             <View style={styles.markings}>
               {[...Array(5).keys()].map((i) => (
                 <View key={i} style={styles.marking}>
-                  <Text style={styles.markingText}>{waterGoal - i * 2}</Text>
+                  <Text style={[
+                    styles.markingText, 
+                    { 
+                      color: waterIntake >= (waterGoal - i * 2) ? primaryColor : '#64748b',
+                      fontWeight: waterIntake >= (waterGoal - i * 2) ? '700' : '500'
+                    }
+                  ]}>
+                    {waterGoal - i * 2}
+                  </Text>
                 </View>
               ))}
             </View>
           </Animated.View>
 
           <View style={styles.statsContainer}>
-            <Animated.View
-              style={[styles.statsRow, {opacity: 1}]}
-            >
+            <View style={styles.statsRow}>
               <View style={[styles.stat, { backgroundColor: `${primaryColor}20` }]}>
                 <Text style={[styles.statValue, { color: primaryColor }]}>{waterIntake}</Text>
-                <Text style={[styles.statLabel, styles.fixedHeight]}>Glass</Text>
+                <Text style={styles.statLabel}>
+                  {waterIntake === 1 ? 'Glass' : 'Glasses'}
+                </Text>
               </View>
               <View style={[styles.stat, { backgroundColor: `${primaryColor}10` }]}>
                 <Text style={[styles.statValue, { color: primaryColor }]}>{waterGoal}</Text>
-                <Text style={[styles.statLabel, styles.fixedHeight]}>Goal</Text>
+                <Text style={styles.statLabel}>Daily Goal</Text>
               </View>
-            </Animated.View>
+            </View>
             
-            <Animated.View style={{opacity: 1}}>
+            <View style={styles.messageContainer}>
               <Text style={[styles.message, { color: primaryColor }]}>
                 {getMessage()}
               </Text>
-            </Animated.View>
+            </View>
             
-            <Animated.View
-              style={[styles.buttonContainer, {opacity: 1}]}
-            >
+            <View style={styles.buttonContainer}>
               <Pressable
-                style={[styles.button, styles.minusButton, { borderColor: primaryColor }]}
+                style={({ pressed }) => [
+                  styles.button, 
+                  styles.minusButton, 
+                  { 
+                    borderColor: primaryColor,
+                    backgroundColor: pressed ? `${primaryColor}10` : 'transparent',
+                    opacity: waterIntake > 0 ? 1 : 0.5
+                  }
+                ]}
                 onPress={() => updateWaterIntake(-1)}
+                disabled={waterIntake <= 0}
               >
                 {renderIcon('minus', 20, primaryColor)}
               </Pressable>
               
               <Pressable
-                style={[styles.button, styles.plusButton, { backgroundColor: primaryColor }]}
+                style={({ pressed }) => [
+                  styles.button, 
+                  styles.plusButton, 
+                  { 
+                    backgroundColor: pressed ? `${primaryColor}80` : primaryColor,
+                    opacity: waterIntake < waterGoal + 2 ? 1 : 0.5
+                  }
+                ]}
                 onPress={() => updateWaterIntake(1)}
+                disabled={waterIntake >= waterGoal + 2}
               >
                 {renderIcon('plus', 20, '#ffffff')}
               </Pressable>
-            </Animated.View>
+            </View>
           </View>
         </View>
       </View>
@@ -376,33 +500,83 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginBottom: 16,
     borderRadius: 20,
-    width: '98%', // Made wider
+    width: '95%',
     alignSelf: 'center',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   container: {
     borderRadius: 20,
-    padding: 18,
+    padding: 20,
     overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   titleContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconWrapper: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconDroplet: {
+    width: 14,
+    height: 18,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ rotate: '45deg' }],
+  },
+  iconDropletFill: {
+    width: 8,
+    height: 12,
+    borderRadius: 6,
+  },
+  iconBar: {
+    width: 12,
+    height: 2,
+    borderRadius: 1,
+  },
+  iconBarVertical: {
+    width: 2,
+    height: 12,
+    borderRadius: 1,
+    position: 'absolute',
+  },
+  iconPlusContainer: {
+    width: 14,
+    height: 14,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
     fontSize: 20,
     fontWeight: '700',
     marginLeft: 8,
+    letterSpacing: 0.2,
+  },
+  progressText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   waterTracker: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    height: 200,
+    height: 220,
   },
   bottleContainer: {
     width: '40%',
@@ -413,7 +587,7 @@ const styles = StyleSheet.create({
     width: '70%',
     height: '100%',
     backgroundColor: '#f8fafc',
-    borderRadius: 24,
+    borderRadius: 28,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     overflow: 'hidden',
@@ -428,7 +602,7 @@ const styles = StyleSheet.create({
   },
   waveContainer: {
     height: '100%',
-    width: 140, // Make it wider than the container to allow for animation
+    width: 140,
   },
   wave: {
     height: '100%',
@@ -448,7 +622,6 @@ const styles = StyleSheet.create({
   },
   markingText: {
     fontSize: 12,
-    color: '#64748b',
     marginLeft: 4,
     fontWeight: '500',
   },
@@ -458,18 +631,19 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
   },
   stat: {
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderRadius: 16,
-    width: '45%',
+    width: '48%',
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
+    letterSpacing: -0.5,
   },
   statLabel: {
     fontSize: 14,
@@ -477,15 +651,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 2,
   },
-  fixedHeight: {
-    height: 20, // Fixed height to ensure alignment
-    lineHeight: 20, // Makes the text vertically centered in the fixed height
+  messageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
   },
   message: {
     fontSize: 18,
     fontWeight: '600',
     textAlign: 'center',
-    marginVertical: 8,
+    letterSpacing: 0.2,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -503,14 +678,20 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   plusButton: {
-    // Shadow removed
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
   },
   bubble: {
     position: 'absolute',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
 });
 

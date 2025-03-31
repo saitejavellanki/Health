@@ -72,7 +72,6 @@ const GEMINI_API_URL =
       snack: /^[-•*]?\s*Snack\s*:/i,
       dinner: /^[-•*]?\s*Dinner\s*:/i,
       tracking: /^[-•*]?\s*Tracking\s*:/i,
-      snackBenefits: /^[-•*]?\s*Snack Benefits\s*:/i,
     };
   
     for (const line of lines) {
@@ -107,7 +106,6 @@ const GEMINI_API_URL =
           snack: [],
           dinner: [],
           tracking: [],
-          snackBenefits: [],
         };
         currentSection = 'overview';
       } else if (currentDay && currentPlan) {
@@ -156,7 +154,6 @@ const GEMINI_API_URL =
           snack: ['Details not available'],
           dinner: ['Details not available'],
           tracking: ['Details not available'],
-          snackBenefits: ['Details not available'],
         },
       }));
     }
@@ -164,196 +161,195 @@ const GEMINI_API_URL =
     return dailyPlans;
   };
 
-  const createPrompt = (userData, healthCondition = '') => {
-    // Log the raw userData coming in
-    console.log(
-      'createPrompt received userData:',
-      JSON.stringify(userData, null, 2)
-    );
-  
-    // Default values for userData to prevent undefined errors
-    const userDataDefaults = {
-      goals: [],
-      preferences: {
-        diet: 'balanced',
-        allergies: [],
-        state: 'general South Indian',
-      },
-      weight: 70,
-      height: { totalInches: 65 },
-      dateOfBirth: { age: 30 },
-      gender: 'male',
-      workoutFrequency: 'moderate',
-      budget: { amount: 5000 },
-    };
-  
-    // Merge defaults with provided userData
-    const safeUserData = {
-      ...userDataDefaults,
-      ...userData,
-      preferences: {
-        ...userDataDefaults.preferences,
-        ...(userData?.preferences || {}),
-      },
-      height: {
-        ...userDataDefaults.height,
-        ...(userData?.height || {}),
-      },
-      dateOfBirth: {
-        ...userDataDefaults.dateOfBirth,
-        ...(userData?.dateOfBirth || {}),
-      },
-      budget: {
-        ...userDataDefaults.budget,
-        ...(userData?.budget || {}),
-      },
-    };
-  
-    // Log the processed safeUserData after defaults are applied
-    console.log(
-      'After applying defaults:',
-      JSON.stringify(safeUserData, null, 2)
-    );
-  
-    const goal =
-      safeUserData.goals && safeUserData.goals.length > 0
-        ? safeUserData.goals[0]?.title || 'health improvement'
-        : 'health improvement';
-  
-    const targetWeight =
-      safeUserData.goals &&
-      safeUserData.goals.length > 0 &&
-      safeUserData.goals[0]?.targetWeight
-        ? safeUserData.goals[0]?.targetWeight
-        : null;
-  
-    const weightGoalText = targetWeight
-      ? `with a target weight of ${targetWeight}kg`
-      : '';
-  
-    const diet = safeUserData.preferences?.diet || 'balanced';
-    const allergies = safeUserData.preferences?.allergies?.join(',') || 'none';
-    const state = safeUserData.preferences?.state || 'general South Indian';
-    const currentWeight = safeUserData.weight || 70;
-  
-    const weightContext =
-      currentWeight && targetWeight
-        ? `Current weight: ${currentWeight}kg, target: ${targetWeight}kg. `
-        : '';
-  
-    // Calculate BMR (Basal Metabolic Rate)
-    let bmr = 0;
-    if (safeUserData.gender === 'female') {
-      bmr =
-        655.1 +
-        9.563 * currentWeight +
-        1.85 * (safeUserData.height?.totalInches || 65) * 2.54 -
-        4.676 * (safeUserData.dateOfBirth?.age || 30);
-    } else {
-      bmr =
-        66.47 +
-        13.75 * currentWeight +
-        5.003 * (safeUserData.height?.totalInches || 65) * 2.54 -
-        6.755 * (safeUserData.dateOfBirth?.age || 30);
-    }
-  
-    // Activity factor based on workout frequency
-    const activityFactors = {
-      none: 1.2,
-      light: 1.375,
-      moderate: 1.55,
-      active: 1.725,
-      intense: 1.9,
-    };
-  
-    const activityFactor = activityFactors[safeUserData.workoutFrequency] || 1.2;
-  
-    // Calculate TDEE (Total Daily Energy Expenditure)
-    let tdee = bmr * activityFactor;
-    let adjustedTdee = tdee;
-  
-    // After calculating adjustedTdee
-    const updateUserCalories = async (userId, adjustedTdee) => {
-      try {
-        const userDocRef = doc(db, 'users', userId);
-        await updateDoc(userDocRef, {
-          targetCalories: adjustedTdee,
-        });
-        console.log('Target calories updated successfully!');
-      } catch (error) {
-        console.error('Error updating target calories:', error);
-      }
-    };
-  
-    adjustedTdee = Math.round(adjustedTdee);
-    // Update the user's targetCalories field
-  
-    console.log('Calculated TDEE:', tdee);
-    console.log('Adjusted TDEE:', adjustedTdee);
-  
-    // Adjust TDEE based on goals
-    if (safeUserData.goals && safeUserData.goals.length > 0) {
-      console.log('Goal for TDEE adjustment:', safeUserData.goals[0].title);
-      if (safeUserData.goals[0].title === 'Weight Gain') {
-        adjustedTdee = tdee + 200;
-      } else if (safeUserData.goals[0].title === 'Weight Loss') {
-        adjustedTdee = tdee - 500;
-  
-        // Ensure minimum healthy calorie intake
-        if (safeUserData.gender === 'male' && adjustedTdee < 1500) {
-          adjustedTdee = 1500;
-        } else if (safeUserData.gender === 'female' && adjustedTdee < 1200) {
-          adjustedTdee = 1200;
-        }
-      }
-    }
-  
-    // Round to nearest whole number for cleaner display
-    adjustedTdee = Math.round(adjustedTdee);
-  
-    if (userData && userData.uid) {
-      updateUserCalories(userData.uid, adjustedTdee);
-    }
-  
-    console.log('Final adjusted TDEE:', adjustedTdee);
-  
-    // Add health condition to the prompt if provided
-    const healthConditionText = healthCondition ? 
-      `Health condition: ${healthCondition}. Please tailor recommendations to be appropriate for someone with this condition. ` : 
-      '';
-  
-    const finalPrompt = `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} 
-    with Indian food specific to ${state} region. Allergies: ${allergies}. 
-    ${healthConditionText}
-    Calorie intake target per day MUST be within 50 calories of ${adjustedTdee}. Ensure that the total calories from all meals and snacks add up to this target.
-    Monthly budget: ${safeUserData.budget.amount} INR. 
-  
-  DO NOT include ragi, jowar, quinoa, puttu or any foods that are not found/used much in metro cities, in any meal suggestions.
-  
-  For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
-  
-  Start with just the day name (e.g., "Monday")
-  Exercise: [brief workout plan that is appropriate for someone with ${healthCondition ? 'the mentioned health condition' : 'the user\'s profile'}]
-  Breakfast : [suggest additional food items to take along with breakfast, specifying how many calories (kcal) they provide at the end of the line]
-  Snack : [ONLY suggest fresh fruits, coconut water, ragi malt, or lassi as snack options. Include the calorie count (kcal) for each. ALWAYS suggest at least one fruit option. Ensure that the options are appropriate for the user's diet goals and health condition.]
-  Lunch : [suggest food items for lunch, specifying how many calories (kcal) they provide at the end of the line]
-  Dinner : [suggest additional food items to take along with dinner, specifying how many calories (kcal) they provide at the end of the line]
-  Tracking: [simple tip for monitoring progress]
-  
-  At the end of each day plan, include a brief note titled "Snack Benefits" that explains how the suggested snacks (fruits, coconut water, ragi malt, lassi) specifically help with the user's ${goal} goal. The explanation should be 1-2 sentences highlighting the nutritional benefits of the snacks.
-  
-  Keep each section brief - 1-2 sentences maximum. Focus on actionable items. All suggestions should be familiar, common, and easy-to-eat ${state}-style South Indian cuisine options that locals regularly consume. Only include dishes and ingredients that are widely available and commonly prepared in households in the ${state} region, tailored to the user's diet and allergies.
-  
-  The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${adjustedTdee}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.
-  
-  After the 7-day meal plan, include a "Weekly Summary" section that shows the total calories for each day and the average for the week, ensuring it aligns with the ${adjustedTdee} target.
-  
-  Remember to adhere strictly to the specified diet preferences, allergies, and budget constraints while meeting the calorie target.`;
-  
-    console.log('Generated prompt:', finalPrompt);
-  
-    return finalPrompt;
+const createPrompt = (userData, healthCondition = '') => {
+  // Log the raw userData coming in
+  console.log(
+    'createPrompt received userData:',
+    JSON.stringify(userData, null, 2)
+  );
+
+  // Default values for userData to prevent undefined errors
+  const userDataDefaults = {
+    goals: [],
+    preferences: {
+      diet: 'balanced',
+      allergies: [],
+      state: 'general South Indian',
+    },
+    weight: 70,
+    height: { totalInches: 65 },
+    dateOfBirth: { age: 30 },
+    gender: 'male',
+    workoutFrequency: 'moderate',
+    budget: { amount: 5000 },
   };
+
+  // Merge defaults with provided userData
+  const safeUserData = {
+    ...userDataDefaults,
+    ...userData,
+    preferences: {
+      ...userDataDefaults.preferences,
+      ...(userData?.preferences || {}),
+    },
+    height: {
+      ...userDataDefaults.height,
+      ...(userData?.height || {}),
+    },
+    dateOfBirth: {
+      ...userDataDefaults.dateOfBirth,
+      ...(userData?.dateOfBirth || {}),
+    },
+    budget: {
+      ...userDataDefaults.budget,
+      ...(userData?.budget || {}),
+    },
+  };
+
+  // Log the processed safeUserData after defaults are applied
+  console.log(
+    'After applying defaults:',
+    JSON.stringify(safeUserData, null, 2)
+  );
+
+  const goal =
+    safeUserData.goals && safeUserData.goals.length > 0
+      ? safeUserData.goals[0]?.title || 'health improvement'
+      : 'health improvement';
+
+  const targetWeight =
+    safeUserData.goals &&
+    safeUserData.goals.length > 0 &&
+    safeUserData.goals[0]?.targetWeight
+      ? safeUserData.goals[0]?.targetWeight
+      : null;
+
+  const weightGoalText = targetWeight
+    ? `with a target weight of ${targetWeight}kg`
+    : '';
+
+  const diet = safeUserData.preferences?.diet || 'balanced';
+  const allergies = safeUserData.preferences?.allergies?.join(',') || 'none';
+  const state = safeUserData.preferences?.state || 'general South Indian';
+  const currentWeight = safeUserData.weight || 70;
+
+  const weightContext =
+    currentWeight && targetWeight
+      ? `Current weight: ${currentWeight}kg, target: ${targetWeight}kg. `
+      : '';
+
+  // Calculate BMR (Basal Metabolic Rate)
+  let bmr = 0;
+  if (safeUserData.gender === 'female') {
+    bmr =
+      655.1 +
+      9.563 * currentWeight +
+      1.85 * (safeUserData.height?.totalInches || 65) * 2.54 -
+      4.676 * (safeUserData.dateOfBirth?.age || 30);
+  } else {
+    bmr =
+      66.47 +
+      13.75 * currentWeight +
+      5.003 * (safeUserData.height?.totalInches || 65) * 2.54 -
+      6.755 * (safeUserData.dateOfBirth?.age || 30);
+  }
+
+  // Activity factor based on workout frequency
+  const activityFactors = {
+    none: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    active: 1.725,
+    intense: 1.9,
+  };
+
+  const activityFactor = activityFactors[safeUserData.workoutFrequency] || 1.2;
+
+  // Calculate TDEE (Total Daily Energy Expenditure)
+  let tdee = bmr * activityFactor;
+  let adjustedTdee = tdee;
+
+  // After calculating adjustedTdee
+  const updateUserCalories = async (userId, adjustedTdee) => {
+    try {
+      const userDocRef = doc(db, 'users', userId);
+      await updateDoc(userDocRef, {
+        targetCalories: adjustedTdee,
+      });
+      console.log('Target calories updated successfully!');
+    } catch (error) {
+      console.error('Error updating target calories:', error);
+    }
+  };
+
+  adjustedTdee = Math.round(adjustedTdee);
+  // Update the user's targetCalories field
+
+  console.log('Calculated TDEE:', tdee);
+  console.log('Adjusted TDEE:', adjustedTdee);
+
+  // Adjust TDEE based on goals
+  if (safeUserData.goals && safeUserData.goals.length > 0) {
+    console.log('Goal for TDEE adjustment:', safeUserData.goals[0].title);
+    if (safeUserData.goals[0].title === 'Weight Gain') {
+      adjustedTdee = tdee + 200;
+    } else if (safeUserData.goals[0].title === 'Weight Loss') {
+      adjustedTdee = tdee - 500;
+
+      // Ensure minimum healthy calorie intake
+      if (safeUserData.gender === 'male' && adjustedTdee < 1500) {
+        adjustedTdee = 1500;
+      } else if (safeUserData.gender === 'female' && adjustedTdee < 1200) {
+        adjustedTdee = 1200;
+      }
+    }
+  }
+
+  // Round to nearest whole number for cleaner display
+  adjustedTdee = Math.round(adjustedTdee);
+
+  if (userData && userData.uid) {
+    updateUserCalories(userData.uid, adjustedTdee);
+  }
+
+  console.log('Final adjusted TDEE:', adjustedTdee);
+
+  // Add health condition to the prompt if provided
+  const healthConditionText = healthCondition ? 
+    `Health condition: ${healthCondition}. Please tailor recommendations to be appropriate for someone with this condition. ` : 
+    '';
+
+  const finalPrompt = `Suggest a meal-plan for ${goal} ${weightGoalText}. ${weightContext} Diet preference: ${diet} 
+  with Indian food specific to ${state} region. Allergies: ${allergies}. 
+  ${healthConditionText}
+  Calorie intake target per day MUST be within 50 calories of ${adjustedTdee}. Ensure that the total calories from all meals and snacks add up to this target.
+  Monthly budget: ${safeUserData.budget.amount} INR. 
+
+DO NOT include ragi, jowar, quinoa, puttu or any foods that are not found/used much in metro cities, in any meal suggestions.
+
+For each day (Monday-Sunday), structure as follows with EXACTLY these section headings:
+
+Start with just the day name (e.g., "Monday")
+Exercise: [brief workout plan that is appropriate for someone with ${healthCondition ? 'the mentioned health condition' : 'the user\'s profile'}]
+Breakfast : [suggest additional food items to take along with breakfast, specifying how many calories (kcal) they provide at the end of the line]
+Snack : [suggest food items to take as snacks, specifying how many calories (kcal) they provide at the end of the line]
+Lunch : [suggest food items for lunch, specifying how many calories (kcal) they provide at the end of the line]
+Dinner : [suggest additional food items to take along with dinner, specifying how many calories (kcal) they provide at the end of the line]
+Tracking: [simple tip for monitoring progress]
+
+
+Keep each section brief - 1-2 sentences maximum. Focus on actionable items. All suggestions should be familiar, common, and easy-to-eat ${state}-style South Indian cuisine options that locals regularly consume. Only include dishes and ingredients that are widely available and commonly prepared in households in the ${state} region, tailored to the user's diet and allergies.
+
+The food items should be very common that every person in ${state} would recognize and know how to prepare or easily obtain. Ensure calorie intake aligns with ${adjustedTdee}, and all recommendations fit within the monthly budget (${safeUserData.budget.amount}), though no pricing information should be included in the output.
+
+After the 7-day meal plan, include a "Weekly Summary" section that shows the total calories for each day and the average for the week, ensuring it aligns with the ${adjustedTdee} target.
+
+Remember to adhere strictly to the specified diet preferences, allergies, and budget constraints while meeting the calorie target.`;
+
+  console.log('Generated prompt:', finalPrompt);
+
+  return finalPrompt;
+};
 
 const { width } = Dimensions.get('window');
 const isMobile = width < 768;
@@ -680,39 +676,6 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     );
   };
 
-  const renderGoalExplanation = () => {
-    if (!userData?.goals || userData.goals.length === 0 || !dailyPlans || dailyPlans.length === 0) {
-      return null;
-    }
-  
-    const userGoal = userData.goals[0]?.title || 'health improvement';
-    const selectedDay = dailyPlans[selectedDayIndex];
-    
-    // Get fruit suggestions from the snack section
-    
-    const fruitMentions = [];
-    
-    
-    // Extract fruit mentions from snack items
-    
-    
-    // Generate goal-specific benefits text
-    
-    
-    return (
-      <View style={styles.goalExplanationContainer}>
-        <View style={styles.goalHeaderRow}>
-          <Info size={20} color="#22c55e" />
-          <Text style={styles.goalExplanationTitle}>Your Personalized Plan</Text>
-        </View>
-        <Text style={styles.goalExplanationText}>
-          We've designed this plan specifically for your <Text style={styles.highlightText}>{userGoal}</Text> goal. 
-          {fruitMentions.length > 0 ? ' '  : ''}
-        </Text>
-      </View>
-    );
-  };
-
   const renderDayPlan = () => {
     if (!dailyPlans || dailyPlans.length === 0) {
       return (
@@ -731,7 +694,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
               Generate a personalized 7-day meal and exercise plan based on your
               fitness goals and preferences.
             </Text>
-  
+
             <View style={styles.healthConditionContainer}>
               <Text style={styles.healthConditionLabel}>
                 Do you have any health conditions? (Optional)
@@ -744,7 +707,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
                 multiline={false}
               />
             </View>
-  
+
             <View style={styles.checkboxContainer}>
               <Checkbox
                 style={styles.checkbox}
@@ -756,7 +719,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
                 I accept CrunchX AI's Terms of Service and Privacy Policy.
               </Text>
             </View>
-  
+
             <Pressable
               style={[
                 styles.generateButton,
@@ -778,58 +741,13 @@ const PlanScreen = ({ userData: propUserData, route }) => {
         </View>
       );
     }
-  
+
     const selectedDay = dailyPlans[selectedDayIndex];
     if (!selectedDay) return null;
-  
-    // Helper function to highlight fruits in the snack section
-    const highlightFruits = (text) => {
-      const fruits = [
-        'apple', 'banana', 'orange', 'grapes', 'watermelon', 'mango', 'pineapple', 
-        'papaya', 'guava', 'pomegranate', 'kiwi', 'strawberry', 'blueberry', 
-        'raspberry', 'blackberry', 'fruit', 'fruits', 'melon', 'berries',
-        'sapota', 'chikoo', 'jackfruit', 'dragon fruit', 'custard apple', 'sitaphal',
-        'lychee', 'litchi', 'plum', 'apricot', 'peach', 'pear', 'fig', 'anjeer',
-        'coconut water', 'tender coconut', 'ragi malt', 'lassi'
-      ];
-      
-      // For each fruit in our list, check if it's in the text
-      let highlightedText = text;
-      fruits.forEach(fruit => {
-        const regex = new RegExp(`\\b${fruit}\\b`, 'gi');
-        highlightedText = highlightedText.replace(regex, match => `<b>${match}</b>`);
-      });
-      
-      // Split the text to preserve the calorie count formatting
-      const parts = highlightedText.split(/(\(\d+\s*kcal\))/);
-      
-      return (
-        <Text style={styles.sectionItem}>
-          {parts.map((part, index) => {
-            if (part.match(/\(\d+\s*kcal\)/)) {
-              return <Text key={index} style={styles.calorieText}>{part}</Text>;
-            } else if (part.includes('<b>')) {
-              // Process the part with bold tags
-              const boldParts = part.split(/(<b>.*?<\/b>)/);
-              return boldParts.map((boldPart, boldIndex) => {
-                if (boldPart.startsWith('<b>') && boldPart.endsWith('</b>')) {
-                  const content = boldPart.replace(/<b>(.*?)<\/b>/, '$1');
-                  return <Text key={`${index}-${boldIndex}`} style={styles.fruitHighlight}>{content}</Text>;
-                }
-                return <Text key={`${index}-${boldIndex}`}>{boldPart}</Text>;
-              });
-            }
-            return <Text key={index}>{part}</Text>;
-          })}
-        </Text>
-      );
-    };
-  
+
     return (
       <View style={styles.dayPlanContainer}>
-        
         <View style={styles.dayHeaderContainer}>
-        {renderGoalExplanation()}
           <Text style={styles.dayHeader}>{selectedDay.day}</Text>
           <View style={styles.actionButtonsContainer}>
             <Pressable
@@ -851,7 +769,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
                 Regenerate
               </Text>
             </Pressable>
-  
+
             <Pressable
               style={styles.actionButton}
               onPress={savePlanToFirebase}
@@ -873,7 +791,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
             </Pressable>
           </View>
         </View>
-  
+
         {selectedDay.sections.overview.length > 0 && (
           <View style={styles.overviewSection}>
             <Text style={styles.overviewText}>
@@ -881,23 +799,9 @@ const PlanScreen = ({ userData: propUserData, route }) => {
             </Text>
           </View>
         )}
-         {selectedDay.sections.snackBenefits && selectedDay.sections.snackBenefits.length > 0 && (
-          <View style={styles.snackBenefitsSection}>
-            <View style={styles.sectionHeader}>
-              <Info size={20} color="#22c55e" />
-              <Text style={styles.sectionTitle}>Snack Benefits</Text>
-            </View>
-            {selectedDay.sections.snackBenefits.map((item, index) => (
-              <Text key={index} style={styles.benefitsText}>
-                {item}
-              </Text>
-            ))}
-          </View>
-        )}
-  
-        {/* Render all sections except overview and snackBenefits first */}
+
         {Object.entries(selectedDay.sections)
-          .filter(([key]) => key !== 'overview' && key !== 'snackBenefits')
+          .filter(([key]) => key !== 'overview')
           .map(([key, items]) => (
             <View key={key} style={styles.planSection}>
               <View style={styles.sectionHeader}>
@@ -905,17 +809,12 @@ const PlanScreen = ({ userData: propUserData, route }) => {
                 <Text style={styles.sectionTitle}>{getSectionTitle(key)}</Text>
               </View>
               {items.map((item, index) => (
-                key === 'snack' ? 
-                  highlightFruits(item) : 
-                  <Text key={index} style={styles.sectionItem}>
-                    {item}
-                  </Text>
+                <Text key={index} style={styles.sectionItem}>
+                  {item}
+                </Text>
               ))}
             </View>
           ))}
-  
-        {/* Render snack benefits section if it exists */}
-       
       </View>
     );
   };
@@ -973,40 +872,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
-  },
-  goalExplanationContainer: {
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: '#f0fff4',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#dcfce7',
-  },
-  goalHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  goalExplanationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginLeft: 8,
-  },
-  goalExplanationText: {
-    fontSize: 14,
-    color: '#334155',
-    lineHeight: 20,
-    paddingLeft: 28,
-  },
-  highlightText: {
-    color: '#22c55e',
-    fontWeight: '600',
   },
   backButton: {
     width: 40,
@@ -1075,35 +940,6 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
     elevation: 1,
     textAlign: 'center',  // Center the input text
-  },
-  fruitHighlight: {
-    color: '#22c55e',
-    fontWeight: '600',
-  },
-  calorieText: {
-    color: '#64748b',
-    fontStyle: 'italic',
-  },
-  snackBenefitsSection: {
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: '#f0f9ff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#e0f2fe',
-  },
-  benefitsText: {
-    fontSize: 14,
-    color: '#334155',
-    lineHeight: 20,
-    marginBottom: 4,
-    paddingLeft: 28,
-    fontStyle: 'italic',
   },
   dayTabsWrapper: {
     paddingVertical: 12,

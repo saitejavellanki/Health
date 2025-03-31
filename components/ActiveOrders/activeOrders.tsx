@@ -13,6 +13,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import {setupActiveOrderNotifications} from '../Notification/OrderStatus-notification-service';
 import * as Notifications from 'expo-notifications'; 
+import React from 'react';
 
 const ActiveOrders = () => {
   const [activeOrders, setActiveOrders] = useState([]);
@@ -50,11 +51,13 @@ const ActiveOrders = () => {
           querySnapshot.forEach((doc) => {
             const orderData = { id: doc.id, ...doc.data() };
             // Only add orders that meet all criteria
+            // Added check for paymentDetails.status === 'success' (meaning paid)
+            // Also removed pending from the status check since we don't want to show pending orders
             if (
-              orderData.status !== 'pending' && 
               orderData.status !== 'cancelled' && 
               orderData.deliveryStatus !== 'completed' && 
-              orderData.deliveryStatus !== 'cancelled'
+              orderData.deliveryStatus !== 'cancelled' &&
+              orderData.paymentDetails?.status === 'success'
             ) {
               orders.push(orderData);
             }
@@ -65,7 +68,14 @@ const ActiveOrders = () => {
           
           // Clean up previous notification listeners before setting up new ones
           notificationUnsubscribers.forEach(unsubscribe => unsubscribe());
-          notificationUnsubscribers = setupActiveOrderNotifications(orders);
+          
+          // Filter orders with 'paid' status for notifications
+          const paidOrders = orders.filter(order => 
+            order.paymentDetails?.status === 'success'
+          );
+          
+          // Only set up notifications for paid orders
+          notificationUnsubscribers = setupActiveOrderNotifications(paidOrders);
         }, (error) => {
           console.error('Error listening to orders:', error);
           setLoading(false);

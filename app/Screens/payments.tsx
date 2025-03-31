@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Modal, TextInput, KeyboardAvoidingView, Platform, BackHandler } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ChevronLeft, Check, Shield, Lock, MapPin, Edit2, Phone } from 'lucide-react-native';
 import { styles } from "../Utils/PaymentsStyles.tsx";
@@ -8,15 +8,13 @@ import { collection, doc, getDoc, updateDoc, getDocs, query, where, setDoc } fro
 import * as Crypto from 'expo-crypto';
 import WebView from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { sendOrderConfirmationNotification } from '../../components/Notification/order-notification-service.js';
 
-// PayU configuration remains the same
+// PayU configuration
 const PAYU_CONFIG = {
-  key: 'gSR07M', // Replace with actual PayU merchant key
-  salt: 'RZdd32itbMYSKM7Kwo4teRkhUKCsWbnj', // Replace with actual PayU salt
-  testMode: false, // Use test mode for development
+  key: 'gSR07M',
+  salt: 'RZdd32itbMYSKM7Kwo4teRkhUKCsWbnj',
+  testMode: false,
   productionBaseUrl: 'https://secure.payu.in/_payment',
   testBaseUrl: 'https://test.payu.in/_payment',
 };
@@ -24,11 +22,7 @@ const PAYU_CONFIG = {
 // Hash generation function
 const generateHash = async (input) => {
   try {
-    const hash = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA512,
-      input
-    );
-    return hash;
+    return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA512, input);
   } catch (error) {
     console.error('Error generating hash:', error);
     throw error;
@@ -36,119 +30,29 @@ const generateHash = async (input) => {
 };
 
 export default function PaymentScreen() {
-  // State variables remain the same
+  // State variables
   const params = useLocalSearchParams();
-  
   const [orderType, setOrderType] = useState(params.orderType || '');
   const [selectedFrequency, setSelectedFrequency] = useState(params.selectedFrequency || '');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(params.selectedTimeSlot || '');
   const [selectedDuration, setSelectedDuration] = useState(params.selectedDuration || '');
   const [address, setAddress] = useState('');
-  
   const [cartItems, setCartItems] = useState({});
   const [priceInfo, setPriceInfo] = useState({ subtotal: '0.00', total: '0.00', savings: '0.00' });
   const [productCategories, setProductCategories] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
-  
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
-  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const [paymentFormData, setPaymentFormData] = useState(null);
-  
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [newAddress, setNewAddress] = useState('');
-
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
-
-  // Create a ref for the WebView
-  const webViewRef = useRef(null);
-
-  // Handle UPI deep links
-  const handleUpiDeepLink = async (url) => {
-    try {
-      console.log("Attempting to open UPI URL:", url);
-      
-      // Check if the URL is supported
-      const canOpen = await Linking.canOpenURL(url);
-      
-      if (canOpen) {
-        // Try to open the URL
-        const opened = await Linking.openURL(url);
-        console.log("URL opened successfully");
-      } else {
-        console.log("Cannot open URL: " + url);
-        
-        // Try to extract UPI ID and amount to create a generic UPI intent
-        let genericUpiUrl = null;
-        
-        // Extract necessary parameters if available
-        const match = url.match(/pa=([^&]+).*&am=([^&]+)/);
-        if (match) {
-          const payeeAddress = match[1];
-          const amount = match[2];
-          genericUpiUrl = `upi://pay?pa=${payeeAddress}&am=${amount}&cu=INR`;
-          
-          // Try with the generic URL
-          const canOpenGeneric = await Linking.canOpenURL(genericUpiUrl);
-          if (canOpenGeneric) {
-            await Linking.openURL(genericUpiUrl);
-            return;
-          }
-        }
-        
-        // If all attempts fail, show error to user
-        Alert.alert(
-          "Payment App Required",
-          "The payment app needed is not installed. Please install a UPI app or choose another payment method.",
-          [{ text: "OK" }]
-        );
-      }
-    } catch (error) {
-      console.error("Error opening UPI URL:", error);
-      Alert.alert(
-        "Error",
-        "There was a problem opening the payment app. Please try another payment method.",
-        [{ text: "OK" }]
-      );
-    }
-  };
-
-  // Handle Android back button
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (showPaymentWebView) {
-          Alert.alert(
-            'Cancel Payment',
-            'Are you sure you want to cancel this payment?',
-            [
-              { text: 'No', style: 'cancel', onPress: () => {} },
-              { 
-                text: 'Yes', 
-                onPress: () => {
-                  setShowPaymentWebView(false);
-                  setIsProcessing(false);
-                  if (paymentFormData) {
-                    updateOrderStatus(paymentFormData.txnid, 'cancelled', { status: 'cancelled' });
-                  }
-                }
-              }
-            ]
-          );
-          return true;
-        }
-        return false;
-      });
-      
-      return () => backHandler.remove();
-    }
-  }, [showPaymentWebView]);
+  const insets = useSafeAreaInsets();
 
   // Fetch user data from Firebase
   useEffect(() => {
@@ -197,25 +101,13 @@ export default function PaymentScreen() {
     fetchUserData();
   }, []);
   
-  
   // Parse JSON params
   useEffect(() => {
     try {
-      if (params.cartItems) {
-        setCartItems(JSON.parse(params.cartItems));
-      }
-      
-      if (params.priceInfo) {
-        setPriceInfo(JSON.parse(params.priceInfo));
-      }
-      
-      if (params.productCategories) {
-        setProductCategories(JSON.parse(params.productCategories));
-      }
-      
-      if (params.allProducts) {
-        setAllProducts(JSON.parse(params.allProducts));
-      }
+      if (params.cartItems) setCartItems(JSON.parse(params.cartItems));
+      if (params.priceInfo) setPriceInfo(JSON.parse(params.priceInfo));
+      if (params.productCategories) setProductCategories(JSON.parse(params.productCategories));
+      if (params.allProducts) setAllProducts(JSON.parse(params.allProducts));
     } catch (error) {
       console.error('Error parsing JSON params:', error);
       Alert.alert('Error', 'There was an error loading your order details.');
@@ -241,7 +133,7 @@ export default function PaymentScreen() {
     return `TXN_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
   };
   
-  // Modified function to prepare payment data with UPI specific parameters
+  // Prepare payment data
   const preparePaymentData = async () => {
     if (!userData) {
       Alert.alert('Error', 'User data not available. Please try again.');
@@ -254,13 +146,11 @@ export default function PaymentScreen() {
     const firstname = userData.firstName || userData.displayName || 'Customer';
     const email = userData.email || 'customer@example.com';
     const phone = phoneNumber || '9999999999';
-    const surl = 'https://yourapp.com/success'; // Replace with your success URL
-    const furl = 'https://yourapp.com/failure'; // Replace with your failure URL
+    const surl = 'https://yourapp.com/success'; 
+    const furl = 'https://yourapp.com/failure';
     
     // Generate hash string as per PayU format
     const hashString = `${PAYU_CONFIG.key}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${PAYU_CONFIG.salt}`;
-    
-    // Generate the hash
     const hash = await generateHash(hashString);
     
     return {
@@ -273,19 +163,11 @@ export default function PaymentScreen() {
       phone,
       surl,
       furl,
-      hash,
-      pg: 'UPI',                    // Force UPI payment method
-      preferred_payment_method: 'UPI',
-      enforce_paymethod: 'UPI',
-      bankcode: 'UPI',
-      drop_category: 'UPI',         // Additional parameter to prioritize UPI 
-      user_credentials: `${PAYU_CONFIG.key}:${email}`, // Add user credentials
-      instrument_id: 'UPI',         // Another way to force UPI
-      instrument_type: 'UPI'        // And another
+      hash
     };
   };
   
-  // Modified payment submission handler
+  // Payment submission handler
   const handleSubmitPayment = async () => {
     if (!userData) {
       Alert.alert('Error', 'User data not available. Please try again.');
@@ -305,7 +187,6 @@ export default function PaymentScreen() {
     setIsProcessing(true);
     
     try {
-      // Prepare payment data with UPI specific parameters
       const paymentData = await preparePaymentData();
       if (!paymentData) {
         setIsProcessing(false);
@@ -324,52 +205,156 @@ export default function PaymentScreen() {
       setIsProcessing(false);
     }
   };
-  
 
-  const renderPhoneModal = () => {
-    return (
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={phoneModalVisible}
-        onRequestClose={() => setPhoneModalVisible(false)}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Phone Number</Text>
-                <Pressable style={styles.closeButton} onPress={() => setPhoneModalVisible(false)}>
-                  <Text style={{ fontSize: 16, color: '#64748b' }}>Cancel</Text>
-                </Pressable>
-              </View>
-              
-              <View style={styles.modalBody}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Phone Number</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your phone number"
-                    value={newPhoneNumber}
-                    onChangeText={setNewPhoneNumber}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.modalFooter}>
-                <Pressable style={styles.saveButton} onPress={handleUpdatePhone}>
-                  <Text style={styles.saveButtonText}>Update Phone</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    );
+  // Save order to Firestore
+  const saveOrderToFirestore = async (paymentData) => {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('User not authenticated');
+      
+      const ordersCollection = collection(db, 'orders');
+      const orderRef = doc(ordersCollection);
+      
+      const orderData = {
+        userId: currentUser.uid,
+        orderId: paymentData.txnid,
+        orderType,
+        items: getCartItemsForDisplay().map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        frequency: selectedFrequency,
+        timeSlot: selectedTimeSlot,
+        duration: selectedDuration,
+        address,
+        phoneNumber,
+        priceInfo,
+        paymentMethod: 'PayU Gateway',
+        status: 'pending',
+        deliveryStatus: 'pending',
+        createdAt: new Date(),
+      };
+      
+      await setDoc(orderRef, orderData);
+      return orderRef;
+    } catch (error) {
+      console.error('Error saving order:', error);
+      throw error;
+    }
   };
-
+  
+  // Handle payment response
+  const handlePaymentResponse = (data) => {
+    try {
+      const response = JSON.parse(data);
+      
+      setShowPaymentWebView(false);
+      setIsProcessing(false);
+      
+      if (response.status === 'success') {
+        // Payment successful
+        setIsComplete(true);
+        
+        // Update order status in Firestore
+        updateOrderStatus(paymentFormData.txnid, 'completed', response);
+        
+        const orderDetails = {
+          orderId: paymentFormData.txnid,
+          orderNumber: paymentFormData.txnid.substring(4, 10),
+          amount: paymentFormData.amount
+        };
+        
+        sendOrderConfirmationNotification(auth.currentUser.uid, orderDetails)
+          .catch(error => console.error('Error sending notification:', error));
+        
+        // Redirect to confirmation
+        setTimeout(() => {
+          router.replace({
+            pathname: '/Screens/OrderConfirmationScreen',
+            params: { orderId: paymentFormData.txnid }
+          });
+        }, 2000);
+      } else {
+        // Payment failed
+        Alert.alert(
+          'Payment Failed',
+          response.error_message || 'Your payment was not processed. Please try again.',
+          [{ text: 'OK', onPress: () => updateOrderStatus(paymentFormData.txnid, 'failed', response) }]
+        );
+      }
+    } catch (error) {
+      console.error('Error processing payment response:', error);
+      Alert.alert('Error', 'There was an error processing your payment. Please try again.');
+      setShowPaymentWebView(false);
+      setIsProcessing(false);
+    }
+  };
+  
+  // Update order status function
+  const updateOrderStatus = async (orderId, status, paymentDetails) => {
+    try {
+      const ordersRef = collection(db, 'orders');
+      const querySnapshot = await getDocs(query(ordersRef, where('orderId', '==', orderId)));
+      
+      if (!querySnapshot.empty) {
+        const orderDoc = querySnapshot.docs[0];
+        await updateDoc(orderDoc.ref, {
+          status,
+          paymentDetails,
+          updatedAt: new Date()
+        });
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+    }
+  };
+  
+  const getDeliveryDetailsText = () => {
+    if (orderType === 'one-time') {
+      const timeSlot = selectedTimeSlot || '';
+      const deliveryTime = timeSlot.replace(/-/g, ' ').replace('today', 'Today').replace('tomorrow', 'Tomorrow');
+      return `One-time delivery: ${deliveryTime}`;
+    } else if (orderType === 'subscription') {
+      const frequency = selectedFrequency.charAt(0).toUpperCase() + selectedFrequency.slice(1);
+      const duration = selectedDuration.replace('-', ' ');
+      return `${frequency} delivery for ${duration}`;
+    }
+    return 'Delivery details not available';
+  };
+  
+  // Address update handlers
+  const handleUpdateAddress = async () => {
+    if (newAddress.trim().length === 0) {
+      Alert.alert('Invalid Address', 'Please enter a valid delivery address.');
+      return;
+    }
+    
+    try {
+      setAddress(newAddress);
+      setAddressModalVisible(false);
+      
+      // Update address in Firebase if user is logged in
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userDocRef, { address: newAddress });
+      }
+      
+      Alert.alert('Success', 'Delivery address has been updated.');
+    } catch (error) {
+      console.error('Error updating address:', error);
+      Alert.alert('Error', 'Failed to update address. Please try again.');
+    }
+  };
+  
+  const openAddressModal = () => {
+    setNewAddress(address);
+    setAddressModalVisible(true);
+  };
+  
+  // Phone number update handlers
   const handleUpdatePhone = async () => {
     if (newPhoneNumber.trim().length < 10) {
       Alert.alert('Invalid Phone Number', 'Please enter a valid phone number.');
@@ -399,235 +384,98 @@ export default function PaymentScreen() {
     setPhoneModalVisible(true);
   };
   
-  
-  // Save order to Firestore
-  const saveOrderToFirestore = async (paymentData) => {
-    try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) throw new Error('User not authenticated');
-      
-      // Create a proper reference to the orders collection
-      const ordersCollection = collection(db, 'orders');
-      // Create a new document with auto-generated ID
-      const orderRef = doc(ordersCollection);
-      
-      const orderData = {
-        userId: currentUser.uid,
-        orderId: paymentData.txnid,
-        orderType,
-        items: getCartItemsForDisplay().map(item => ({
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price
-        })),
-        frequency: selectedFrequency,
-        timeSlot: selectedTimeSlot,
-        duration: selectedDuration,
-        address,
-        phoneNumber, // Add phone number to order
-        priceInfo,
-        paymentMethod: 'PayU Gateway',
-        status: 'pending',
-        deliveryStatus: 'pending', // Add delivery status field
-        createdAt: new Date(),
-      };
-      
-      // Use setDoc for a new document with a specific ID
-      await setDoc(orderRef, orderData);
-      return orderRef;
-    } catch (error) {
-      console.error('Error saving order:', error);
-      throw error;
-    }
-  };
-  
-  
-  // Handle payment response
-  const handlePaymentResponse = (data) => {
-    try {
-      // Parse response data
-      const response = JSON.parse(data);
-      
-      setShowPaymentWebView(false);
-      setIsProcessing(false);
-      
-      if (response.status === 'success') {
-        // Payment successful
-        setIsComplete(true);
-        
-        // Update order status in Firestore
-        updateOrderStatus(paymentFormData.txnid, 'completed', response);
-        
-        const orderDetails = {
-          orderId: paymentFormData.txnid,
-          orderNumber: paymentFormData.txnid.substring(4, 10), // Extract shorter version for notification
-          amount: paymentFormData.amount
-        };
-        
-        sendOrderConfirmationNotification(auth.currentUser.uid, orderDetails)
-          .then(success => {
-            if (!success) {
-              console.warn('Failed to send notification, but payment was successful');
-            }
-          })
-          .catch(error => {
-            console.error('Error sending notification:', error);
-          });
-        // Redirect to confirmation after success
-        setTimeout(() => {
-          router.replace({
-            pathname: '/Screens/OrderConfirmationScreen',
-            params: { orderId: paymentFormData.txnid }
-          });
-        }, 2000);
-      } else {
-        // Payment failed
-        Alert.alert(
-          'Payment Failed',
-          response.error_message || 'Your payment was not processed. Please try again.',
-          [{ text: 'OK', onPress: () => updateOrderStatus(paymentFormData.txnid, 'failed', response) }]
-        );
-      }
-    } catch (error) {
-      console.error('Error processing payment response:', error);
-      Alert.alert('Error', 'There was an error processing your payment. Please try again.');
-      setShowPaymentWebView(false);
-      setIsProcessing(false);
-    }
-  };
-  
-  // Update order status function
-  // Update order status function
-const updateOrderStatus = async (orderId, status, paymentDetails) => {
-  try {
-    // Find order by transaction ID
-    const ordersRef = collection(db, 'orders');
-    const querySnapshot = await getDocs(query(ordersRef, where('orderId', '==', orderId)));
-    
-    if (!querySnapshot.empty) {
-      const orderDoc = querySnapshot.docs[0];
-      await updateDoc(orderDoc.ref, {
-        status,
-        paymentDetails,
-        updatedAt: new Date()
-      });
-      
-      // Send notification if payment completed
-      if (status === 'completed') {
-        const orderData = orderDoc.data();
-        const orderDetails = {
-          orderId: orderId,
-          orderNumber: orderId.substring(4, 10), // Extract shorter version for notification
-          amount: orderData.priceInfo.total
-        };
-        
-        await sendOrderConfirmationNotification(orderData.userId, orderDetails);
-      }
-    }
-  } catch (error) {
-    console.error('Error updating order status:', error);
-  }
-};
-  
-  const getDeliveryDetailsText = () => {
-    if (orderType === 'one-time') {
-      const timeSlot = selectedTimeSlot || '';
-      const deliveryTime = timeSlot.replace(/-/g, ' ').replace('today', 'Today').replace('tomorrow', 'Tomorrow');
-      return `One-time delivery: ${deliveryTime}`;
-    } else if (orderType === 'subscription') {
-      const frequency = selectedFrequency.charAt(0).toUpperCase() + selectedFrequency.slice(1);
-      const duration = selectedDuration.replace('-', ' ');
-      return `${frequency} delivery for ${duration}`;
-    }
-    return 'Delivery details not available';
-  };
-  
-  // Handle address update
-  const handleUpdateAddress = async () => {
-    if (newAddress.trim().length === 0) {
-      Alert.alert('Invalid Address', 'Please enter a valid delivery address.');
-      return;
-    }
-    
-    try {
-      setAddress(newAddress);
-      setAddressModalVisible(false);
-      
-      // Update address in Firebase if user is logged in
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        await updateDoc(userDocRef, { address: newAddress });
-      }
-      
-      Alert.alert('Success', 'Delivery address has been updated.');
-    } catch (error) {
-      console.error('Error updating address:', error);
-      Alert.alert('Error', 'Failed to update address. Please try again.');
-    }
-  };
-  
-  // Initialize newAddress when opening modal
-  const openAddressModal = () => {
-    setNewAddress(address);
-    setAddressModalVisible(true);
-  };
-  
-  // Address Update Modal
-  const renderAddressModal = () => {
-    return (
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={addressModalVisible}
-        onRequestClose={() => setAddressModalVisible(false)}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Delivery Address</Text>
-                <Pressable style={styles.closeButton} onPress={() => setAddressModalVisible(false)}>
-                  <Text style={{ fontSize: 16, color: '#64748b' }}>Cancel</Text>
-                </Pressable>
-              </View>
-              
-              <View style={styles.modalBody}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>New Address</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your full address"
-                    value={newAddress}
-                    onChangeText={setNewAddress}
-                    multiline={true}
-                    numberOfLines={3}
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.modalFooter}>
-                <Pressable style={styles.saveButton} onPress={handleUpdateAddress}>
-                  <Text style={styles.saveButtonText}>Update Address</Text>
-                </Pressable>
+  // Render modals
+  const renderAddressModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={addressModalVisible}
+      onRequestClose={() => setAddressModalVisible(false)}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Delivery Address</Text>
+              <Pressable style={styles.closeButton} onPress={() => setAddressModalVisible(false)}>
+                <Text style={{ fontSize: 16, color: '#64748b' }}>Cancel</Text>
+              </Pressable>
+            </View>
+            
+            <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>New Address</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your full address"
+                  value={newAddress}
+                  onChangeText={setNewAddress}
+                  multiline={true}
+                  numberOfLines={3}
+                />
               </View>
             </View>
+            
+            <View style={styles.modalFooter}>
+              <Pressable style={styles.saveButton} onPress={handleUpdateAddress}>
+                <Text style={styles.saveButtonText}>Update Address</Text>
+              </Pressable>
+            </View>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    );
-  };
-  
-  // Modified: PayU WebView with UPI specific JavaScript injection
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  const renderPhoneModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={phoneModalVisible}
+      onRequestClose={() => setPhoneModalVisible(false)}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Phone Number</Text>
+              <Pressable style={styles.closeButton} onPress={() => setPhoneModalVisible(false)}>
+                <Text style={{ fontSize: 16, color: '#64748b' }}>Cancel</Text>
+              </Pressable>
+            </View>
+            
+            <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your phone number"
+                  value={newPhoneNumber}
+                  onChangeText={setNewPhoneNumber}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+            
+            <View style={styles.modalFooter}>
+              <Pressable style={styles.saveButton} onPress={handleUpdatePhone}>
+                <Text style={styles.saveButtonText}>Update Phone</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // Render payment WebView
   const renderPaymentWebView = () => {
     if (!showPaymentWebView || !paymentFormData) return null;
     
-    // Use payment URL 
     const paymentUrl = PAYU_CONFIG.testMode ? PAYU_CONFIG.testBaseUrl : PAYU_CONFIG.productionBaseUrl;
     
-    // Create HTML form for payment submission with UPI focus
     const formHtml = `
       <html>
         <head>
@@ -732,151 +580,38 @@ const updateOrderStatus = async (orderId, status, paymentDetails) => {
           </View>
           
           <WebView
-  ref={webViewRef}
-  source={{ html: formHtml }}
-  injectedJavaScript={`
-    (function() {
-      // More aggressive interception of UPI links
-      function interceptLinks() {
-        // All possible UPI app URI schemes
-        const upiSchemes = ['upi://', 'phonepe://', 'gpay://', 'paytm://', 'bhim://', 'tez://'];
-        
-        // Intercept all anchor tags
-        const links = document.getElementsByTagName('a');
-        for (let i = 0; i < links.length; i++) {
-          links[i].addEventListener('click', function(e) {
-            const href = this.getAttribute('href');
-            if (href && upiSchemes.some(scheme => href.startsWith(scheme))) {
-              e.preventDefault();
-              e.stopPropagation();
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'upi_deeplink',
-                url: href
-              }));
-              return false;
-            }
-          });
-        }
-        
-        // Add direct observer for buttons that might trigger UPI apps
-        const payButtons = document.querySelectorAll('.upi-option, .upi-button, [data-payment="UPI"]');
-        payButtons.forEach(button => {
-          button.addEventListener('click', function() {
-            console.log('UPI payment option clicked');
-          });
-        });
-      }
-      
-      // Run interceptor on load and periodically to catch dynamically added elements
-      interceptLinks();
-      setInterval(interceptLinks, 1000);
-      
-      // Watch for DOM changes more aggressively
-      const observer = new MutationObserver(function(mutations) {
-        interceptLinks();
-      });
-      
-      observer.observe(document.body, { 
-        childList: true, 
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['href']
-      });
-      
-      // Additional instrumentation to debug
-      console.log = function(message) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'console',
-          message: message
-        }));
-      };
-    })();
-  `}
-  onMessage={(event) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'upi_deeplink') {
-        handleUpiDeepLink(data.url);
-      } else if (data.type === 'console') {
-        console.log("WebView console:", data.message);
-      }
-    } catch (e) {
-      // Handle direct URL string format for backward compatibility
-      const url = event.nativeEvent.data;
-      if (url.startsWith('phonepe://') || 
-          url.startsWith('gpay://') || 
-          url.startsWith('upi://') ||
-          url.startsWith('paytm://') ||
-          url.startsWith('bhim://')) {
-        handleUpiDeepLink(url);
-      }
-    }
-  }}
-  onNavigationStateChange={(navState) => {
-    console.log("Navigation state changed:", navState.url);
-    
-    // More comprehensive check for UPI deep links
-    const isUpiUrl = navState.url.startsWith('upi://') || 
-                      navState.url.startsWith('phonepe://') || 
-                      navState.url.startsWith('gpay://') || 
-                      navState.url.startsWith('paytm://') ||
-                      navState.url.startsWith('bhim://') ||
-                      navState.url.startsWith('tez://');
-    
-    if (isUpiUrl) {
-      if (webViewRef.current) {
-        webViewRef.current.stopLoading();
-      }
-      handleUpiDeepLink(navState.url);
-      return;
-    }
-    
-    // Handle success and failure URLs
-    if (navState.url.includes('success') || navState.url.includes('failure')) {
-      // Extract response data from URL
-      const urlParams = new URLSearchParams(navState.url.split('?')[1] || '');
-      const response = {};
-      
-      for (const [key, value] of urlParams.entries()) {
-        response[key] = value;
-      }
-      
-      response.status = navState.url.includes('success') ? 'success' : 'failed';
-      handlePaymentResponse(JSON.stringify(response));
-    }
-  }}
-  onShouldStartLoadWithRequest={(request) => {
-    console.log("Should start load:", request.url);
-    
-    // More comprehensive check for UPI deep links
-    const isUpiUrl = request.url.startsWith('upi://') || 
-                      request.url.startsWith('phonepe://') || 
-                      request.url.startsWith('gpay://') || 
-                      request.url.startsWith('paytm://') ||
-                      request.url.startsWith('bhim://') ||
-                      request.url.startsWith('tez://');
-    
-    if (isUpiUrl) {
-      handleUpiDeepLink(request.url);
-      return false; // Prevent WebView from trying to load this URL
-    }
-    return true; // Allow WebView to load other URLs
-  }}
-  javaScriptEnabled={true}
-  domStorageEnabled={true}
-  startInLoadingState={true}
-  renderLoading={() => (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#22c55e" />
-      <Text style={styles.loadingText}>Initializing payment gateway...</Text>
-    </View>
-  )}
-/>
+            source={{ html: formHtml }}
+            onNavigationStateChange={(navState) => {
+              // Handle success and failure URLs
+              if (navState.url.includes('success') || navState.url.includes('failure')) {
+                // Extract response data from URL
+                const urlParams = new URLSearchParams(navState.url.split('?')[1] || '');
+                const response = {};
+                
+                for (const [key, value] of urlParams.entries()) {
+                  response[key] = value;
+                }
+                
+                response.status = navState.url.includes('success') ? 'success' : 'failed';
+                handlePaymentResponse(JSON.stringify(response));
+              }
+            }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#22c55e" />
+                <Text style={styles.loadingText}>Initializing payment gateway...</Text>
+              </View>
+            )}
+          />
         </View>
       </Modal>
     );
   };
   
+  // Show loading indicator
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -885,39 +620,27 @@ const updateOrderStatus = async (orderId, status, paymentDetails) => {
       </View>
     );
   }
-  const insets = useSafeAreaInsets();
   
   // Main UI render
   return (
     <View style={styles.container}>
-      {/* Address Update Modal */}
+      {/* Modals */}
       {renderAddressModal()}
-
       {renderPhoneModal()}
-      
-      {/* Payment WebView Modal */}
       {renderPaymentWebView()}
       
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
-  <Pressable 
-    onPress={() => router.replace('/(tabs)/subscription')} 
-    style={styles.backButton}>
-    <ChevronLeft size={24} color="#000" />
-  </Pressable>
-  <Text style={styles.headerTitle}>Payment</Text>
-  <View style={styles.headerPlaceholder} />
-</View>
+        <Pressable 
+          onPress={() => router.replace('/(tabs)/subscription')} 
+          style={styles.backButton}>
+          <ChevronLeft size={24} color="#000" />
+        </Pressable>
+        <Text style={styles.headerTitle}>Payment</Text>
+        <View style={styles.headerPlaceholder} />
+      </View>
       
       <ScrollView style={styles.content}>
-        {/* User Info
-        {userData && (
-          <View style={styles.userInfoCard}>
-            <Text style={styles.userGreeting}>Hello, {userData.firstName || userData.displayName}</Text>
-            <Text style={styles.userEmail}>{userData.email}</Text>
-          </View>
-        )} */}
-        
         {/* Order Summary */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Order Summary</Text>
@@ -965,13 +688,11 @@ const updateOrderStatus = async (orderId, status, paymentDetails) => {
           </View>
         </View>
         
-        {/* Delivery Address with Update Button */}
+        {/* Delivery Address */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Delivery Address</Text>
-            <Pressable 
-              style={styles.editButton} 
-              onPress={openAddressModal}>
+            <Pressable style={styles.editButton} onPress={openAddressModal}>
               <Edit2 size={16} color="#22c55e" />
               <Text style={styles.editButtonText}>Update</Text>
             </Pressable>
@@ -984,29 +705,26 @@ const updateOrderStatus = async (orderId, status, paymentDetails) => {
           </View>
         </View>
 
-        {/* Phone Number with Update Button */}
-<View style={styles.section}>
-  <View style={styles.sectionHeader}>
-    <Text style={styles.sectionTitle}>Contact Number</Text>
-    <Pressable 
-      style={styles.editButton} 
-      onPress={openPhoneModal}>
-      <Edit2 size={16} color="#22c55e" />
-      <Text style={styles.editButtonText}>Update</Text>
-    </Pressable>
-  </View>
-  <View style={styles.addressCard}>
-    <View style={styles.addressRow}>
-      <Phone size={20} color="#64748b" style={styles.addressIcon} />
-      <Text style={styles.addressText}>
-        {phoneNumber || "Please add your phone number"}
-      </Text>
-    </View>
-  </View>
-</View>
-
+        {/* Phone Number */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Contact Number</Text>
+            <Pressable style={styles.editButton} onPress={openPhoneModal}>
+              <Edit2 size={16} color="#22c55e" />
+              <Text style={styles.editButtonText}>Update</Text>
+            </Pressable>
+          </View>
+          <View style={styles.addressCard}>
+            <View style={styles.addressRow}>
+              <Phone size={20} color="#64748b" style={styles.addressIcon} />
+              <Text style={styles.addressText}>
+                {phoneNumber || "Please add your phone number"}
+              </Text>
+            </View>
+          </View>
+        </View>
         
-        {/* Payment Section - Updated to show PayU info instead of payment methods */}
+        {/* Payment Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Information</Text>
           

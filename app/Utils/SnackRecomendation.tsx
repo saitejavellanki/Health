@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator } from 'react-native';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator } from 'react-native';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import { db } from '../../components/firebase/Firebase';
-import { ShoppingBag } from 'lucide-react-native';
+import { ShoppingBag, Star } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
 export default function SnackRecommendations({ todaysPlan, addToCart }) {
   const [loading, setLoading] = useState(true);
-  const [recommendedSnacks, setRecommendedSnacks] = useState([]);
-  const [showingRandomSnacks, setShowingRandomSnacks] = useState(false);
+  const [todaysPick, setTodaysPick] = useState(null);
   const router = useRouter();
   
   useEffect(() => {
-    const fetchRecommendedSnacks = async () => {
+    const fetchTodaysPick = async () => {
       try {
-        let matchingProducts = [];
         let allProducts = [];
         
         // Try to get cached products first
@@ -73,78 +71,55 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
           }
         }
         
-        // If today's plan exists, try to match snacks
-        if (todaysPlan && todaysPlan.sections && todaysPlan.sections.snack) {
-          // Get snack names from today's plan
-          const snackNames = todaysPlan.sections.snack;
-          
-          // Filter products that match snack names
-          matchingProducts = allProducts.filter(product => {
-            return snackNames.some(snackName => 
-              product.name.toLowerCase().includes(snackName.toLowerCase())
-            );
-          });
-        }
-        
-        // If no matching products found, show random snacks
-        if (matchingProducts.length === 0) {
-          // Randomize the array of all products
-          const shuffledProducts = [...allProducts].sort(() => 0.5 - Math.random());
-          // Take up to 5 random products
-          matchingProducts = shuffledProducts.slice(0, 5);
-          setShowingRandomSnacks(true);
+        // Select one random product as today's pick
+        if (allProducts.length > 0) {
+          const randomIndex = Math.floor(Math.random() * allProducts.length);
+          setTodaysPick(allProducts[randomIndex]);
         } else {
-          setShowingRandomSnacks(false);
-        }
-        
-        setRecommendedSnacks(matchingProducts);
-      } catch (error) {
-        console.error("Error fetching snacks:", error);
-        // In case of error, try to show some random products from Firebase directly
-        try {
-          const productsCollection = collection(db, "productCategories/zLQ1DRXaIDvagLGCNJvc/products");
-          const randomProductsQuery = query(productsCollection, limit(5));
-          const randomProductsSnapshot = await getDocs(randomProductsQuery);
-          
-          // Get random products and their images
-          const randomProducts = await Promise.all(randomProductsSnapshot.docs.map(async (doc) => {
-            const productData = doc.data();
+          // If no products found in cache, try to fetch directly from Firebase
+          try {
+            const productsCollection = collection(db, "productCategories/zLQ1DRXaIDvagLGCNJvc/products");
+            const randomProductQuery = query(productsCollection, limit(1));
+            const randomProductSnapshot = await getDocs(randomProductQuery);
             
-            // If the image is a storage path rather than a URL, fetch the download URL
-            let imageUrl = productData.image;
-            if (imageUrl && (imageUrl.startsWith('gs://') || imageUrl.startsWith('products/'))) {
-              try {
-                const storage = getStorage();
-                // If it's a relative path, prepend the storage path
-                if (!imageUrl.startsWith('gs://')) {
-                  imageUrl = `products/${imageUrl}`;
+            if (!randomProductSnapshot.empty) {
+              const doc = randomProductSnapshot.docs[0];
+              const productData = doc.data();
+              
+              // Handle image URL
+              let imageUrl = productData.image;
+              if (imageUrl && (imageUrl.startsWith('gs://') || imageUrl.startsWith('products/'))) {
+                try {
+                  const storage = getStorage();
+                  if (!imageUrl.startsWith('gs://')) {
+                    imageUrl = `products/${imageUrl}`;
+                  }
+                  const imageRef = ref(storage, imageUrl);
+                  imageUrl = await getDownloadURL(imageRef);
+                } catch (imageError) {
+                  console.error(`Error fetching fallback image for product ${doc.id}:`, imageError);
+                  imageUrl = null;
                 }
-                const imageRef = ref(storage, imageUrl);
-                imageUrl = await getDownloadURL(imageRef);
-              } catch (imageError) {
-                console.error(`Error fetching fallback image for product ${doc.id}:`, imageError);
-                imageUrl = null;
               }
+              
+              setTodaysPick({
+                id: doc.id,
+                ...productData,
+                image: imageUrl
+              });
             }
-            
-            return {
-              id: doc.id,
-              ...productData,
-              image: imageUrl
-            };
-          }));
-          
-          setRecommendedSnacks(randomProducts);
-          setShowingRandomSnacks(true);
-        } catch (fallbackError) {
-          console.error("Error fetching fallback snacks:", fallbackError);
+          } catch (fallbackError) {
+            console.error("Error fetching fallback today's pick:", fallbackError);
+          }
         }
+      } catch (error) {
+        console.error("Error fetching today's pick:", error);
       } finally {
         setLoading(false);
       }
     };
     
-    fetchRecommendedSnacks();
+    fetchTodaysPick();
   }, [todaysPlan]);
   
   const handleProductPress = (item) => {
@@ -156,68 +131,72 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color="#22c55e" />
-        <Text style={styles.loadingText}>Finding snacks for you...</Text>
+        <Text style={styles.loadingText}>Finding today's pick for you...</Text>
       </View>
     );
   }
   
-  // If there are no recommendations at all, don't render anything
-  if (recommendedSnacks.length === 0) {
+  // If there's no today's pick, don't render anything
+  if (!todaysPick) {
     return null;
   }
   
-  // Render recommended snacks
+  // Render today's pick in Zomato-style horizontal card
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
-        <Text style={styles.title}>
-          {showingRandomSnacks ? "Popular Snacks" : "Recommended Snacks"}
-        </Text>
-        <Text style={styles.subtitle}>
-          {showingRandomSnacks ? "You might like these" : "Matches with today's plan"}
-        </Text>
+        <Text style={styles.title}>Today's Pick</Text>
+        <Text style={styles.subtitle}>Selected just for you</Text>
       </View>
       
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={recommendedSnacks}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.productCard}
-            onPress={() => handleProductPress(item)}
-          >
-            {/* Image Component */}
-            <Image 
-              source={{ uri: item.image }}
-             
-              style={styles.productImage}
-            />
+      <Pressable
+        style={styles.zomatoCard}
+        onPress={() => handleProductPress(todaysPick)}
+      >
+        {/* Left side - Image */}
+        <View style={styles.imageContainer}>
+          <Image 
+            source={{ uri: todaysPick.image }}
+            style={styles.productImage}
             
-            <View style={styles.deliveryBadge}>
-              <ShoppingBag size={12} color="#22c55e" />
-              <Text style={styles.deliveryText}>{item.deliveryTime || "1 hour"}</Text>
+          />
+          <View style={styles.deliveryBadge}>
+            <ShoppingBag size={12} color="#22c55e" />
+            <Text style={styles.deliveryText}>{todaysPick.deliveryTime || "1 hour"}</Text>
+          </View>
+        </View>
+        
+        {/* Right side - Product Info */}
+        <View style={styles.productInfo}>
+          <Text style={styles.productName}>{todaysPick.name}</Text>
+          
+          {/* Rating & Time Section */}
+          <View style={styles.ratingContainer}>
+            <View style={styles.rating}>
+              <Star size={12} fill="#22c55e" color="#ffffff" />
+              <Text style={styles.ratingText}>4.2</Text>
             </View>
-            
-            <View style={styles.productInfo}>
-              <Text numberOfLines={1} style={styles.productName}>{item.name}</Text>
-              <Text style={styles.weightText}>{item.weight || "100g"}</Text>
-              
-              <View style={styles.priceContainer}>
-                <Text style={styles.priceText}>₹{item.price}</Text>
-                <Pressable
-                  style={styles.addButton}
-                  onPress={() => addToCart && addToCart(item)}
-                >
-                  <Text style={styles.addButtonText}>Add</Text>
-                </Pressable>
-              </View>
-            </View>
-          </Pressable>
-        )}
-        contentContainerStyle={styles.productList}
-      />
+            <Text style={styles.dotSeparator}>•</Text>
+            <Text style={styles.timeText}>{todaysPick.deliveryTime || "1 hour"}</Text>
+          </View>
+          
+          <Text style={styles.weightText}>{todaysPick.weight || "100g"}</Text>
+          
+          <View style={styles.priceActionContainer}>
+            <Text style={styles.priceText}>₹{todaysPick.price}</Text>
+            <Pressable
+  style={styles.addButton}
+  onPress={() => {
+    
+    // Navigate to payments page
+    router.push("/(tabs)/subscription");
+  }}
+>
+  <Text style={styles.addButtonText}>ADD</Text>
+</Pressable>
+          </View>
+        </View>
+      </Pressable>
     </View>
   );
 }
@@ -225,7 +204,7 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
 const styles = StyleSheet.create({
   container: {
     marginTop: 16,
-    marginBottom: 8,
+    marginBottom: 16,
     paddingHorizontal: 16,
   },
   headerContainer: {
@@ -241,31 +220,33 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 2,
   },
-  productList: {
-    paddingRight: 8,
-  },
-  productCard: {
-    width: 160,
+  zomatoCard: {
+    width: '100%',
+    height: 130,
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    marginRight: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
+    flexDirection: 'row', // Horizontal layout
     overflow: 'hidden',
+  },
+  imageContainer: {
+    width: '40%',
+    position: 'relative',
   },
   productImage: {
     width: '100%',
-    height: 100,
+    height: '100%',
     resizeMode: 'cover',
     backgroundColor: '#f3f4f6',
   },
   deliveryBadge: {
     position: 'absolute',
     top: 8,
-    right: 8,
+    left: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
     paddingHorizontal: 8,
@@ -280,24 +261,54 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   productInfo: {
+    width: '60%',
     padding: 12,
+    justifyContent: 'space-between',
   },
   productName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  rating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  ratingText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 3,
+  },
+  dotSeparator: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginHorizontal: 6,
+  },
+  timeText: {
+    fontSize: 12,
+    color: '#6b7280',
   },
   weightText: {
     fontSize: 12,
     color: '#6b7280',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  priceContainer: {
+  priceActionContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 'auto',
   },
   priceText: {
     fontSize: 16,
@@ -305,17 +316,19 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   addButton: {
-    backgroundColor: '#22c55e',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#22c55e',
     justifyContent: 'center',
     alignItems: 'center',
   },
   addButtonText: {
-    color: '#ffffff',
+    color: '#22c55e',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   loadingContainer: {
     marginTop: 16,

@@ -523,12 +523,12 @@ export default function Home() {
         </View>
       )}
 
-{!nutritionOnlyMode && (
+
   <SnackRecommendations 
     todaysPlan={todaysPlan} 
     addToCart={handleAddToCart}
   />
-)}
+
 
       {/* Nutrition Stats */}
       <Pressable

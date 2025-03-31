@@ -1,9 +1,24 @@
 import { StyleSheet } from 'react-native';
 
+// Zomato uses a predominantly red color scheme
+// Primary colors from Zomato's palette
+const colors = {
+  primary: '#cb202d', // Zomato red
+  primaryLight: '#ff5063', // Lighter shade of red
+  primaryDark: '#9b0000', // Darker shade of red
+  background: '#f8f8f8',
+  white: '#ffffff',
+  dark: '#333333',
+  gray: '#8c8c8c',
+  lightGray: '#e8e8e8',
+  success: '#4caf50',
+  rating: '#db7c38' // Zomato rating color (orange)
+};
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -11,9 +26,9 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: colors.lightGray,
   },
   backButton: {
     padding: 4,
@@ -21,6 +36,7 @@ export const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: colors.dark,
   },
   headerPlaceholder: {
     width: 32,
@@ -43,10 +59,11 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
     marginTop: 16,
+    color: colors.dark,
   },
   orderDetailsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -58,21 +75,23 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 4,
+    color: colors.dark,
   },
   deliveryDetailsText: {
     fontSize: 16,
-    color: '#64748b',
+    color: colors.gray,
     marginBottom: 16,
   },
   divider: {
     height: 1,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: colors.lightGray,
     marginVertical: 16,
   },
   orderItemsTitle: {
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 12,
+    color: colors.dark,
   },
   orderItemRow: {
     flexDirection: 'row',
@@ -82,10 +101,11 @@ export const styles = StyleSheet.create({
   orderItemName: {
     flex: 1,
     fontSize: 14,
+    color: colors.dark,
   },
   orderItemQuantity: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.gray,
     width: 32,
     textAlign: 'center',
   },
@@ -94,10 +114,11 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     width: 60,
     textAlign: 'right',
+    color: colors.dark,
   },
   moreItemsText: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.primary,
     marginTop: 8,
   },
   priceSummary: {
@@ -110,20 +131,21 @@ export const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.gray,
   },
   priceValue: {
     fontSize: 14,
     fontWeight: '500',
+    color: colors.dark,
   },
   savingsLabel: {
     fontSize: 14,
-    color: '#22c55e',
+    color: colors.success,
   },
   savingsValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#22c55e',
+    color: colors.success,
   },
   totalRow: {
     marginTop: 8,
@@ -131,14 +153,16 @@ export const styles = StyleSheet.create({
   totalLabel: {
     fontSize: 16,
     fontWeight: '600',
+    color: colors.dark,
   },
   totalValue: {
     fontSize: 16,
     fontWeight: '600',
+    color: colors.dark,
   },
   addressCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -153,11 +177,13 @@ export const styles = StyleSheet.create({
   addressIcon: {
     marginRight: 8,
     marginTop: 2,
+    color: colors.primary,
   },
   addressText: {
     flex: 1,
     fontSize: 16,
     lineHeight: 24,
+    color: colors.dark,
   },
   editButton: {
     flexDirection: 'row',
@@ -166,14 +192,14 @@ export const styles = StyleSheet.create({
   editButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#22c55e',
+    color: colors.primary,
     marginLeft: 4,
   },
   paymentMethodCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
@@ -184,13 +210,13 @@ export const styles = StyleSheet.create({
   },
   paymentMethodCardSelected: {
     borderWidth: 2,
-    borderColor: '#22c55e',
+    borderColor: colors.primary,
   },
   paymentMethodIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.lightGray,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -198,17 +224,20 @@ export const styles = StyleSheet.create({
   iconText: {
     fontSize: 12,
     fontWeight: '600',
+    color: colors.dark,
   },
   paymentMethodTitle: {
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
+    color: colors.dark,
   },
   checkmark: {
     width: 24,
     height: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    color: colors.primary,
   },
   payButtonContainer: {
     padding: 16,
@@ -218,26 +247,26 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#22c55e',
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
     padding: 16,
     marginBottom: 12,
   },
   payButtonProcessing: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: colors.gray,
   },
   payButtonComplete: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success,
   },
   payButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.white,
     marginRight: 8,
   },
   securityNote: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.gray,
     textAlign: 'center',
   },
   modalOverlay: {
@@ -246,7 +275,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -260,6 +289,7 @@ export const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: colors.dark,
   },
   closeButton: {
     padding: 4,
@@ -274,28 +304,30 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 8,
+    color: colors.dark,
   },
   input: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.background,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     minHeight: 100,
     textAlignVertical: 'top',
+    color: colors.dark,
   },
   modalFooter: {
     marginTop: 8,
   },
   saveButton: {
-    backgroundColor: '#22c55e',
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
     padding: 16,
     alignItems: 'center',
   },
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.white,
   },
   paymentGatewayBadge: {
     flexDirection: 'row',
@@ -303,13 +335,13 @@ export const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginBottom: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
     borderRadius: 8,
     alignSelf: 'flex-start',
   },
   paymentGatewayText: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.gray,
     marginLeft: 6,
     fontWeight: '500',
   },
@@ -318,16 +350,16 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   loadingText: {
     fontSize: 16,
-    color: '#64748b',
+    color: colors.gray,
     marginTop: 12,
   },
   userInfoCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: 8,
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 24,
@@ -341,14 +373,15 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 4,
+    color: colors.dark,
   },
   userEmail: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.gray,
   },
   paymentInfoCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -358,18 +391,18 @@ export const styles = StyleSheet.create({
   },
   paymentInfoText: {
     fontSize: 14,
-    color: '#374151',
+    color: colors.dark,
     marginBottom: 12,
     lineHeight: 20,
   },
   webViewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: colors.lightGray,
     height: 56,
   },
   webViewBackButton: {
@@ -379,7 +412,7 @@ export const styles = StyleSheet.create({
   },
   webViewBackText: {
     fontSize: 16,
-    color: '#000000',
+    color: colors.primary,
     marginLeft: 4,
   },
   webViewTitle: {
@@ -388,7 +421,35 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     marginRight: 32, // To balance the back button
-  }
+    color: colors.dark,
+  },
+  // Additional Zomato specific styles
+  ratingBadge: {
+    backgroundColor: colors.rating,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  ratingText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  offerTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#eef7ee',
+    borderRadius: 4,
+    marginBottom: 12,
+  },
+  offerText: {
+    fontSize: 14,
+    color: '#3a9741',
+    marginLeft: 6,
+  },
 });
 
 // Adding default export to satisfy the routing system

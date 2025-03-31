@@ -9,15 +9,23 @@ import {
   Dimensions, 
   StatusBar,
   StyleSheet,
-  Modal
+  Modal,
+  Share,
+  Alert,
+  Platform
 } from 'react-native';
-import { getFirestore, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, query, where, orderBy, getDocs, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 import { Feather } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import InstagramShareModal, { ShareableContent } from '../Utils/InstagramShareModal';
 
 const MemoryGalleryScreen = () => {
   const router = useRouter();
@@ -27,9 +35,12 @@ const MemoryGalleryScreen = () => {
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [sharingInProgress, setSharingInProgress] = useState(false);
+  const [igShareVisible, setIgShareVisible] = useState(false);
   const isFocused = useIsFocused();
   const windowWidth = Dimensions.get('window').width;
   const lastFetchTimeRef = useRef(null);
+  const memoriesRef = useRef([]);
   
   // Change to 2 columns with staggered layout for a more organic look
   const numColumns = 2;
@@ -41,12 +52,14 @@ const MemoryGalleryScreen = () => {
     if (!initialLoadDone) {
       loadCachedMemories().then(cached => {
         if (cached) {
-          // If we have cached data, show it immediately and then refresh in background
+          // If we have cached data, show it immediately
           setLoading(false);
           setInitialLoadDone(true);
-          // Only fetch from Firestore if it's been more than 5 minutes since last fetch
+          
+          // Check if we need to refresh from Firestore (if last fetch was > 5 minutes ago)
           const now = Date.now();
-          if (!lastFetchTimeRef.current || (now - lastFetchTimeRef.current) > 5 * 60 * 1000) {
+          const lastFetchTime = lastFetchTimeRef.current;
+          if (!lastFetchTime || (now - lastFetchTime) > 5 * 60 * 1000) {
             loadUserFoodMemories(false); // false = don't show loading indicator
             lastFetchTimeRef.current = now;
           }
@@ -83,6 +96,7 @@ const MemoryGalleryScreen = () => {
         // Check if cache is less than 1 hour old
         if (Date.now() - timestamp < 60 * 60 * 1000) {
           setMemories(cachedMemories);
+          memoriesRef.current = cachedMemories;
           return true;
         }
       }
@@ -101,6 +115,7 @@ const MemoryGalleryScreen = () => {
         timestamp: Date.now()
       };
       await AsyncStorage.setItem('userMemoriesCache', JSON.stringify(cacheData));
+      memoriesRef.current = memoriesToCache;
     } catch (error) {
       console.error('Error caching memories:', error);
     }
@@ -171,6 +186,88 @@ const MemoryGalleryScreen = () => {
     }
   };
   
+  // Add a new food memory with image to Firestore and update cache
+  const addFoodMemory = async (imageUri, foodData) => {
+    try {
+      const auth = getAuth();
+      const db = getFirestore();
+      const storage = getStorage();
+      const userId = auth.currentUser?.uid;
+      
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+      
+      // First upload the image to Firebase Storage
+      const imageBlob = await fetchImageAsBlob(imageUri);
+      const storageRef = ref(storage, `foodImages/${userId}/${Date.now()}.jpg`);
+      const uploadTask = uploadBytesResumable(storageRef, imageBlob);
+      
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            // Progress tracking if needed
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            console.log(`Upload is ${progress}% done`);
+          },
+          (error) => {
+            // Handle error
+            console.error('Error uploading image:', error);
+            reject(error);
+          },
+          async () => {
+            // Upload completed, get download URL
+            try {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              
+              // Add meal data to Firestore
+              const mealData = {
+                userId,
+                foodName: foodData.foodName || 'Unknown food',
+                calories: foodData.calories || 0,
+                junk: foodData.junk || 0,
+                image: downloadURL,
+                timestamp: serverTimestamp()
+              };
+              
+              const docRef = await addDoc(collection(db, 'meals'), mealData);
+              
+              // Add the new meal to our local cache
+              const newMemory = {
+                id: docRef.id,
+                ...mealData,
+                timestamp: new Date(),
+                formattedDate: formatDate(new Date()),
+                heightRatio: Math.random() * 0.4 + 1.0
+              };
+              
+              // Update the state and cache with the new memory
+              const updatedMemories = [newMemory, ...memoriesRef.current];
+              setMemories(updatedMemories);
+              cacheMemories(updatedMemories);
+              
+              resolve(newMemory);
+            } catch (error) {
+              console.error('Error adding meal to Firestore:', error);
+              reject(error);
+            }
+          }
+        );
+      });
+    } catch (error) {
+      console.error('Error in addFoodMemory:', error);
+      throw error;
+    }
+  };
+  
+  // Convert image URI to blob for upload
+  const fetchImageAsBlob = async (uri) => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return blob;
+  };
+  
   // Simple date formatter
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', { 
@@ -200,10 +297,45 @@ const MemoryGalleryScreen = () => {
     return memories;
   };
   
+  // Handler for going back
+  const handleGoBack = () => {
+    router.back();
+  };
+  
   // Open full screen image modal
   const openFullImage = (item) => {
     setSelectedImage(item.image);
     setModalVisible(true);
+  };
+  
+  // Navigate to camera screen with callback for saving new images
+  const navigateToCamera = () => {
+    router.push({
+      pathname: '/Screens/CalorieTrackerScreen',
+      params: {
+        onImageCaptured: (imageUri, foodData) => {
+          // This function will be called from the CalorieTrackerScreen
+          // after a photo is taken and processed
+          return addFoodMemory(imageUri, foodData);
+        }
+      }
+    });
+  };
+  
+  // Share all images
+  const shareImages = () => {
+    const filteredMemories = getFilteredMemories();
+    
+    console.log('Memories to share:', filteredMemories.length);
+    console.log('First memory sample:', filteredMemories.length > 0 ? filteredMemories[0] : 'No memories');
+    
+    if (filteredMemories.length === 0) {
+      Alert.alert('No Images', 'There are no images to share.');
+      return;
+    }
+    
+    // Show the Instagram share modal
+    setIgShareVisible(true);
   };
   
   // Render memory item with staggered layout
@@ -250,7 +382,7 @@ const MemoryGalleryScreen = () => {
       </Text>
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => router.push('/Screens/CalorieTrackerScreen')}
+        onPress={navigateToCamera}
       >
         <Feather name="camera" size={16} color="#ffffff" style={{ marginRight: 8 }} />
         <Text style={styles.addButtonText}>Track a Meal</Text>
@@ -264,18 +396,42 @@ const MemoryGalleryScreen = () => {
       
       {/* Header */}
       <View style={styles.header}>
-      <View style={styles.headerTitleContainer}>
-  <Text style={styles.headerTitle}>
-    Crunch<Text style={styles.redX}>X</Text>
-  </Text>
-</View>
-        
+        {/* Back button */}
         <TouchableOpacity
-          style={styles.cameraButton}
-          onPress={() => router.push('/Screens/CalorieTrackerScreen')}
+          style={styles.backButton}
+          onPress={handleGoBack}
         >
-          <Feather name="camera" size={20} color="#ffffff" />
+          <Feather name="arrow-left" size={20} color="#ffffff" />
         </TouchableOpacity>
+        
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>
+            Crunch<Text style={styles.redX}>X</Text>
+          </Text>
+        </View>
+        
+        <View style={styles.headerRightButtons}>
+          {/* Share button */}
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={shareImages}
+            disabled={sharingInProgress}
+          >
+            {sharingInProgress ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Feather name="share-2" size={20} color="#ffffff" />
+            )}
+          </TouchableOpacity>
+          
+          {/* Camera button */}
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={navigateToCamera}
+          >
+            <Feather name="camera" size={20} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
       </View>
       
       {/* Filter tabs - Today/Month/All */}
@@ -345,6 +501,21 @@ const MemoryGalleryScreen = () => {
           )}
         </View>
       </Modal>
+      
+      {/* Instagram Share Modal - Updated to use React Native's Modal */}
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={igShareVisible}
+        onRequestClose={() => setIgShareVisible(false)}
+        statusBarTranslucent={true}
+      >
+        <ShareableContent
+          memories={getFilteredMemories()}
+          onClose={() => setIgShareVisible(false)}
+          onSaveSuccess={() => setIgShareVisible(false)}
+        />
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -368,13 +539,41 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
   },
-  
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 24,
     fontFamily: 'Inter-Bold',
     color: '#FFFFFF', // White color for dark background
     textAlign: 'center',
     lineHeight: 28, // Adding lineHeight to ensure consistent baseline
+  },
+  headerRightButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#222222',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  shareButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#222222',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+    marginRight: 10,
   },
   cameraButton: {
     width: 42,
@@ -494,6 +693,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '80%',
   }
-  });
-  
-  export default MemoryGalleryScreen;
+});
+
+export default MemoryGalleryScreen;
