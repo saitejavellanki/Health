@@ -139,15 +139,16 @@ export default function CalorieTrackerScreen() {
   }, [showTickAnimation]);
 
   // Effect to automatically analyze image after capture
-  useEffect(() => {
-    if (image && !analyzing && !calories) {
-      if (scanMode === 'food') {
-        sendImageToGemini(image);
-      } else {
-        scanBarcodeFromImage(image);
-      }
+  // Replace this useEffect
+useEffect(() => {
+  if (image && !analyzing && !calories) {
+    if (scanMode === 'food') {
+      sendImageToServer(image, 'food');
+    } else {
+      sendImageToServer(image, 'barcode');
     }
-  }, [image, scanMode]);
+  }
+}, [image, scanMode]);
 
   if (!permission) {
     // Camera permissions are still loading.
@@ -211,6 +212,85 @@ export default function CalorieTrackerScreen() {
   function toggleScanMode() {
     setScanMode((current) => (current === 'food' ? 'barcode' : 'food'));
   }
+
+  // Add this function to send images to the backend server
+const sendImageToServer = async (imageUri, mode) => {
+  try {
+    setAnalyzing(true);
+    
+    // Create form data for image upload
+    const formData = new FormData();
+    formData.append('image', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: 'food_image.jpg',
+    });
+    
+    // Get current user ID
+    const auth = getAuth();
+    const userId = auth.currentUser?.uid;
+    
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+    
+    // Add user ID and scan mode to the form data
+    formData.append('userId', userId);
+    formData.append('scanMode', mode);
+    
+    // Send the image to the backend for analysis
+    const response = await fetch('https://efff-49-206-60-211.ngrok-free.app/api/analyze-image', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Server error');
+    }
+    
+    const data = await response.json();
+    
+    // Process the server response
+    if (data && data.analysis) {
+      const analysis = data.analysis;
+      setFoodName(analysis.foodName || 'Unknown food');
+      setCalories(analysis.calories.toString());
+      setProtein(analysis.protein.toString());
+      setFat(analysis.fat.toString());
+      setCarbohydrates(analysis.carbohydrates.toString());
+      setSugars(analysis.sugars.toString());
+      setIsJunkFood(analysis.isJunkFood ? 1 : 0);
+      
+      // Optional: Show token usage information
+      if (data.tokenInfo) {
+        console.log(`Token usage: ${data.tokenInfo.used}/${data.tokenInfo.remaining}`);
+      }
+    } else {
+      throw new Error('Invalid response from server');
+    }
+  } catch (error) {
+    console.error('Error analyzing image with server:', error);
+    Alert.alert(
+      'Analysis Error',
+      'Could not analyze the image. Please try again.',
+      [{ text: 'OK' }]
+    );
+    // Set default values when analysis fails
+    setFoodName('Unknown food');
+    setCalories('0');
+    setProtein('0');
+    setFat('0');
+    setCarbohydrates('0');
+    setSugars('0');
+    setIsJunkFood(0);
+  } finally {
+    setAnalyzing(false);
+  }
+};
 
   // Function to scan barcode from image
   const scanBarcodeFromImage = async (imageUri) => {
@@ -492,117 +572,61 @@ export default function CalorieTrackerScreen() {
   };
 
   // Modified function to log the meal with carbs and sugars
-  const logMealToFirebase = async () => {
-    try {
-      const auth = getAuth();
-      const db = getFirestore();
-      const userId = auth.currentUser?.uid;
+  // Replace the logMealToFirebase function with this one
+const logMealToFirebase = async () => {
+  try {
+    const auth = getAuth();
+    const userId = auth.currentUser?.uid;
 
-      if (!userId) {
-        console.error('User not authenticated');
-        return;
-      }
-
-      // Create meal object with carbs and sugars
-      const mealData = {
-        userId: userId,
-        foodName: foodName || 'Unknown food',
-        calories: parseInt(calories) || 0,
-        protein: protein ? parseInt(protein) : 0,
-        fat: fat ? parseInt(fat) : 0,
-        carbohydrates: carbohydrates ? parseInt(carbohydrates) : 0,
-        sugars: sugars ? parseInt(sugars) : 0,
-        junk: isJunkFood,
-        image: image,
-        timestamp: serverTimestamp(),
-      };
-
-      // Add the meal to a separate meals collection
-      const mealsCollection = collection(db, 'meals');
-      await addDoc(mealsCollection, mealData);
-
-      // Update user totals in the user document
-      const userRef = doc(db, 'users', userId);
-
-      // Get today's date at midnight
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Check if the user has a lastTrackingDate field and if it's today
-      const userDoc = await getDoc(userRef);
-      const userData = userDoc.data();
-      let lastTrackingDate = userData?.lastTrackingDate?.toDate();
-      let mealsTrackedToday = userData?.mealsTrackedToday || 0;
-      let currentStreak = userData?.streak || 0;
-      let lastStreakDate = userData?.lastStreakDate?.toDate();
-
-      if (lastTrackingDate) {
-        lastTrackingDate.setHours(0, 0, 0, 0);
-
-        // If last tracking date is not today, reset counter
-        if (lastTrackingDate.getTime() !== today.getTime()) {
-          mealsTrackedToday = 1;
-
-          // Check if lastStreakDate was yesterday to maintain streak
-          if (lastStreakDate) {
-            lastStreakDate.setHours(0, 0, 0, 0);
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            
-            if (lastStreakDate.getTime() === yesterday.getTime()) {
-              // Last streak was yesterday, continue the streak
-              // But only increment if this is their first log of today
-              currentStreak = currentStreak;
-            } else {
-              // Streak broken, reset to 0
-              currentStreak = 0;
-            }
-          }
-        } else {
-          // Increment counter if already tracking today
-          mealsTrackedToday += 1;
-
-          // Check if they've now reached 2 meals today to increment streak
-          if (
-            mealsTrackedToday >= 2 &&
-            lastStreakDate?.getTime() !== today.getTime()
-          ) {
-            currentStreak += 1;
-            // Update lastStreakDate to today since they've hit the goal
-            lastStreakDate = today;
-          }
-        }
-      } else {
-        mealsTrackedToday = 1;
-        // First ever tracking, streak remains at 0
-      }
-
-      // Update user document with tracking data and streak info
-      await updateDoc(userRef, {
-        totalCalories: increment(parseInt(calories) || 0),
-        totalProtein: increment(protein ? parseInt(protein) : 0),
-        totalFat: increment(fat ? parseInt(fat) : 0),
-        totalCarbohydrates: increment(carbohydrates ? parseInt(carbohydrates) : 0),
-        totalSugars: increment(sugars ? parseInt(sugars) : 0),
-        lastUpdated: serverTimestamp(),
-        lastTrackingDate: today,
-        mealsTrackedToday: mealsTrackedToday,
-        streak: currentStreak,
-        lastStreakDate: mealsTrackedToday >= 2 ? today : lastStreakDate || null,
-      });
-
-      console.log('Meal logged successfully');
-      console.log('Current streak:', currentStreak);
-      setLoggedMeal(true);
-
-      // Show tick animation before redirecting
-      setShowTickAnimation(true);
-
-      // Navigation will happen after animation completes in the useEffect hook
-    } catch (error) {
-      console.error('Error logging meal to Firebase:', error);
+    if (!userId) {
+      console.error('User not authenticated');
+      return;
     }
-  };
+
+    // Prepare meal data for server
+    const mealData = {
+      userId: userId,
+      foodName: foodName || 'Unknown food',
+      calories: parseInt(calories) || 0,
+      protein: protein ? parseInt(protein) : 0,
+      fat: fat ? parseInt(fat) : 0,
+      carbohydrates: carbohydrates ? parseInt(carbohydrates) : 0,
+      sugars: sugars ? parseInt(sugars) : 0,
+      isJunkFood: isJunkFood === 1,
+      imageUrl: image, // This may need modification based on your image storage approach
+    };
+
+    // Send meal data to server
+    const response = await fetch('https://efff-49-206-60-211.ngrok-free.app/api/log-meal', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(mealData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Server error');
+    }
+
+    const data = await response.json();
+    console.log('Meal logged successfully');
+    console.log('Current streak:', data.streak);
+    setLoggedMeal(true);
+
+    // Show tick animation before redirecting
+    setShowTickAnimation(true);
+    // Navigation will happen after animation completes in the useEffect hook
+  } catch (error) {
+    console.error('Error logging meal to server:', error);
+    Alert.alert(
+      'Logging Error',
+      'Could not log your meal. Please try again.',
+      [{ text: 'OK' }]
+    );
+  }
+};
 
   return (
     <View style={styles.container}>

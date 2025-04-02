@@ -8,6 +8,10 @@ import {
   Modal,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { ArrowLeft, Calendar as CalendarIcon, RefreshCw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -389,45 +393,50 @@ export default function AllMeals() {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Replace {replacingMealType}</Text>
-            <Text style={styles.modalSubtitle}>Current meal: {replacingMeal}</Text>
-            
-            <Text style={styles.inputLabel}>Any preferences? (optional)</Text>
-            <TextInput
-              style={styles.preferenceInput}
-              placeholder="e.g. vegetarian, gluten-free, higher protein..."
-              value={userPreferences}
-              onChangeText={setUserPreferences}
-              multiline
-            />
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setModalVisible(false);
-                  setUserPreferences('');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Replace {replacingMealType}</Text>
+              <Text style={styles.modalSubtitle}>Current meal: {replacingMeal}</Text>
               
-              <TouchableOpacity
-                style={[styles.generateButton, generatingMeal && styles.disabledButton]}
-                onPress={generateNewMeal}
-                disabled={generatingMeal}
-              >
-                {generatingMeal ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.generateButtonText}>Generate New Meal</Text>
-                )}
-              </TouchableOpacity>
+              <Text style={styles.inputLabel}>Any preferences? (optional)</Text>
+              <TextInput
+                style={styles.preferenceInput}
+                placeholder="e.g. vegetarian, gluten-free, higher protein..."
+                value={userPreferences}
+                onChangeText={setUserPreferences}
+                multiline
+              />
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setModalVisible(false);
+                    setUserPreferences('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.generateButton, generatingMeal && styles.disabledButton]}
+                  onPress={generateNewMeal}
+                  disabled={generatingMeal}
+                >
+                  {generatingMeal ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.generateButtonText}>Generate New Meal</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );

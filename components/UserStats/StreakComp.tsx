@@ -7,6 +7,7 @@ import {
   Platform,
   Modal,
   ScrollView,
+  Image,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
@@ -86,6 +87,14 @@ const SimpleStreakComp = () => {
           <View style={styles.textContainer}>
             <Text style={styles.streakValue}>{streak} <Text style={styles.streakUnit}>day streak</Text></Text>
             <Text style={styles.streakDescription}>{getStreakDescription()}</Text>
+          </View>
+          <View style={styles.logoContainer}>
+            {/* Replace the path below with your actual logo path */}
+            <Image 
+              source={require('../../assets/images/icon.png')} 
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
         </View>
       </TouchableOpacity>
@@ -196,6 +205,17 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
+  },
+  logoContainer: {
+    height: 36,
+    width: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  logoImage: {
+    width: 58,
+    height: 58,
   },
   streakValue: {
     fontSize: 16,

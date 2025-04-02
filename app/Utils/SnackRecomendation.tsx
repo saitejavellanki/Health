@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator } from 'react-native';
-import { collection, getDocs, limit, query } from 'firebase/firestore';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import { db } from '../../components/firebase/Firebase';
 import { ShoppingBag, Star } from 'lucide-react-native';
@@ -71,7 +71,83 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
           }
         }
         
-        // Select one random product as today's pick
+        // Check if todaysPlan exists and has snacks
+        if (todaysPlan && todaysPlan.sections && todaysPlan.sections.snack && todaysPlan.sections.snack.length > 0) {
+          // Get the first snack from today's plan
+          const todaysSnack = todaysPlan.sections.snack[0];
+          
+          // Try to find a matching product based on snack name
+          // We'll use a fuzzy match (includes) to be more flexible
+          const matchingProducts = allProducts.filter(product => 
+            product.name && todaysSnack && 
+            (product.name.toLowerCase().includes(todaysSnack.toLowerCase()) || 
+             todaysSnack.toLowerCase().includes(product.name.toLowerCase()))
+          );
+          
+          if (matchingProducts.length > 0) {
+            // Use the first matching product
+            setTodaysPick(matchingProducts[0]);
+            setLoading(false);
+            return;
+          }
+          
+          // If no match found through simple comparison, try to query Firestore directly
+          try {
+            const productsCollection = collection(db, "productCategories/zLQ1DRXaIDvagLGCNJvc/products");
+            // Create a query to find products that contain the snack name or vice versa
+            const snackNameLower = todaysSnack.toLowerCase();
+            
+            // We can't do complex string operations in Firestore query
+            // So we'll fetch a reasonable number of products and filter client side
+            const snackProductsQuery = query(productsCollection, limit(20));
+            const snackProductsSnapshot = await getDocs(snackProductsQuery);
+            
+            if (!snackProductsSnapshot.empty) {
+              const matchingProducts = [];
+              
+              for (const doc of snackProductsSnapshot.docs) {
+                const productData = doc.data();
+                const productName = productData.name ? productData.name.toLowerCase() : '';
+                
+                // Check if product name contains snack name or vice versa
+                if (productName.includes(snackNameLower) || snackNameLower.includes(productName)) {
+                  // Handle image URL
+                  let imageUrl = productData.image;
+                  if (imageUrl && (imageUrl.startsWith('gs://') || imageUrl.startsWith('products/'))) {
+                    try {
+                      const storage = getStorage();
+                      if (!imageUrl.startsWith('gs://')) {
+                        imageUrl = `products/${imageUrl}`;
+                      }
+                      const imageRef = ref(storage, imageUrl);
+                      imageUrl = await getDownloadURL(imageRef);
+                    } catch (imageError) {
+                      console.error(`Error fetching image for product ${doc.id}:`, imageError);
+                      imageUrl = null;
+                    }
+                  }
+                  
+                  matchingProducts.push({
+                    id: doc.id,
+                    ...productData,
+                    image: imageUrl
+                  });
+                }
+              }
+              
+              if (matchingProducts.length > 0) {
+                setTodaysPick(matchingProducts[0]);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (matchError) {
+            console.error("Error finding matching product:", matchError);
+          }
+        }
+        
+        // Fallback: If no matching product found or no snacks in today's plan, use a random product
+        console.log("Falling back to random product selection");
         if (allProducts.length > 0) {
           const randomIndex = Math.floor(Math.random() * allProducts.length);
           setTodaysPick(allProducts[randomIndex]);
@@ -141,12 +217,20 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
     return null;
   }
   
+  // Updated header to indicate whether this is from today's meal plan or a suggestion
+  const isFromMealPlan = todaysPlan && 
+                         todaysPlan.sections && 
+                         todaysPlan.sections.snack && 
+                         todaysPlan.sections.snack.length > 0;
+  
   // Render today's pick in Zomato-style horizontal card
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.title}>Today's Pick</Text>
-        <Text style={styles.subtitle}>Selected just for you</Text>
+        <Text style={styles.subtitle}>
+          {isFromMealPlan ? 'Based on your meal plan' : 'Selected just for you'}
+        </Text>
       </View>
       
       <Pressable
@@ -158,7 +242,7 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
           <Image 
             source={{ uri: todaysPick.image }}
             style={styles.productImage}
-            
+            defaultSource={require('../../assets/images/icon.png')}
           />
           <View style={styles.deliveryBadge}>
             <ShoppingBag size={12} color="#22c55e" />
@@ -185,15 +269,14 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
           <View style={styles.priceActionContainer}>
             <Text style={styles.priceText}>₹{todaysPick.price}</Text>
             <Pressable
-  style={styles.addButton}
-  onPress={() => {
-    
-    // Navigate to payments page
-    router.push("/(tabs)/subscription");
-  }}
->
-  <Text style={styles.addButtonText}>ADD</Text>
-</Pressable>
+              style={styles.addButton}
+              onPress={() => {
+                // Navigate to payments page
+                router.push("(tabs)/subscription");
+              }}
+            >
+              <Text style={styles.addButtonText}>ADD</Text>
+            </Pressable>
           </View>
         </View>
       </Pressable>

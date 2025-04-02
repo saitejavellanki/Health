@@ -46,6 +46,7 @@ export default function Home() {
   const [calorieProgress, setCalorieProgress] = useState(0);
   const [userPlanDocId, setUserPlanDocId] = useState(null);
   const [nutritionOnlyMode, setNutritionOnlyMode] = useState(false); // Toggle state for nutrition-only mode
+  const [isPremium, setIsPremium] = useState(false); // Premium status
 
   // Function to get personalized calorie recommendations from Gemini AI
   const getPersonalizedCalories = async (userData) => {
@@ -139,12 +140,16 @@ export default function Home() {
 
         const db = getFirestore();
         
-        // First, fetch the user document to get targetCalories
+        // First, fetch the user document to get premium status and targetCalories
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
+          
+          // Check if user is premium
+          setIsPremium(userData.isPremium === true);
+          console.log('User premium status:', userData.isPremium);
           
           // Check if targetCalories exists in the user document
           if (userData.targetCalories) {
@@ -155,6 +160,7 @@ export default function Home() {
           }
         } else {
           console.log('User document not found');
+          setIsPremium(false);
         }
 
         const userPlansRef = collection(db, 'userplans');
@@ -266,8 +272,12 @@ export default function Home() {
 
         setTodaysPlan(todaysPlan);
 
-        // Fetch nutrition data from the meals collection
-        await fetchTodaysNutritionData(currentUser.uid);
+        // Fetch nutrition data from the meals collection if premium
+        if (isPremium) {
+          await fetchTodaysNutritionData(currentUser.uid);
+        } else {
+          setLoading(false);
+        }
       } catch (error) {
         console.error('Error fetching user plan:', error);
         Alert.alert(
@@ -414,6 +424,11 @@ export default function Home() {
   };
 
   const navigateToTracker = () => {
+    if (!isPremium) {
+      navigateToPremium();
+      return;
+    }
+    
     router.push({
       pathname: '/Screens/CalorieTrackerScreen',
       params: {
@@ -424,6 +439,11 @@ export default function Home() {
         targetCalories: targetCalories.toString(),
       },
     });
+  };
+
+  const navigateToPremium = () => {
+    // Navigate to premium subscription page
+    router.push('/Screens/PremiumSubscriptionScreen');
   };
 
   const getTimeOfDay = () => {
@@ -492,7 +512,20 @@ export default function Home() {
             />
           </View>
         </View>
-        <StreakComp />
+        
+        {/* Conditionally render streak or premium upgrade button */}
+        {isPremium ? (
+          <StreakComp />
+        ) : (
+          <Pressable 
+            style={styles.upgradeToPremiumButton} 
+            onPress={navigateToPremium}
+            android_ripple={{ color: '#f59e0b' }}
+          >
+            <Feather name="star" size={16} color="#ffffff" style={{marginRight: 8}} />
+            <Text style={styles.upgradeToPremiumText}>Upgrade to Premium</Text>
+          </Pressable>
+        )}
       </View>
 
       <ActiveOrders />
@@ -523,73 +556,91 @@ export default function Home() {
         </View>
       )}
 
+      <SnackRecommendations 
+        todaysPlan={todaysPlan} 
+        addToCart={handleAddToCart}
+      />
 
-  <SnackRecommendations 
-    todaysPlan={todaysPlan} 
-    addToCart={handleAddToCart}
-  />
-
-
-      {/* Nutrition Stats */}
-      <Pressable
-        style={[
-          styles.statsContainer,
-          nutritionOnlyMode && styles.statsContainerExpanded,
-        ]}
-        onPress={navigateToTracker}
-        android_ripple={{ color: '#f3f4f6' }}
-      >
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Calories</Text>
-          <Text style={styles.statValue}>
-            {nutritionData.calories}{' '}
-            <Text style={styles.statTarget}>/ {targetCalories}</Text>
-          </Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Protein</Text>
-          <Text style={styles.statValue}>{nutritionData.protein}g</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Fat</Text>
-          <Text style={styles.statValue}>{nutritionData.fat}g</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Carbs</Text>
-          <Text style={styles.statValue}>{nutritionData.carbohydrates}g</Text>
-        </View>
-      </Pressable>
-
-      {/* Track Button */}
-      <View style={styles.trackButtonContainer}>
+      {/* Nutrition Stats - Only show for premium users */}
+      {isPremium && (
         <Pressable
-          style={[styles.trackButton, { width: '75%' }]}
+          style={[
+            styles.statsContainer,
+            nutritionOnlyMode && styles.statsContainerExpanded,
+          ]}
           onPress={navigateToTracker}
-          android_ripple={{ color: '#e6f7ef' }}
+          android_ripple={{ color: '#f3f4f6' }}
         >
-          <Feather
-            name="bar-chart-2"
-            size={18}
-            color="#ffffff"
-            style={styles.trackButtonIcon}
-          />
-          <Text style={styles.trackButtonText}>Scan meal</Text>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Calories</Text>
+            <Text style={styles.statValue}>
+              {nutritionData.calories}{' '}
+              <Text style={styles.statTarget}>/ {targetCalories}</Text>
+            </Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Protein</Text>
+            <Text style={styles.statValue}>{nutritionData.protein}g</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Fat</Text>
+            <Text style={styles.statValue}>{nutritionData.fat}g</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Carbs</Text>
+            <Text style={styles.statValue}>{nutritionData.carbohydrates}g</Text>
+          </View>
         </Pressable>
+      )}
 
-        <Pressable
-          style={[styles.trackButton, { width: '22%' }]}
-          onPress={() => router.push('/Screens/MemoryGalleryScreen')}
-          android_ripple={{ color: '#e6f7ef' }}
-        >
-          <Feather name="image" size={18} color="#ffffff" />
-        </Pressable>
+      {/* Track Button - Show different versions based on premium status */}
+      <View style={styles.trackButtonContainer}>
+        {isPremium ? (
+          <>
+            <Pressable
+              style={[styles.trackButton, { width: '75%' }]}
+              onPress={navigateToTracker}
+              android_ripple={{ color: '#e6f7ef' }}
+            >
+              <Feather
+                name="bar-chart-2"
+                size={18}
+                color="#ffffff"
+                style={styles.trackButtonIcon}
+              />
+              <Text style={styles.trackButtonText}>Scan meal</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.trackButton, { width: '22%' }]}
+              onPress={() => router.push('/Screens/MemoryGalleryScreen')}
+              android_ripple={{ color: '#e6f7ef' }}
+            >
+              <Feather name="image" size={18} color="#ffffff" />
+            </Pressable>
+          </>
+        ) : (
+          <Pressable
+            style={[styles.trackButton, { width: '100%', backgroundColor: '#f59e0b' }]}
+            onPress={navigateToPremium}
+            android_ripple={{ color: '#f59e0b' }}
+          >
+            <Feather
+              name="star"
+              size={18}
+              color="#ffffff"
+              style={styles.trackButtonIcon}
+            />
+            <Text style={styles.trackButtonText}>Unlock Premium Features</Text>
+          </Pressable>
+        )}
       </View>
 
-
-      {/* Tracking Section - Always show regardless of mode */}
+      {/* Tracking Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tracking Focus</Text>
         
+        {/* Water tracking is shown to all users */}
         <WaterTrackingComponent/>
 
         {!nutritionOnlyMode && (
@@ -603,23 +654,50 @@ export default function Home() {
             </Text>
           </View>
         )}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressLabelContainer}>
-            <Text style={styles.progressLabel}>Calorie goal progress</Text>
-            <Text style={styles.progressPercentage}>{calorieProgress}%</Text>
+        
+        {/* Only show calorie progress for premium users */}
+        {isPremium && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressLabelContainer}>
+              <Text style={styles.progressLabel}>Calorie goal progress</Text>
+              <Text style={styles.progressPercentage}>{calorieProgress}%</Text>
+            </View>
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[styles.progressBar, { width: `${calorieProgress}%` }]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {nutritionData.calories} / {targetCalories} calories consumed
+            </Text>
           </View>
-          <View style={styles.progressBarContainer}>
-            <View
-              style={[styles.progressBar, { width: `${calorieProgress}%` }]}
-            />
-          </View>
-          <Text style={styles.progressText}>
-            {nutritionData.calories} / {targetCalories} calories consumed
-          </Text>
-        </View>
+        )}
+        
+        {/* For non-premium users, show upgrade prompt */}
+        {!isPremium && (
+          <Pressable
+            style={styles.premiumPromptCard}
+            onPress={navigateToPremium}
+            android_ripple={{ color: '#fef3c7' }}
+          >
+            <View style={styles.premiumPromptHeader}>
+              <Feather name="star" size={20} color="#f59e0b" />
+              <Text style={{
+                fontSize: 16,
+                fontWeight: '600',
+                color: '#f59e0b',
+                marginLeft: 8,
+              }}>Premium Feature</Text>
+            </View>
+            <Text style={styles.premiumPromptText}>
+              Upgrade to premium to track your nutrition, calories, and meal progress.
+            </Text>
+            <Text style={styles.premiumBenefitsText}>
+              Get personalized meal plans, calorie tracking, and advanced analytics.
+            </Text>
+          </Pressable>
+        )}
       </View>
-
-      {/* <HabitTracker/> */}
 
       <CrunchXLogo />
       {/* Bottom padding */}

@@ -78,6 +78,63 @@ export const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
+  upgradeToPremiumButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f59e0b',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  upgradeToPremiumText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  
+  // Premium feature prompt card
+  premiumPromptCard: {
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#ffedd5',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  premiumPromptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  premiumPromptHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#f59e0b',
+    marginLeft: 8,
+  },
+  premiumPromptText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#713f12',
+    marginBottom: 8,
+  },
+  premiumBenefitsText: {
+    fontSize: 13,
+    color: '#92400e',
+    fontStyle: 'italic',
+  },
   mealInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -168,6 +225,35 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  // Add these to your styles object in HomePageStyles.js
+
+scanButtonDisabled: {
+  backgroundColor: '#f3f4f6',
+  borderColor: '#e5e7eb',
+},
+
+scanButtonTextDisabled: {
+  color: '#9ca3af',
+},
+
+upgradeContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#f9fafb',
+  padding: 12,
+  borderRadius: 8,
+  flex: 1,
+  gap: 8,
+},
+
+upgradeText: {
+  fontSize: 14,
+  color: '#6b7280',
+  fontWeight: '500',
+  textAlign: 'center',
+},
+
   trackButton: {
     backgroundColor: '#22c55e',
     paddingVertical: 12,

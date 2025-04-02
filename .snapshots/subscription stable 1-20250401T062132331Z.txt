@@ -7,8 +7,6 @@ import { styles } from "../Utils/SubscriptionStyles";
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../components/firebase/Firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 export default function OrderComponent() {
   // ======== STATE MANAGEMENT ========
@@ -21,7 +19,6 @@ export default function OrderComponent() {
   const [productCategories, setProductCategories] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [isInServiceArea, setIsInServiceArea] = useState(false);
-  const [imageCache, setImageCache] = useState({});
   
   // Define default styles as a fallback
   const defaultStyles = StyleSheet.create({
@@ -57,108 +54,6 @@ export default function OrderComponent() {
     const distance = R * c; // Distance in km
     return distance;
   };
-  
-  // ======== IMAGE CACHING SYSTEM ========
-  const cacheDirectory = FileSystem.cacheDirectory + 'images/';
-  
-  // Ensure cache directory exists
-  useEffect(() => {
-    (async () => {
-      const dirInfo = await FileSystem.getInfoAsync(cacheDirectory);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(cacheDirectory, { intermediates: true });
-      }
-    })();
-  }, []);
-  
-  // Function to cache an image
-  const cacheImage = async (uri) => {
-    try {
-      // Create a unique filename based on the URI
-      const filename = uri.split('/').pop();
-      const path = cacheDirectory + filename;
-      
-      // Check if the file already exists in cache
-      const fileInfo = await FileSystem.getInfoAsync(path);
-      
-      if (fileInfo.exists) {
-        // Image is already cached
-        return { uri: path };
-      }
-      
-      // Download the image
-      const downloadResult = await FileSystem.downloadAsync(uri, path);
-      
-      if (downloadResult.status === 200) {
-        // Return the local URI of the cached image
-        return { uri: path };
-      }
-      
-      // If download failed, return the original URI
-      return { uri };
-    } catch (error) {
-      console.error("Error caching image:", error);
-      return { uri }; // Return original on error
-    }
-  };
-  
-  // Function to get an image from cache or load it
-  const getImageUri = async (uri) => {
-    if (!uri) return null;
-    
-    // Check if we already have this image in our state cache
-    if (imageCache[uri]) {
-      return imageCache[uri];
-    }
-    
-    // Try to load from file cache
-    const cachedImage = await cacheImage(uri);
-    
-    // Update the state cache
-    setImageCache(prev => ({
-      ...prev,
-      [uri]: cachedImage.uri
-    }));
-    
-    return cachedImage.uri;
-  };
-  
-  // Load initial image cache from storage
-  useEffect(() => {
-    (async () => {
-      try {
-        const storedImageCache = await AsyncStorage.getItem('imageCache');
-        if (storedImageCache) {
-          setImageCache(JSON.parse(storedImageCache));
-        }
-      } catch (error) {
-        console.error("Error loading image cache:", error);
-      }
-    })();
-  }, []);
-  
-  // Save image cache to storage when it changes
-  useEffect(() => {
-    if (Object.keys(imageCache).length > 0) {
-      AsyncStorage.setItem('imageCache', JSON.stringify(imageCache));
-    }
-  }, [imageCache]);
-  
-  // Pre-cache all product images after loading products
-  useEffect(() => {
-    if (productCategories.length > 0) {
-      const allProducts = productCategories.flatMap(cat => cat.products);
-      
-      // Start pre-caching images in the background
-      (async () => {
-        for (const product of allProducts) {
-          if (product.image && !imageCache[product.image]) {
-            await getImageUri(product.image);
-          }
-        }
-      })();
-    }
-  }, [productCategories]);
   
   // ======== IMPROVED DATA FETCHING WITH CACHE ========
   useEffect(() => {
@@ -354,90 +249,14 @@ export default function OrderComponent() {
       setLoading(false);
     }
   };
-
-  // ======== OPTIMIZED PRODUCT RENDERING ========
-  const OptimizedImage = ({ source, style, fallback }) => {
-    const [imageSource, setImageSource] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [hasError, setHasError] = useState(false);
-    
-    useEffect(() => {
-      let isMounted = true;
-      
-      const loadImage = async () => {
-        if (!source) {
-          setIsLoading(false);
-          setHasError(true);
-          return;
-        }
-        
-        try {
-          const cachedUri = await getImageUri(source.uri);
-          if (isMounted) {
-            setImageSource({ uri: cachedUri });
-            setIsLoading(false);
-          }
-        } catch (error) {
-          console.error("Error loading image:", error);
-          if (isMounted) {
-            setIsLoading(false);
-            setHasError(true);
-          }
-        }
-      };
-      
-      loadImage();
-      
-      return () => {
-        isMounted = false;
-      };
-    }, [source]);
-    
-    if (isLoading) {
-      return (
-        <View style={[style, { backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="small" color="#22c55e" />
-        </View>
-      );
-    }
-    
-    if (hasError) {
-      return (
-        <View style={[style, { backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{ color: '#94a3b8', fontSize: 10 }}>No Image</Text>
-        </View>
-      );
-    }
-    
-    return (
-      <Image 
-        source={imageSource} 
-        style={style} 
-        resizeMode="cover"
-        defaultSource={fallback}  // Fallback image
-      />
-    );
-  };
   
   // ======== CACHE MANAGEMENT ========
-  const clearAllCache = async () => {
+  const clearProductCache = async () => {
     try {
-      // Clear product cache
       await AsyncStorage.removeItem('productCategories');
       await AsyncStorage.removeItem('productCategoriesTimestamp');
-      
-      // Clear image cache in AsyncStorage
-      await AsyncStorage.removeItem('imageCache');
-      
-      // Clear file system image cache
-      await FileSystem.deleteAsync(cacheDirectory, { idempotent: true });
-      await FileSystem.makeDirectoryAsync(cacheDirectory, { intermediates: true });
-      
-      // Reset state
-      setImageCache({});
-      
-      console.log("All caches cleared");
-      Alert.alert("Cache Cleared", "All data will be refreshed on next load");
+      console.log("Product cache cleared");
+      Alert.alert("Cache Cleared", "Product data will be refreshed on next load");
       
       // Refresh products immediately
       setLoadingProducts(true);
@@ -530,14 +349,10 @@ export default function OrderComponent() {
     locationText = address;
   }
 
-  // ======== MODIFIED PRODUCT RENDERING ========
+  // ======== COMPONENT RENDERING ========
   const renderProductItem = ({ item }) => (
     <View style={styleToUse.productCard}>
-      <OptimizedImage 
-        source={{ uri: item.image }} 
-        style={styleToUse.productImage}
-        fallback={require('../../assets/images/icon.png')} // Add a placeholder image to your assets
-      />
+      <Image source={{ uri: item.image }} style={styleToUse.productImage} />
       <View style={styleToUse.deliveryBadge}>
         <Clock size={12} color="#22c55e" />
         <Text style={styleToUse.deliveryText}>{item.deliveryTime}</Text>
@@ -579,27 +394,7 @@ export default function OrderComponent() {
       </View>
     </View>
   );
-  
-  // ======== OPTIMIZED FLATLIST RENDERING ========
-  const renderCategoryProducts = (category) => (
-    <FlatList
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      data={category.products}
-      renderItem={renderProductItem}
-      keyExtractor={item => item.id}
-      contentContainerStyle={styleToUse.productList}
-      initialNumToRender={3}  // Limit initial render count
-      maxToRenderPerBatch={5} // Limit items per batch
-      windowSize={3}          // Reduce window size for better performance
-      removeClippedSubviews={true} // Remove items that are outside of the viewport
-      getItemLayout={(data, index) => (
-        // Pre-calculate item dimensions to improve rendering speed
-        {length: 160, offset: 160 * index, index}
-      )}
-    />
-  );
-  
+
   // ======== NAVIGATION HANDLER ========
   const handleOrderNow = () => {
     if (canProceed) {
@@ -723,7 +518,7 @@ export default function OrderComponent() {
                 </Text>
                 <Pressable 
                   style={styleToUse.refreshButton}
-                  onPress={clearAllCache}
+                  onPress={clearProductCache}
                 >
                   <Text style={styleToUse.refreshButtonText}>Refresh Products</Text>
                 </Pressable>
@@ -733,7 +528,14 @@ export default function OrderComponent() {
               productCategories.map((category) => (
                 <View key={category.id} style={styleToUse.categoryContainer}>
                   <Text style={styleToUse.categoryTitle}>{category.title}</Text>
-                  {renderCategoryProducts(category)}
+                  <FlatList
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    data={category.products}
+                    renderItem={renderProductItem}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styleToUse.productList}
+                  />
                 </View>
               ))
             )}
@@ -784,6 +586,33 @@ export default function OrderComponent() {
               />
             </Pressable>
           </View>
+          
+          {/* Debug Button - You can remove this in production
+          <Pressable 
+            style={{
+              padding: 12,
+              margin: 16,
+              backgroundColor: '#f1f5f9',
+              borderRadius: 8,
+              alignItems: 'center',
+            }}
+            onPress={clearProductCache}
+          >
+            <Text style={{ color: '#64748b', fontWeight: '500' }}>
+              Refresh Products
+            </Text>
+          </Pressable> */}
+          
+          {/* Debug Info - Remove in production
+          <View style={{ padding: 16, backgroundColor: '#f8fafc' }}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Debug Info:</Text>
+            <Text>Categories Found: {productCategories.length}</Text>
+            {productCategories.map(cat => (
+              <Text key={cat.id}>
+                • {cat.title}: {cat.products.length} products
+              </Text>
+            ))}
+          </View> */}
         </>
       )}
     </ScrollView>

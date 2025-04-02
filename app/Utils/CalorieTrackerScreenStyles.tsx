@@ -205,11 +205,78 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
   },
+  captureButtonDisabled: {
+    opacity: 0.5,
+  },
+  
+  captureButtonInnerDisabled: {
+    backgroundColor: '#888888',
+  },
+  
+  limitReachedText: {
+    position: 'absolute',
+    bottom: -24,
+    color: '#ff4d4d',
+    fontSize: 12,
+    fontWeight: '600',
+    width: 100,
+    textAlign: 'center',
+  },
+  
+  tokenInfoContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#22c55e',
+  },
+  
+  tokenInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#22c55e',
+    marginBottom: 6,
+  },
+  
+  tokenInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  
+  tokenProgressContainer: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    borderRadius: 3,
+    marginRight: 10,
+  },
+  
+  tokenProgressBar: {
+    height: 6,
+    backgroundColor: '#22c55e',
+    borderRadius: 3,
+  },
+  
+  tokenInfoText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '500',
+  },
+  
+  analysesRemainingText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontWeight: '500',
+  },
   previewImage: {
     width: '100%',
     aspectRatio: 4 / 3,
     backgroundColor: '#111111',
   },
+  
   imageGradient: {
     position: 'absolute',
     top: 0,
@@ -219,14 +286,56 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // tokenInfoContainer: {
+  //   marginTop: 16,
+  //   padding: 12,
+  //   backgroundColor: 'rgba(34, 197, 94, 0.1)',
+  //   borderRadius: 8,
+  //   borderLeftWidth: 3,
+  //   borderLeftColor: '#22c55e',
+  // },
+  // tokenInfoTitle: {
+  //   fontSize: 14,
+  //   fontWeight: '600',
+  //   color: '#22c55e',
+  //   marginBottom: 6,
+  // },
+  // tokenInfoRow: {
+  //   flexDirection: 'row',
+  //   alignItems: 'center',
+  //   justifyContent: 'space-between',
+  // },
+  // tokenProgressContainer: {
+  //   flex: 1,
+  //   height: 6,
+  //   backgroundColor: 'rgba(34, 197, 94, 0.2)',
+  //   borderRadius: 3,
+  //   marginRight: 10,
+  // },
+  // tokenProgressBar: {
+  //   height: 6,
+  //   backgroundColor: '#22c55e',
+  //   borderRadius: 3,
+  // },
+  // tokenInfoText: {
+  //   fontSize: 12,
+  //   color: '#333',
+  //   fontWeight: '500',
+  // },
+  // analysesRemainingText: {
+  //   fontSize: 12,
+  //   color: '#666',
+  //   marginTop: 4,
+  //   fontWeight: '500',
+  // },
+  // backButton: {
+  //   width: 40,
+  //   height: 40,
+  //   borderRadius: 20,
+  //   backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  //   alignItems: 'center',
+  //   justifyContent: 'center',
+  // },
   resultContainer: {
     padding: 24,
     backgroundColor: '#000000',
