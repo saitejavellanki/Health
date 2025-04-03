@@ -2,9 +2,47 @@ import { Tabs } from 'expo-router';
 import { View, Text, SafeAreaView } from 'react-native';
 import { Home, CalendarDays, User, PieChart, Ticket, ScanFace } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { useRouter } from 'expo-router';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const [isPremium, setIsPremium] = useState(false);
+  const router = useRouter();
+  
+  // Check if user is premium
+  useEffect(() => {
+    const checkPremiumStatus = async () => {
+      try {
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+        
+        if (currentUser) {
+          const db = getFirestore();
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          
+          if (userDoc.exists()) {
+            setIsPremium(userDoc.data().isPremium === true);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking premium status:", error);
+      }
+    };
+    
+    checkPremiumStatus();
+  }, []);
+  
+  // Handle scan button press based on premium status
+  const handleScanPress = () => {
+    if (isPremium) {
+      router.push('/Screens/CalorieTrackerScreen');
+    } else {
+      router.push('/Screens/PremiumSubscriptionScreen');
+    }
+  };
   
   return (
     <Tabs
@@ -93,9 +131,17 @@ export default function TabLayout() {
         }}
       />
       
-      {/* 3. Calorie Tracker (Center Button) */}
+      {/* 3. Calorie Tracker (Center Button) - Always show but redirect if not premium */}
       <Tabs.Screen
         name="NavigateToCalorie"
+        listeners={{
+          tabPress: (e) => {
+            // Prevent default navigation
+            e.preventDefault();
+            // Handle custom navigation based on premium status
+            handleScanPress();
+          }
+        }}
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={{

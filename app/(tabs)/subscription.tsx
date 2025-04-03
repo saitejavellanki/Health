@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert, ActivityIndicator, FlatList } from 'react-native';
-import { ChevronRight, MapPin, Navigation, Plus, Minus, Clock } from 'lucide-react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
+import { ChevronRight, MapPin, Navigation, Plus, Minus, Clock, RefreshCw } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { styles } from "../Utils/SubscriptionStyles";
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../../components/firebase/Firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
@@ -22,6 +22,7 @@ export default function OrderComponent() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [isInServiceArea, setIsInServiceArea] = useState(false);
   const [imageCache, setImageCache] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
   
   // Define default styles as a fallback
   const defaultStyles = StyleSheet.create({
@@ -160,99 +161,106 @@ export default function OrderComponent() {
     }
   }, [productCategories]);
   
-  // ======== IMPROVED DATA FETCHING WITH CACHE ========
-  useEffect(() => {
-    const fetchProductsWithCache = async () => {
-      setLoadingProducts(true);
+  // ======== IMPROVED DATA FETCHING WITH REAL-TIME UPDATES ========
+  // Function to process products snapshot into categories
+  const processProductsSnapshot = (snapshot) => {
+    // Create a map to group products by category
+    const categoriesMap = new Map();
+    
+    // Process each product and group by its actual category from Firestore
+    snapshot.docs.forEach(doc => {
+      const productData = doc.data();
+      // Get the category from the product data
+      const category = productData.category || "Uncategorized";
       
-      try {
-        // Try to get products from cache first
-        const cachedData = await AsyncStorage.getItem('productCategories');
-        const cacheTimestamp = await AsyncStorage.getItem('productCategoriesTimestamp');
-        const currentTime = new Date().getTime();
-        
-        // Check if we have valid cached data (less than 1 hour old)
-        const CACHE_VALIDITY_PERIOD = 60 * 60 * 1000; // 1 hour in milliseconds
-        const isCacheValid = cachedData && cacheTimestamp && 
-                            (currentTime - parseInt(cacheTimestamp) < CACHE_VALIDITY_PERIOD);
-        
-        if (isCacheValid) {
-          console.log("Using cached product data");
-          setProductCategories(JSON.parse(cachedData));
-          setLoadingProducts(false);
-          return;
-        }
-        
-        // If no valid cache, fetch from Firebase
-        console.log("Cache invalid or missing, fetching from Firebase...");
-        
-        // Get all products from the 'products' collection
-        const productsCollection = collection(db, 'products');
-        const productsSnapshot = await getDocs(productsCollection);
-        
-        console.log(`Found ${productsSnapshot.docs.length} products in the products collection`);
-        
-        // Create a map to group products by category
-        const categoriesMap = new Map();
-        
-        // Process each product and group by its actual category from Firestore
-        productsSnapshot.docs.forEach(doc => {
-          const productData = doc.data();
-          // Get the category from the product data
-          const category = productData.category || "Uncategorized";
-          
-          console.log(`Product: ${productData.name}, Category: ${category}`);
-          
-          // Check if we already have this category in our map
-          if (!categoriesMap.has(category)) {
-            // Create a new category if it doesn't exist
-            categoriesMap.set(category, {
-              id: category.toLowerCase().replace(/\s+/g, '-'),
-              title: category,
-              products: []
-            });
-          }
-          
-          // Add product to its category
-          categoriesMap.get(category).products.push({
-            id: doc.id,
-            ...productData
-          });
+      console.log(`Product: ${productData.name}, Category: ${category}`);
+      
+      // Check if we already have this category in our map
+      if (!categoriesMap.has(category)) {
+        // Create a new category if it doesn't exist
+        categoriesMap.set(category, {
+          id: category.toLowerCase().replace(/\s+/g, '-'),
+          title: category,
+          products: []
         });
+      }
+      
+      // Add product to its category
+      categoriesMap.get(category).products.push({
+        id: doc.id,
+        ...productData
+      });
+    });
+    
+    // Convert the map to an array of categories
+    let categoriesArray = Array.from(categoriesMap.values());
+    
+    // Filter out empty categories and sort alphabetically
+    categoriesArray = categoriesArray
+      .filter(category => category.products.length > 0)
+      .sort((a, b) => a.title.localeCompare(b.title));
+    
+    console.log("Categories found:", categoriesArray.map(c => c.title).join(", "));
+    console.log("Product counts by category:", 
+      categoriesArray.map(c => `${c.title}: ${c.products.length}`).join(", "));
+    
+    return categoriesArray;
+  };
+  
+  // Set up real-time listener for product updates
+  useEffect(() => {
+    setLoadingProducts(true);
+    
+    // Get products collection reference
+    const productsCollection = collection(db, 'products');
+    
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(productsCollection, 
+      (snapshot) => {
+        console.log(`Received real-time update with ${snapshot.docs.length} products`);
         
-        // Convert the map to an array of categories
-        let categoriesArray = Array.from(categoriesMap.values());
+        // Process the snapshot into categories
+        const categoriesArray = processProductsSnapshot(snapshot);
         
-        // Filter out empty categories and sort alphabetically
-        categoriesArray = categoriesArray
-          .filter(category => category.products.length > 0)
-          .sort((a, b) => a.title.localeCompare(b.title));
-        
-        console.log("Categories found:", categoriesArray.map(c => c.title).join(", "));
-        console.log("Product counts by category:", 
-          categoriesArray.map(c => `${c.title}: ${c.products.length}`).join(", "));
-        
+        // Update state with the latest data
         setProductCategories(categoriesArray);
+        setLoadingProducts(false);
         
-        // Save to cache
-        await AsyncStorage.setItem('productCategories', JSON.stringify(categoriesArray));
-        await AsyncStorage.setItem('productCategoriesTimestamp', currentTime.toString());
+        // Save to cache for offline use
+        AsyncStorage.setItem('productCategories', JSON.stringify(categoriesArray));
+        AsyncStorage.setItem('productCategoriesTimestamp', new Date().getTime().toString());
         
-        console.log("Product data fetched and cached successfully");
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        console.error("Error stack:", error.stack);
+        console.log("Product data updated from real-time listener");
+      },
+      (error) => {
+        console.error("Error in real-time products listener:", error);
         Alert.alert(
           "Error Loading Products", 
           "Please check your internet connection and try again. Error: " + error.message
         );
-      } finally {
         setLoadingProducts(false);
+        
+        // Try to load from cache if available
+        loadProductsFromCache();
       }
-    };
+    );
     
-    fetchProductsWithCache();
+    // Clean up listener when component unmounts
+    return () => unsubscribe();
   }, []);
+  
+  // Function to load products from cache
+  const loadProductsFromCache = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem('productCategories');
+      if (cachedData) {
+        console.log("Loading products from cache as fallback");
+        setProductCategories(JSON.parse(cachedData));
+      }
+    } catch (error) {
+      console.error("Error loading cached products:", error);
+    }
+  };
 
   // ======== LOCATION HANDLING ========
   useEffect(() => {
@@ -437,50 +445,26 @@ export default function OrderComponent() {
       setImageCache({});
       
       console.log("All caches cleared");
-      Alert.alert("Cache Cleared", "All data will be refreshed on next load");
+      Alert.alert("Cache Cleared", "All data will be refreshed immediately");
       
-      // Refresh products immediately
-      setLoadingProducts(true);
-      const productsCollection = collection(db, 'products');
-      const productsSnapshot = await getDocs(productsCollection);
-      
-      console.log(`Found ${productsSnapshot.docs.length} products after cache clear`);
-      
-      // Create a map to group products by category
-      const categoriesMap = new Map();
-      
-      // Process each product
-      productsSnapshot.docs.forEach(doc => {
-        const productData = doc.data();
-        const category = productData.category || "Uncategorized";
-        
-        if (!categoriesMap.has(category)) {
-          categoriesMap.set(category, {
-            id: category.toLowerCase().replace(/\s+/g, '-'),
-            title: category,
-            products: []
-          });
-        }
-        
-        categoriesMap.get(category).products.push({
-          id: doc.id,
-          ...productData
-        });
-      });
-      
-      // Convert to array and filter/sort
-      const categoriesArray = Array.from(categoriesMap.values())
-        .filter(category => category.products.length > 0)
-        .sort((a, b) => a.title.localeCompare(b.title));
-      
-      setProductCategories(categoriesArray);
-      setLoadingProducts(false);
-      
+      // Products will be refreshed automatically by the real-time listener
     } catch (error) {
       console.error("Error clearing cache:", error);
-      setLoadingProducts(false);
     }
   };
+  
+  // Pull to refresh functionality
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await clearAllCache();
+      // Note: No need to fetch products manually as the real-time listener will update automatically
+    } catch (error) {
+      console.error("Error during refresh:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
   
   // ======== CART FUNCTIONS ========
   const handleAddToCart = (productId) => {
@@ -659,7 +643,17 @@ export default function OrderComponent() {
 
   // ======== MAIN RENDER ========
   return (
-    <ScrollView style={styleToUse.container}>
+    <ScrollView 
+      style={styleToUse.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={["#22c55e"]}
+          tintColor="#22c55e"
+        />
+      }
+    >
       {/* Real-time Location Header */}
       <View style={styleToUse.locationContainer}>
         <View style={styleToUse.locationHeader}>
@@ -705,9 +699,25 @@ export default function OrderComponent() {
           <View style={styleToUse.section}>
             <View style={styleToUse.sectionHeaderRow}>
               <Text style={styleToUse.sectionTitle}>Items</Text>
-              <Text style={styleToUse.itemsSelectedText}>
-                {totalItems} items selected
-              </Text>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Text style={styleToUse.itemsSelectedText}>
+                  {totalItems} items selected
+                </Text>
+                <Pressable 
+                  onPress={clearAllCache} 
+                  style={{
+                    marginLeft: 10,
+                    padding: 5,
+                    borderRadius: 4,
+                    backgroundColor: '#f1f5f9',
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}
+                >
+                  <RefreshCw size={14} color="#22c55e" />
+                  <Text style={{color: '#22c55e', fontSize: 12, marginLeft: 4}}>Refresh</Text>
+                </Pressable>
+              </View>
             </View>
             
             {loadingProducts ? (
