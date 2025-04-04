@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, Easing } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Animated,
+  Easing,
+  Vibration,
+} from 'react-native';
 import { doc, getDoc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../components/firebase/Firebase';
 
@@ -12,14 +20,14 @@ const WaterTrackingComponent = () => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const bubbleAnim1 = useRef(new Animated.Value(0)).current;
   const bubbleAnim2 = useRef(new Animated.Value(0)).current;
-  
+
   // Local cache to reduce Firestore reads
   const waterDataRef = useRef({
     intake: 0,
     goal: 8,
-    lastUpdated: ''
+    lastUpdated: '',
   });
-  
+
   // Unsubscribe reference for cleanup
   const unsubscribeRef = useRef(null);
 
@@ -28,15 +36,15 @@ const WaterTrackingComponent = () => {
     const currentUser = auth.currentUser;
     if (currentUser) {
       setUserId(currentUser.uid);
-      
+
       // Get today's date in YYYY-MM-DD format for date comparison
       const today = new Date().toISOString().split('T')[0];
       setLastUpdatedDate(today);
-      
+
       // Initial fetch of water data from Firestore
       fetchWaterData(currentUser.uid, today);
     }
-    
+
     return () => {
       // Clean up listener when component unmounts
       if (unsubscribeRef.current) {
@@ -50,12 +58,15 @@ const WaterTrackingComponent = () => {
     try {
       const userDocRef = doc(db, 'users', uid);
       const userDoc = await getDoc(userDocRef);
-      
+
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        
+
         // Check if water tracking data exists and if it's from today
-        if (userData.waterTracking && userData.waterTracking.lastUpdated === today) {
+        if (
+          userData.waterTracking &&
+          userData.waterTracking.lastUpdated === today
+        ) {
           // Use today's data
           waterDataRef.current = userData.waterTracking;
           setWaterIntake(userData.waterTracking.intake);
@@ -65,9 +76,9 @@ const WaterTrackingComponent = () => {
           const newWaterData = {
             intake: 0,
             goal: userData.waterTracking?.goal || 8,
-            lastUpdated: today
+            lastUpdated: today,
           };
-          
+
           // Update Firestore with the reset data for new day
           await updateDoc(userDocRef, { waterTracking: newWaterData });
           waterDataRef.current = newWaterData;
@@ -79,36 +90,37 @@ const WaterTrackingComponent = () => {
         const newWaterData = {
           intake: 0,
           goal: 8,
-          lastUpdated: today
+          lastUpdated: today,
         };
-        
-        await setDoc(userDocRef, { 
+
+        await setDoc(userDocRef, {
           waterTracking: newWaterData,
-          createdAt: new Date()
+          createdAt: new Date(),
         });
-        
+
         waterDataRef.current = newWaterData;
       }
-      
+
       // Set up real-time listener for changes (only during active sessions)
       unsubscribeRef.current = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
           const userData = doc.data();
           // Only update state if data is different to avoid unnecessary renders
-          if (userData.waterTracking && 
-              (userData.waterTracking.intake !== waterDataRef.current.intake ||
-               userData.waterTracking.goal !== waterDataRef.current.goal)) {
+          if (
+            userData.waterTracking &&
+            (userData.waterTracking.intake !== waterDataRef.current.intake ||
+              userData.waterTracking.goal !== waterDataRef.current.goal)
+          ) {
             waterDataRef.current = userData.waterTracking;
             setWaterIntake(userData.waterTracking.intake);
             setWaterGoal(userData.waterTracking.goal || 8);
           }
         }
       });
-      
     } catch (error) {
       console.error('Error fetching water data:', error);
     }
-    
+
     // Start animations
     startWaveAnimation();
     startBubbleAnimations();
@@ -151,7 +163,7 @@ const WaterTrackingComponent = () => {
       ])
     ).start();
   };
-  
+
   const startBubbleAnimations = () => {
     // Animate first bubble
     Animated.loop(
@@ -169,7 +181,7 @@ const WaterTrackingComponent = () => {
         }),
       ])
     ).start();
-    
+
     // Animate second bubble with delay
     setTimeout(() => {
       Animated.loop(
@@ -192,64 +204,71 @@ const WaterTrackingComponent = () => {
 
   // Debounce timer to batch Firestore updates
   const updateTimerRef = useRef(null);
-  
+
   const updateWaterIntake = (amount) => {
     if (!userId) return;
-    
+
+    // Trigger vibration when button is pressed
+    Vibration.vibrate(20); // Short vibration for tactile feedback
+
     // Get today's date to check if we need to reset
     const today = new Date().toISOString().split('T')[0];
-    
+
     // Check if the date has changed since last update
     if (lastUpdatedDate !== today) {
       // It's a new day, reset the intake
       setWaterIntake(amount > 0 ? amount : 0);
       setLastUpdatedDate(today);
-      
+
       // Update Firestore with reset data
       const newWaterData = {
         intake: amount > 0 ? amount : 0,
         goal: waterGoal,
-        lastUpdated: today
+        lastUpdated: today,
       };
-      
+
       updateFirestore(newWaterData);
       return;
     }
-    
+
     // Calculate new intake value with bounds
-    const newIntake = Math.max(0, Math.min(waterGoal + 2, waterIntake + amount));
-    
+    const newIntake = Math.max(
+      0,
+      Math.min(waterGoal + 2, waterIntake + amount)
+    );
+
     // Update local state immediately for UI responsiveness
     setWaterIntake(newIntake);
-    
+
     // Batch Firestore updates using debounce pattern
     if (updateTimerRef.current) {
       clearTimeout(updateTimerRef.current);
     }
-    
+
     updateTimerRef.current = setTimeout(() => {
       // Update Firestore after a delay to batch frequent updates
       const waterData = {
         intake: newIntake,
         goal: waterGoal,
-        lastUpdated: today
+        lastUpdated: today,
       };
-      
+
       updateFirestore(waterData);
     }, 1000); // Reduced debounce to 1 second for better responsiveness
   };
-  
+
   // Function to update Firestore with minimal writes
   const updateFirestore = async (waterData) => {
     try {
       // Only update if data has changed
-      if (waterDataRef.current.intake !== waterData.intake || 
-          waterDataRef.current.goal !== waterData.goal ||
-          waterDataRef.current.lastUpdated !== waterData.lastUpdated) {
-        
+      if (
+        waterDataRef.current.intake !== waterData.intake ||
+        waterDataRef.current.goal !== waterData.goal ||
+        waterDataRef.current.lastUpdated !== waterData.lastUpdated
+      ) {
         const userDocRef = doc(db, 'users', userId);
         await updateDoc(userDocRef, { waterTracking: waterData });
-        
+
         // Update local cache
         waterDataRef.current = waterData;
         console.log('Water intake updated in Firestore:', waterData);
@@ -260,15 +279,18 @@ const WaterTrackingComponent = () => {
   };
 
   // Calculate water percentage
-  const waterPercentage = Math.min(Math.round((waterIntake / waterGoal) * 100), 100);
-  
+  const waterPercentage = Math.min(
+    Math.round((waterIntake / waterGoal) * 100),
+    100
+  );
+
   // Enhanced motivational messages based on percentage
   const getMessage = () => {
-    if (waterPercentage < 25) return "Stay hydrated!";
-    if (waterPercentage < 50) return "Keep it up!";
-    if (waterPercentage < 75) return "More than halfway!";
-    if (waterPercentage < 100) return "Almost there!";
-    return "Goal achieved! 💦";
+    if (waterPercentage < 25) return 'Stay hydrated!';
+    if (waterPercentage < 50) return 'Keep it up!';
+    if (waterPercentage < 75) return 'More than halfway!';
+    if (waterPercentage < 100) return 'Almost there!';
+    return 'Goal achieved! 💦';
   };
 
   // Enhanced color gradient based on percentage
@@ -285,33 +307,33 @@ const WaterTrackingComponent = () => {
     inputRange: [0, 1],
     outputRange: [-30, 30], // Wider wave movement
   });
-  
+
   // Bubble animations
   const bubble1TranslateY = bubbleAnim1.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -100],
   });
-  
+
   const bubble2TranslateY = bubbleAnim2.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -80],
   });
-  
+
   const bubble1Scale = bubbleAnim1.interpolate({
     inputRange: [0, 0.3, 1],
     outputRange: [0.7, 1, 0.5],
   });
-  
+
   const bubble2Scale = bubbleAnim2.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: [0.5, 0.8, 0.3],
   });
-  
+
   const bubble1Opacity = bubbleAnim1.interpolate({
     inputRange: [0, 0.2, 0.8, 1],
     outputRange: [0, 0.7, 0.5, 0],
   });
-  
+
   const bubble2Opacity = bubbleAnim2.interpolate({
     inputRange: [0, 0.2, 0.8, 1],
     outputRange: [0, 0.5, 0.3, 0],
@@ -319,102 +341,115 @@ const WaterTrackingComponent = () => {
 
   // Create icons with clean, professional look
   const renderIcon = (iconName, size, color) => {
-    switch(iconName) {
+    switch (iconName) {
       case 'droplet':
         return (
-          <View style={[styles.iconDroplet, {borderColor: color}]}>
-            <View style={[styles.iconDropletFill, {backgroundColor: color}]} />
+          <View style={[styles.iconDroplet, { borderColor: color }]}>
+            <View
+              style={[styles.iconDropletFill, { backgroundColor: color }]}
+            />
           </View>
         );
       case 'minus':
-        return <View style={[styles.iconBar, {backgroundColor: color}]} />;
+        return <View style={[styles.iconBar, { backgroundColor: color }]} />;
       case 'plus':
         return (
           <View style={styles.iconPlusContainer}>
-            <View style={[styles.iconBar, {backgroundColor: color}]} />
-            <View style={[styles.iconBarVertical, {backgroundColor: color}]} />
+            <View style={[styles.iconBar, { backgroundColor: color }]} />
+            <View
+              style={[styles.iconBarVertical, { backgroundColor: color }]}
+            />
           </View>
         );
       default:
-        return <Text style={{fontSize: size, color: color}}>•</Text>;
+        return <Text style={{ fontSize: size, color: color }}>•</Text>;
     }
   };
 
   // Calculate the water height percentage for the bottle
   const waveHeight = `${Math.max(5, waterPercentage)}%`;
-  
+
   // Calculate progress percentage for display
   const progressText = `${Math.round((waterIntake / waterGoal) * 100)}%`;
 
   return (
     <View style={styles.outerContainer}>
-      <View style={[styles.container, {backgroundColor: '#f0f9ff'}]}>
+      <View style={[styles.container, { backgroundColor: '#f0f9ff' }]}>
         <View style={styles.headerRow}>
           <View style={styles.titleContainer}>
             <View style={styles.iconWrapper}>
               {renderIcon('droplet', 20, primaryColor)}
             </View>
-            <Text style={[styles.title, { color: primaryColor }]}>Hydration Tracker</Text>
+            <Text style={[styles.title, { color: primaryColor }]}>
+              Hydration Tracker
+            </Text>
           </View>
-          <Text style={[styles.progressText, { color: primaryColor }]}>{progressText}</Text>
+          <Text style={[styles.progressText, { color: primaryColor }]}>
+            {progressText}
+          </Text>
         </View>
 
         <View style={styles.waterTracker}>
-          <Animated.View 
+          <Animated.View
             style={[
               styles.bottleContainer,
-              { transform: [{ scale: scaleAnim }] }
+              { transform: [{ scale: scaleAnim }] },
             ]}
           >
             <View style={styles.bottle}>
-              <View style={[styles.bottleInner, { height: waveHeight, backgroundColor: primaryColor }]}>
+              <View
+                style={[
+                  styles.bottleInner,
+                  { height: waveHeight, backgroundColor: primaryColor },
+                ]}
+              >
                 <Animated.View
                   style={[
                     styles.waveContainer,
-                    { transform: [{ translateX }] }
+                    { transform: [{ translateX }] },
                   ]}
                 >
                   <View
-                    style={[styles.wave, {backgroundColor: primaryColor}]}
+                    style={[styles.wave, { backgroundColor: primaryColor }]}
                   />
                 </Animated.View>
               </View>
-              
+
               {/* Enhanced animated bubbles */}
               {waterPercentage > 0 && (
-                <Animated.View 
+                <Animated.View
                   style={[
-                    styles.bubble, 
-                    { 
-                      left: '30%', 
+                    styles.bubble,
+                    {
+                      left: '30%',
                       bottom: '20%',
                       transform: [
                         { translateY: bubble1TranslateY },
-                        { scale: bubble1Scale }
+                        { scale: bubble1Scale },
                       ],
                       opacity: bubble1Opacity,
-                      backgroundColor: 'rgba(255, 255, 255, 0.8)'
-                    }
+                      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    },
                   ]}
                 />
               )}
-              
+
               {waterPercentage > 0 && (
-                <Animated.View 
+                <Animated.View
                   style={[
-                    styles.bubble, 
-                    { 
-                      left: '55%', 
+                    styles.bubble,
+                    {
+                      left: '55%',
                       bottom: '35%',
-                      width: 8, 
+                      width: 8,
                       height: 8,
                       transform: [
                         { translateY: bubble2TranslateY },
-                        { scale: bubble2Scale }
+                        { scale: bubble2Scale },
                       ],
                       opacity: bubble2Opacity,
-                      backgroundColor: 'rgba(255, 255, 255, 0.7)'
-                    }
+                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    },
                   ]}
                 />
               )}
@@ -422,13 +457,19 @@ const WaterTrackingComponent = () => {
             <View style={styles.markings}>
               {[...Array(5).keys()].map((i) => (
                 <View key={i} style={styles.marking}>
-                  <Text style={[
-                    styles.markingText, 
-                    { 
-                      color: waterIntake >= (waterGoal - i * 2) ? primaryColor : '#64748b',
-                      fontWeight: waterIntake >= (waterGoal - i * 2) ? '700' : '500'
-                    }
-                  ]}>
+                  <Text
+                    style={[
+                      styles.markingText,
+                      {
+                        color:
+                          waterIntake >= waterGoal - i * 2
+                            ? primaryColor
+                            : '#64748b',
+                        fontWeight:
+                          waterIntake >= waterGoal - i * 2 ? '700' : '500',
+                      },
+                    ]}
+                  >
                     {waterGoal - i * 2}
                   </Text>
                 </View>
@@ -438,49 +479,61 @@ const WaterTrackingComponent = () => {
 
           <View style={styles.statsContainer}>
             <View style={styles.statsRow}>
-              <View style={[styles.stat, { backgroundColor: `${primaryColor}20` }]}>
-                <Text style={[styles.statValue, { color: primaryColor }]}>{waterIntake}</Text>
+              <View
+                style={[styles.stat, { backgroundColor: `${primaryColor}20` }]}
+              >
+                <Text style={[styles.statValue, { color: primaryColor }]}>
+                  {waterIntake}
+                </Text>
                 <Text style={styles.statLabel}>
                   {waterIntake === 1 ? 'Glass' : 'Glasses'}
                 </Text>
               </View>
-              <View style={[styles.stat, { backgroundColor: `${primaryColor}10` }]}>
-                <Text style={[styles.statValue, { color: primaryColor }]}>{waterGoal}</Text>
+              <View
+                style={[styles.stat, { backgroundColor: `${primaryColor}10` }]}
+              >
+                <Text style={[styles.statValue, { color: primaryColor }]}>
+                  {waterGoal}
+                </Text>
                 <Text style={styles.statLabel}>Daily Goal</Text>
               </View>
             </View>
-            
+
             <View style={styles.messageContainer}>
               <Text style={[styles.message, { color: primaryColor }]}>
                 {getMessage()}
               </Text>
             </View>
-            
+
             <View style={styles.buttonContainer}>
               <Pressable
                 style={({ pressed }) => [
-                  styles.button, 
-                  styles.minusButton, 
-                  { 
+                  styles.button,
+                  styles.minusButton,
+                  {
                     borderColor: primaryColor,
-                    backgroundColor: pressed ? `${primaryColor}10` : 'transparent',
-                    opacity: waterIntake > 0 ? 1 : 0.5
-                  }
+                    backgroundColor: pressed
+                      ? `${primaryColor}10`
+                      : 'transparent',
+                    opacity: waterIntake > 0 ? 1 : 0.5,
+                  },
                 ]}
                 onPress={() => updateWaterIntake(-1)}
                 disabled={waterIntake <= 0}
               >
                 {renderIcon('minus', 20, primaryColor)}
               </Pressable>
-              
+
               <Pressable
                 style={({ pressed }) => [
-                  styles.button, 
-                  styles.plusButton, 
-                  { 
-                    backgroundColor: pressed ? `${primaryColor}80` : primaryColor,
-                    opacity: waterIntake < waterGoal + 2 ? 1 : 0.5
-                  }
+                  styles.button,
+                  styles.plusButton,
+                  {
+                    backgroundColor: pressed
+                      ? `${primaryColor}80`
+                      : primaryColor,
+                    opacity: waterIntake < waterGoal + 2 ? 1 : 0.5,
+                  },
                 ]}
                 onPress={() => updateWaterIntake(1)}
                 disabled={waterIntake >= waterGoal + 2}
@@ -502,7 +555,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: '95%',
     alignSelf: 'center',
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -678,7 +731,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   plusButton: {
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 1,

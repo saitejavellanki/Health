@@ -30,11 +30,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '../../components/firebase/Firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import {
-  Mail,
-  Lock,
-  ArrowRight,
-} from 'lucide-react-native';
+import { Mail, Lock, ArrowRight } from 'lucide-react-native';
 
 // Import Google Sign In
 import * as Google from 'expo-auth-session/providers/google';
@@ -50,7 +46,7 @@ maybeCompleteAuthSession();
 export default function Login() {
   // Use the AuthContext
   const { user, isLoading: authLoading, checkUserOnboardingStatus } = useAuth();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -95,38 +91,42 @@ export default function Login() {
       setError('Please fill in all fields');
       return;
     }
-  
+
     try {
       setLoading(true);
       setError('');
-      
+
       // Sign in with Firebase
       await signInWithEmailAndPassword(auth, email, password);
-      
+
       // Don't navigate here - let the AuthContext handle it
     } catch (err) {
       // Customize error message based on Firebase error code
       let errorMessage = 'Failed to login. Please try again.';
-      
-      if (err.code === 'auth/invalid-credential' || 
-          err.code === 'auth/user-not-found' || 
-          err.code === 'auth/wrong-password') {
+
+      if (
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password'
+      ) {
         errorMessage = 'Invalid email or password. Please try again.';
       } else if (err.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many failed login attempts. Please try again later.';
+        errorMessage =
+          'Too many failed login attempts. Please try again later.';
       } else if (err.code === 'auth/user-disabled') {
-        errorMessage = 'This account has been disabled. Please contact support.';
+        errorMessage =
+          'This account has been disabled. Please contact support.';
       } else if (err.code === 'auth/network-request-failed') {
-        errorMessage = 'Network error. Please check your connection and try again.';
+        errorMessage =
+          'Network error. Please check your connection and try again.';
       }
-      
+
       setError(errorMessage);
       Alert.alert('Login Failed', errorMessage);
     } finally {
       setLoading(false);
     }
   };
-  
 
   const handleGoogleSignIn = async () => {
     try {
@@ -147,7 +147,7 @@ export default function Login() {
 
       // Sign in with credential - AuthContext will handle the state
       await signInWithCredential(auth, googleCredential);
-      
+
       // Navigation will be handled by the useEffect
     } catch (error) {
       Alert.alert('Authentication Error', error.message);
@@ -174,7 +174,7 @@ export default function Login() {
 
       // Sign in with credential - AuthContext will handle the state
       await signInWithCredential(auth, credential);
-      
+
       // Navigation will be handled by the useEffect
     } catch (error) {
       // Ignore cancel errors
@@ -189,12 +189,13 @@ export default function Login() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={styles.header}>
         <Image
-          source={{
-            uri: 'https://res.cloudinary.com/dzlvcxhuo/image/upload/v1741947741/IMG_1539_kehx9d.jpg',
-          }}
+          // source={{
+          //   uri: '../../../assets/images/login_logo.jpg',
+          // }}
+          source={require('../../assets/images/login_logo.jpg')}
           style={styles.headerImage}
         />
       </View>

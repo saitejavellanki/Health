@@ -49,9 +49,11 @@ export default function Welcome() {
       </View>
 
       <Image
-        source={{
-          uri: 'https://images.unsplash.com/photo-1543362906-acfc16c67564?q=80&w=1000&auto=format&fit=crop',
-        }}
+        // source={{
+
+        //   uri: 'https://images.unsplash.com/photo-1543362906-acfc16c67564?q=80&w=1000&auto=format&fit=crop',
+        // }}
+        source={require('../../assets/images/onboarding-logo.avif')}
         style={styles.image}
       />
 
