@@ -144,12 +144,16 @@ export default function Home() {
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         
+        let userData = null;
+        let userIsPremium = false;
+        
         if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
+          userData = userDocSnap.data();
           
           // Check if user is premium
-          setIsPremium(userData.isPremium === true);
-          console.log('User premium status:', userData.isPremium);
+          userIsPremium = userData.isPremium === true;
+          setIsPremium(userIsPremium);
+          console.log('User premium status:', userIsPremium);
           
           // Check if targetCalories exists in the user document
           if (userData.targetCalories) {
@@ -161,6 +165,7 @@ export default function Home() {
         } else {
           console.log('User document not found');
           setIsPremium(false);
+          userIsPremium = false;
         }
 
         const userPlansRef = collection(db, 'userplans');
@@ -272,10 +277,12 @@ export default function Home() {
 
         setTodaysPlan(todaysPlan);
 
-        // Fetch nutrition data from the meals collection if premium
-        if (isPremium) {
+        // Fetch nutrition data from the meals collection if premium - use userIsPremium directly
+        if (userIsPremium) {
+          console.log('User is premium, fetching nutrition data');
           await fetchTodaysNutritionData(currentUser.uid);
         } else {
+          console.log('User is not premium, skipping nutrition data fetch');
           setLoading(false);
         }
       } catch (error) {
@@ -310,6 +317,7 @@ export default function Home() {
 
   const fetchTodaysNutritionData = async (userId) => {
     try {
+      console.log('Fetching nutrition data for user:', userId);
       const db = getFirestore();
       const mealsRef = collection(db, 'meals');
 
@@ -332,6 +340,7 @@ export default function Home() {
       );
 
       const querySnapshot = await getDocs(q);
+      console.log(`Found ${querySnapshot.size} meal entries for today`);
 
       // Calculate total nutrition values
       let totalCalories = 0;
@@ -341,10 +350,18 @@ export default function Home() {
 
       querySnapshot.forEach((doc) => {
         const mealData = doc.data();
+        console.log('Meal data:', mealData);
         totalCalories += mealData.calories || 0;
         totalProtein += mealData.protein || 0;
         totalFat += mealData.fat || 0;
         totalCarbs += mealData.carbohydrates || 0;
+      });
+
+      console.log('Total nutrition calculated:', {
+        calories: totalCalories,
+        protein: totalProtein,
+        fat: totalFat,
+        carbohydrates: totalCarbs,
       });
 
       setNutritionData({
@@ -360,6 +377,7 @@ export default function Home() {
         100
       );
       setCalorieProgress(progress);
+      console.log('Calorie progress:', progress);
 
       // Update progress in userplans collection
       if (userPlanDocId) {
@@ -370,6 +388,7 @@ export default function Home() {
             calorieProgress: progress,
             lastUpdated: Timestamp.now(),
           });
+          console.log('Updated userplans with current nutrition data');
         } catch (error) {
           console.error('Error updating progress:', error);
         }

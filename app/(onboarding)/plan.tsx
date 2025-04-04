@@ -552,7 +552,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
       const prompt = createPrompt(userData, healthCondition);
       
       // Call your backend API
-      const response = await fetch('https://efff-49-206-60-211.ngrok-free.app/api/generate-plan', {
+      const response = await fetch('http://ec2-65-1-3-17.ap-south-1.compute.amazonaws.com/api/generate-plan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

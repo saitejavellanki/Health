@@ -23,6 +23,7 @@ import {
   serverTimestamp,
   increment,
   getDoc,
+  setDoc,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import styles from '../Utils/CalorieTrackerScreenStyles';
@@ -239,7 +240,7 @@ const sendImageToServer = async (imageUri, mode) => {
     formData.append('scanMode', mode);
     
     // Send the image to the backend for analysis
-    const response = await fetch('https://efff-49-206-60-211.ngrok-free.app/api/analyze-image', {
+    const response = await fetch('http://ec2-65-1-3-17.ap-south-1.compute.amazonaws.com/api/analyze-image', {
       method: 'POST',
       body: formData,
       headers: {
@@ -573,6 +574,7 @@ const sendImageToServer = async (imageUri, mode) => {
 
   // Modified function to log the meal with carbs and sugars
   // Replace the logMealToFirebase function with this one
+// Replace the logMealToFirebase function with this one
 const logMealToFirebase = async () => {
   try {
     const auth = getAuth();
@@ -583,8 +585,10 @@ const logMealToFirebase = async () => {
       return;
     }
 
-    // Prepare meal data for server
-    const mealData = {
+    const db = getFirestore();
+    
+    // Create a new meal document in the 'meals' collection
+    const mealRef = await addDoc(collection(db, 'meals'), {
       userId: userId,
       foodName: foodName || 'Unknown food',
       calories: parseInt(calories) || 0,
@@ -593,33 +597,89 @@ const logMealToFirebase = async () => {
       carbohydrates: carbohydrates ? parseInt(carbohydrates) : 0,
       sugars: sugars ? parseInt(sugars) : 0,
       isJunkFood: isJunkFood === 1,
-      imageUrl: image, // This may need modification based on your image storage approach
-    };
-
-    // Send meal data to server
-    const response = await fetch('https://efff-49-206-60-211.ngrok-free.app/api/log-meal', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(mealData),
+      timestamp: serverTimestamp(),
+      imageUrl: image // This stores the local URI - you may want to upload to Firebase Storage instead
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Server error');
+    
+    console.log('Meal document written with ID: ', mealRef.id);
+    
+    // Update user statistics in a 'userStats' document
+    const userStatsRef = doc(db, 'userStats', userId);
+    const userStatsDoc = await getDoc(userStatsRef);
+    
+    if (userStatsDoc.exists()) {
+      // Update existing stats
+      await updateDoc(userStatsRef, {
+        totalMeals: increment(1),
+        totalCalories: increment(parseInt(calories) || 0),
+        totalProtein: increment(protein ? parseInt(protein) : 0),
+        totalFat: increment(fat ? parseInt(fat) : 0),
+        totalCarbs: increment(carbohydrates ? parseInt(carbohydrates) : 0),
+        totalSugars: increment(sugars ? parseInt(sugars) : 0),
+        junkFoodCount: isJunkFood === 1 ? increment(1) : increment(0),
+        lastMealDate: serverTimestamp()
+      });
+    } else {
+      // Create new stats document if it doesn't exist
+      await setDoc(userStatsRef, {
+        userId: userId,
+        totalMeals: 1,
+        totalCalories: parseInt(calories) || 0,
+        totalProtein: protein ? parseInt(protein) : 0,
+        totalFat: fat ? parseInt(fat) : 0,
+        totalCarbs: carbohydrates ? parseInt(carbohydrates) : 0,
+        totalSugars: sugars ? parseInt(sugars) : 0,
+        junkFoodCount: isJunkFood === 1 ? 1 : 0,
+        streak: 1, // Initialize streak
+        lastMealDate: serverTimestamp()
+      });
     }
-
-    const data = await response.json();
-    console.log('Meal logged successfully');
-    console.log('Current streak:', data.streak);
+    
+    // Update user streak
+    if (userStatsDoc.exists()) {
+      const userData = userStatsDoc.data();
+      const lastMealDate = userData.lastMealDate?.toDate();
+      const today = new Date();
+      
+      // Check if the last meal was yesterday
+      let newStreak = userData.streak || 0;
+      
+      if (lastMealDate) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const isLastMealYesterday = 
+          lastMealDate.getDate() === yesterday.getDate() &&
+          lastMealDate.getMonth() === yesterday.getMonth() &&
+          lastMealDate.getFullYear() === yesterday.getFullYear();
+          
+        const isLastMealToday =
+          lastMealDate.getDate() === today.getDate() &&
+          lastMealDate.getMonth() === today.getMonth() &&
+          lastMealDate.getFullYear() === today.getFullYear();
+          
+        if (isLastMealYesterday) {
+          // Increment streak if last meal was yesterday
+          newStreak += 1;
+          await updateDoc(userStatsRef, { streak: newStreak });
+        } else if (!isLastMealToday) {
+          // Reset streak if last meal was neither yesterday nor today
+          newStreak = 1;
+          await updateDoc(userStatsRef, { streak: newStreak });
+        }
+        // If last meal was today, don't change the streak
+      }
+      
+      console.log('Current streak:', newStreak);
+    }
+    
     setLoggedMeal(true);
 
     // Show tick animation before redirecting
     setShowTickAnimation(true);
     // Navigation will happen after animation completes in the useEffect hook
   } catch (error) {
-    console.error('Error logging meal to server:', error);
+    console.error('Error logging meal to Firebase:', error);
     Alert.alert(
       'Logging Error',
       'Could not log your meal. Please try again.',
