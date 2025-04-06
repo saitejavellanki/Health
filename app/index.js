@@ -19,7 +19,7 @@ export default function Index() {
 
             if (!userDoc.exists() || !userDoc.data().onboardingCompleted) {
               // User needs to complete onboarding
-              router.replace('/(onboarding)');
+              console.log('hi');
             } else {
               // User is authenticated and has completed onboarding
               router.replace('/(tabs)');
@@ -27,7 +27,7 @@ export default function Index() {
           } catch (error) {
             console.error('Error checking user status:', error);
             // Default to onboarding on error
-            router.replace('/(onboarding)');
+            console.log("onboard");
           }
         } else {
           // User is not authenticated, go to login

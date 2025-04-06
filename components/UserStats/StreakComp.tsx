@@ -182,13 +182,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     marginVertical: 8,
+    // Updated styling for raised button effect
+    borderWidth: 2,
+    borderColor: '#000000',
+    // These shadow properties create the raised effect
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: Platform.OS === 'android' ? 3 : 2,
-    borderWidth: 1,
-    borderColor: 'rgba(255,87,34,0.12)',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 6,
+    // Add some margin to make the shadow visible
+    margin: 4,
   },
   content: {
     flexDirection: 'row',

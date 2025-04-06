@@ -552,7 +552,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
       const prompt = createPrompt(userData, healthCondition);
       
       // Call your backend API
-      const response = await fetch('http://ec2-65-1-3-17.ap-south-1.compute.amazonaws.com/api/generate-plan', {
+      const response = await fetch('http://ec2-13-232-119-133.ap-south-1.compute.amazonaws.com/api/generate-plan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

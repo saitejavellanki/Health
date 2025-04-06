@@ -14,7 +14,7 @@ import { WebView } from 'react-native-webview';
 import { getAuth } from 'firebase/auth';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 
-const API_BASE_URL = 'https://7989-49-206-60-211.ngrok-free.app';
+const API_BASE_URL = 'http://ec2-13-232-119-133.ap-south-1.compute.amazonaws.com';
 const PAYMENT_TIMEOUT = 60000; // 60 seconds timeout
 
 const PaymentProcessor = () => {

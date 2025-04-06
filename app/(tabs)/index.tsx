@@ -640,17 +640,17 @@ export default function Home() {
           </>
         ) : (
           <Pressable
-            style={[styles.trackButton, { width: '100%', backgroundColor: '#f59e0b' }]}
+            
             onPress={navigateToPremium}
             android_ripple={{ color: '#f59e0b' }}
           >
-            <Feather
+            {/* <Feather
               name="star"
               size={18}
               color="#ffffff"
               style={styles.trackButtonIcon}
             />
-            <Text style={styles.trackButtonText}>Unlock Premium Features</Text>
+            <Text style={styles.trackButtonText}>Unlock Premium Features</Text> */}
           </Pressable>
         )}
       </View>

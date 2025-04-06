@@ -31,13 +31,13 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
           const productsCollection = collection(db, "productCategories/zLQ1DRXaIDvagLGCNJvc/products");
           const productsSnapshot = await getDocs(productsCollection);
           
-          // Get all products and their images
+          // Get all products and pre-load their images with proper error handling
           allProducts = await Promise.all(productsSnapshot.docs.map(async (doc) => {
             const productData = doc.data();
             
-            // If the image is a storage path rather than a URL, fetch the download URL
+            // Handle image URL loading with better error handling
             let imageUrl = productData.image;
-            if (imageUrl && (imageUrl.startsWith('gs://') || imageUrl.startsWith('products/'))) {
+            if (imageUrl && (imageUrl.startsWith('gs://') || !imageUrl.startsWith('http'))) {
               try {
                 const storage = getStorage();
                 // If it's a relative path, prepend the storage path
@@ -48,7 +48,8 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
                 imageUrl = await getDownloadURL(imageRef);
               } catch (imageError) {
                 console.error(`Error fetching image for product ${doc.id}:`, imageError);
-                imageUrl = null; // Set to null so we can use the defaultSource
+                // Use a valid placeholder URL instead of null
+                imageUrl = 'https://via.placeholder.com/150';
               }
             }
             
@@ -71,100 +72,111 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
           }
         }
         
-        // Check if todaysPlan exists and has snacks
-        if (todaysPlan && todaysPlan.sections && todaysPlan.sections.snack && todaysPlan.sections.snack.length > 0) {
-          // Get the first snack from today's plan
-          const todaysSnack = todaysPlan.sections.snack[0];
-          
-          // Try to find a matching product based on snack name
-          // We'll use a fuzzy match (includes) to be more flexible
-          const matchingProducts = allProducts.filter(product => 
-            product.name && todaysSnack && 
-            (product.name.toLowerCase().includes(todaysSnack.toLowerCase()) || 
-             todaysSnack.toLowerCase().includes(product.name.toLowerCase()))
-          );
-          
-          if (matchingProducts.length > 0) {
-            // Use the first matching product
-            setTodaysPick(matchingProducts[0]);
-            setLoading(false);
-            return;
+        // Check if todaysPlan exists and has snacks or fruits
+        let snackFound = false;
+        
+        if (todaysPlan && todaysPlan.sections) {
+          // Check snacks first
+          if (todaysPlan.sections.snack && todaysPlan.sections.snack.length > 0) {
+            snackFound = await findMatchingProduct(todaysPlan.sections.snack[0], allProducts);
           }
           
-          // If no match found through simple comparison, try to query Firestore directly
-          try {
-            const productsCollection = collection(db, "productCategories/zLQ1DRXaIDvagLGCNJvc/products");
-            // Create a query to find products that contain the snack name or vice versa
-            const snackNameLower = todaysSnack.toLowerCase();
-            
-            // We can't do complex string operations in Firestore query
-            // So we'll fetch a reasonable number of products and filter client side
-            const snackProductsQuery = query(productsCollection, limit(20));
-            const snackProductsSnapshot = await getDocs(snackProductsQuery);
-            
-            if (!snackProductsSnapshot.empty) {
-              const matchingProducts = [];
-              
-              for (const doc of snackProductsSnapshot.docs) {
-                const productData = doc.data();
-                const productName = productData.name ? productData.name.toLowerCase() : '';
-                
-                // Check if product name contains snack name or vice versa
-                if (productName.includes(snackNameLower) || snackNameLower.includes(productName)) {
-                  // Handle image URL
-                  let imageUrl = productData.image;
-                  if (imageUrl && (imageUrl.startsWith('gs://') || imageUrl.startsWith('products/'))) {
-                    try {
-                      const storage = getStorage();
-                      if (!imageUrl.startsWith('gs://')) {
-                        imageUrl = `products/${imageUrl}`;
-                      }
-                      const imageRef = ref(storage, imageUrl);
-                      imageUrl = await getDownloadURL(imageRef);
-                    } catch (imageError) {
-                      console.error(`Error fetching image for product ${doc.id}:`, imageError);
-                      imageUrl = null;
-                    }
-                  }
-                  
-                  matchingProducts.push({
-                    id: doc.id,
-                    ...productData,
-                    image: imageUrl
-                  });
-                }
-              }
-              
-              if (matchingProducts.length > 0) {
-                setTodaysPick(matchingProducts[0]);
-                setLoading(false);
-                return;
-              }
-            }
-          } catch (matchError) {
-            console.error("Error finding matching product:", matchError);
+          // If no snack found, check fruits
+          if (!snackFound && todaysPlan.sections.fruit && todaysPlan.sections.fruit.length > 0) {
+            snackFound = await findMatchingProduct(todaysPlan.sections.fruit[0], allProducts);
           }
         }
         
-        // Fallback: If no matching product found or no snacks in today's plan, use a random product
-        console.log("Falling back to random product selection");
-        if (allProducts.length > 0) {
-          const randomIndex = Math.floor(Math.random() * allProducts.length);
-          setTodaysPick(allProducts[randomIndex]);
-        } else {
-          // If no products found in cache, try to fetch directly from Firebase
-          try {
-            const productsCollection = collection(db, "productCategories/zLQ1DRXaIDvagLGCNJvc/products");
-            const randomProductQuery = query(productsCollection, limit(1));
-            const randomProductSnapshot = await getDocs(randomProductQuery);
-            
-            if (!randomProductSnapshot.empty) {
-              const doc = randomProductSnapshot.docs[0];
-              const productData = doc.data();
+        // If no matching product found, use a random product
+        if (!snackFound) {
+          console.log("Falling back to random product selection");
+          if (allProducts.length > 0) {
+            const randomIndex = Math.floor(Math.random() * allProducts.length);
+            setTodaysPick(allProducts[randomIndex]);
+          } else {
+            // If no products found in cache, try to fetch directly from Firebase
+            try {
+              const productsCollection = collection(db, "productCategories/zLQ1DRXaIDvagLGCNJvc/products");
+              const randomProductQuery = query(productsCollection, limit(1));
+              const randomProductSnapshot = await getDocs(randomProductQuery);
               
-              // Handle image URL
+              if (!randomProductSnapshot.empty) {
+                const doc = randomProductSnapshot.docs[0];
+                const productData = doc.data();
+                
+                // Handle image URL with proper error handling
+                let imageUrl = productData.image;
+                if (imageUrl && (imageUrl.startsWith('gs://') || !imageUrl.startsWith('http'))) {
+                  try {
+                    const storage = getStorage();
+                    if (!imageUrl.startsWith('gs://')) {
+                      imageUrl = `products/${imageUrl}`;
+                    }
+                    const imageRef = ref(storage, imageUrl);
+                    imageUrl = await getDownloadURL(imageRef);
+                  } catch (imageError) {
+                    console.error(`Error fetching fallback image for product ${doc.id}:`, imageError);
+                    imageUrl = 'https://via.placeholder.com/150';
+                  }
+                }
+                
+                setTodaysPick({
+                  id: doc.id,
+                  ...productData,
+                  image: imageUrl
+                });
+              }
+            } catch (fallbackError) {
+              console.error("Error fetching fallback today's pick:", fallbackError);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching today's pick:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Helper function to find a matching product and set it as today's pick
+    const findMatchingProduct = async (itemName, productsList) => {
+      if (!itemName) return false;
+      
+      const itemNameLower = itemName.toLowerCase();
+      
+      // Try to find a matching product based on name
+      // Using a fuzzy match (includes) to be more flexible
+      const matchingProducts = productsList.filter(product => 
+        product.name && 
+        (product.name.toLowerCase().includes(itemNameLower) || 
+         itemNameLower.includes(product.name.toLowerCase()))
+      );
+      
+      if (matchingProducts.length > 0) {
+        // Use the first matching product
+        setTodaysPick(matchingProducts[0]);
+        return true;
+      }
+      
+      // If no direct match in cache, try to query Firestore
+      try {
+        const productsCollection = collection(db, "productCategories/zLQ1DRXaIDvagLGCNJvc/products");
+        // Fetch a reasonable number of products and filter client-side
+        const snackProductsQuery = query(productsCollection, limit(20));
+        const snackProductsSnapshot = await getDocs(snackProductsQuery);
+        
+        if (!snackProductsSnapshot.empty) {
+          const matchingProducts = [];
+          
+          for (const doc of snackProductsSnapshot.docs) {
+            const productData = doc.data();
+            const productName = productData.name ? productData.name.toLowerCase() : '';
+            
+            // Check if product name contains item name or vice versa
+            if (productName.includes(itemNameLower) || itemNameLower.includes(productName)) {
+              // Handle image URL with proper error handling
               let imageUrl = productData.image;
-              if (imageUrl && (imageUrl.startsWith('gs://') || imageUrl.startsWith('products/'))) {
+              if (imageUrl && (imageUrl.startsWith('gs://') || !imageUrl.startsWith('http'))) {
                 try {
                   const storage = getStorage();
                   if (!imageUrl.startsWith('gs://')) {
@@ -173,26 +185,29 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
                   const imageRef = ref(storage, imageUrl);
                   imageUrl = await getDownloadURL(imageRef);
                 } catch (imageError) {
-                  console.error(`Error fetching fallback image for product ${doc.id}:`, imageError);
-                  imageUrl = null;
+                  console.error(`Error fetching image for product ${doc.id}:`, imageError);
+                  imageUrl = 'https://via.placeholder.com/150'; 
                 }
               }
               
-              setTodaysPick({
+              matchingProducts.push({
                 id: doc.id,
                 ...productData,
                 image: imageUrl
               });
             }
-          } catch (fallbackError) {
-            console.error("Error fetching fallback today's pick:", fallbackError);
+          }
+          
+          if (matchingProducts.length > 0) {
+            setTodaysPick(matchingProducts[0]);
+            return true;
           }
         }
-      } catch (error) {
-        console.error("Error fetching today's pick:", error);
-      } finally {
-        setLoading(false);
+      } catch (matchError) {
+        console.error("Error finding matching product:", matchError);
       }
+      
+      return false;
     };
     
     fetchTodaysPick();
@@ -217,32 +232,49 @@ export default function SnackRecommendations({ todaysPlan, addToCart }) {
     return null;
   }
   
-  // Updated header to indicate whether this is from today's meal plan or a suggestion
+  // Check if this is from today's meal plan (either snack or fruit)
   const isFromMealPlan = todaysPlan && 
                          todaysPlan.sections && 
-                         todaysPlan.sections.snack && 
-                         todaysPlan.sections.snack.length > 0;
+                         ((todaysPlan.sections.snack && todaysPlan.sections.snack.length > 0) ||
+                          (todaysPlan.sections.fruit && todaysPlan.sections.fruit.length > 0));
   
-  // Render today's pick in Zomato-style horizontal card
+  // Get source type (fruit or snack)
+  const getSourceType = () => {
+    if (!todaysPlan || !todaysPlan.sections) return 'Selected just for you';
+    
+    if (todaysPlan.sections.fruit && todaysPlan.sections.fruit.length > 0) {
+      return 'From your fruit recommendations';
+    }
+    
+    if (todaysPlan.sections.snack && todaysPlan.sections.snack.length > 0) {
+      return 'Based on your meal plan';
+    }
+    
+    return 'Selected just for you';
+  };
+  
+  // Render today's pick with glassy UI
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.title}>Today's Pick</Text>
-        <Text style={styles.subtitle}>
-          {isFromMealPlan ? 'Based on your meal plan' : 'Selected just for you'}
-        </Text>
+        <Text style={styles.subtitle}>{getSourceType()}</Text>
       </View>
       
       <Pressable
-        style={styles.zomatoCard}
+        style={styles.glassyCard}
         onPress={() => handleProductPress(todaysPick)}
       >
-        {/* Left side - Image */}
+        {/* Left side - Image with fallback handling */}
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: todaysPick.image }}
-            style={styles.productImage}
+            source={
+              todaysPick.image && todaysPick.image.startsWith('http')
+                ? { uri: todaysPick.image }
+                : require('../../assets/images/icon.png')
+            }
             defaultSource={require('../../assets/images/icon.png')}
+            style={styles.productImage}
           />
           <View style={styles.deliveryBadge}>
             <ShoppingBag size={12} color="#22c55e" />
@@ -297,28 +329,36 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#111827',
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   subtitle: {
     fontSize: 14,
     color: '#6b7280',
     marginTop: 2,
   },
-  zomatoCard: {
+  glassyCard: {
     width: '100%',
     height: 130,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     borderRadius: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
     flexDirection: 'row', // Horizontal layout
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   imageContainer: {
     width: '40%',
     position: 'relative',
+    overflow: 'hidden',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255, 255, 255, 0.3)',
   },
   productImage: {
     width: '100%',
@@ -330,12 +370,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   deliveryText: {
     fontSize: 10,
@@ -347,12 +394,16 @@ const styles = StyleSheet.create({
     width: '60%',
     padding: 12,
     justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   productName: {
     fontSize: 16,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.05)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -366,6 +417,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   ratingText: {
     fontSize: 11,
@@ -397,16 +453,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#111827',
+    textShadowColor: 'rgba(0, 0, 0, 0.05)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   addButton: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#22c55e',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
+    // These shadow properties create the raised effect
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 6,
+    // Add some margin to make the shadow visible
+    margin: 4,
   },
   addButtonText: {
     color: '#22c55e',
@@ -420,6 +487,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   loadingText: {
     marginLeft: 8,

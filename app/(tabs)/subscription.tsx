@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
-import { ChevronRight, MapPin, Navigation, Plus, Minus, Clock, RefreshCw } from 'lucide-react-native';
+import { ChevronRight, MapPin, Navigation, Plus, Minus, Clock, RefreshCw, AlertCircle } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { styles } from "../Utils/SubscriptionStyles";
@@ -468,10 +468,17 @@ export default function OrderComponent() {
   
   // ======== CART FUNCTIONS ========
   const handleAddToCart = (productId) => {
-    setCartItems(prev => ({
-      ...prev,
-      [productId]: (prev[productId] || 0) + 1,
-    }));
+    // Find the product
+    const allProducts = productCategories.flatMap(cat => cat.products);
+    const product = allProducts.find(p => p.id === productId);
+    
+    // Only add to cart if the product is in stock
+    if (product && product.inStock) {
+      setCartItems(prev => ({
+        ...prev,
+        [productId]: (prev[productId] || 0) + 1,
+      }));
+    }
   };
 
   const handleRemoveFromCart = (productId) => {
@@ -516,16 +523,36 @@ export default function OrderComponent() {
 
   // ======== MODIFIED PRODUCT RENDERING ========
   const renderProductItem = ({ item }) => (
-    <View style={styleToUse.productCard}>
+    <View style={[
+      styleToUse.productCard,
+      !item.inStock && { opacity: 0.7 }  // Add opacity to out-of-stock items
+    ]}>
       <OptimizedImage 
         source={{ uri: item.image }} 
         style={styleToUse.productImage}
-        fallback={require('../../assets/images/icon.png')} // Add a placeholder image to your assets
+        fallback={require('../../assets/images/icon.png')}
       />
       <View style={styleToUse.deliveryBadge}>
         <Clock size={12} color="#22c55e" />
         <Text style={styleToUse.deliveryText}>{item.deliveryTime}</Text>
       </View>
+      
+      {/* Add out of stock badge when item is not in stock */}
+      {!item.inStock && (
+        <View style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          backgroundColor: 'rgba(239, 68, 68, 0.9)',
+          paddingVertical: 3,
+          paddingHorizontal: 6,
+          borderRadius: 4
+        }}>
+          <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
+            OUT OF STOCK
+          </Text>
+        </View>
+      )}
       
       <View style={styleToUse.productInfo}>
         <Text numberOfLines={1} style={styleToUse.productName}>{item.name}</Text>
@@ -534,36 +561,41 @@ export default function OrderComponent() {
         <View style={styleToUse.priceContainer}>
           <Text style={styleToUse.priceText}>₹{item.price}</Text>
           
-          {cartItems[item.id] ? (
-            <View style={styleToUse.quantityControl}>
+          {item.inStock ? (
+            cartItems[item.id] ? (
+              <View style={styleToUse.quantityControl}>
+                <Pressable
+                  onPress={() => handleRemoveFromCart(item.id)}
+                  style={styleToUse.quantityButton}
+                >
+                  <Minus size={16} color="#22c55e" />
+                </Pressable>
+                <Text style={styleToUse.quantityText}>{cartItems[item.id]}</Text>
+                <Pressable
+                  onPress={() => handleAddToCart(item.id)}
+                  style={styleToUse.quantityButton}
+                >
+                  <Plus size={16} color="#22c55e" />
+                </Pressable>
+              </View>
+            ) : (
               <Pressable
-                onPress={() => handleRemoveFromCart(item.id)}
-                style={styleToUse.quantityButton}
-              >
-                <Minus size={16} color="#22c55e" />
-              </Pressable>
-              <Text style={styleToUse.quantityText}>{cartItems[item.id]}</Text>
-              <Pressable
+                style={styleToUse.addButton}
                 onPress={() => handleAddToCart(item.id)}
-                style={styleToUse.quantityButton}
+                disabled={!isInServiceArea}
               >
-                <Plus size={16} color="#22c55e" />
+                <Plus size={16} color="#fff" />
               </Pressable>
-            </View>
+            )
           ) : (
-            <Pressable
-              style={styleToUse.addButton}
-              onPress={() => handleAddToCart(item.id)}
-              disabled={!isInServiceArea}
-            >
-              <Plus size={16} color="#fff" />
-            </Pressable>
+            <View style={[styleToUse.addButton, { backgroundColor: '#d1d5db' }]}>
+              <AlertCircle size={16} color="#fff" />
+            </View>
           )}
         </View>
       </View>
     </View>
   );
-  
   // ======== OPTIMIZED FLATLIST RENDERING ========
   const renderCategoryProducts = (category) => (
     <FlatList
