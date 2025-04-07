@@ -176,8 +176,14 @@ const ProfileScreen: React.FC = () => {
           const goals = firestoreData.goals || [];
 
           // Get targetWeight from first goal or fallback to root value
-          const targetWeight =
-            goals[0]?.targetWeight || firestoreData.targetWeight || 100;
+          if (
+            goals[0]?.title != 'Weight Gain' ||
+            goals[0]?.title != 'Weight Loss'
+          ) {
+            const targetWeight = firestoreData.weight;
+          }
+          // const targetWeight =
+          //   goals[0]?.targetWeight || firestoreData.weight || 70;
 
           const data = {
             ...firestoreData,
@@ -474,7 +480,7 @@ const ProfileScreen: React.FC = () => {
 
   // Add handler for email support
   const handleEmailSupport = () => {
-    Linking.openURL('mailto:crunchx.ai@gmail.com');
+    Linking.openURL('mailto:crunchx.app@gmail.com');
   };
 
   const handleRegeneratePlan = () => {

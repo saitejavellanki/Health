@@ -21,49 +21,53 @@ export default function PremiumSubscriptionScreen() {
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
-  
+
   const handleSubscribe = async () => {
     try {
       setLoading(true);
       const auth = getAuth();
       const currentUser = auth.currentUser;
-      
+
       if (!currentUser) {
         Alert.alert('Error', 'You need to be logged in to subscribe');
         setLoading(false);
         return;
       }
-      
+
       // Set pricing based on plan
       const amount = selectedPlan === 'monthly' ? 1 : 3150;
-      
+
       // Navigate to payment screen
       router.push({
         pathname: '/Utils/PaymentProcessor',
         params: {
           plan: selectedPlan,
           amount: amount,
-        }
+        },
       });
-      
+
       // Reset loading state after navigation
       setLoading(false);
-      
     } catch (error) {
       console.error('Error initiating subscription:', error);
-      Alert.alert('Error', 'Failed to start subscription process. Please try again.');
+      Alert.alert(
+        'Error',
+        'Failed to start subscription process. Please try again.'
+      );
       setLoading(false);
     }
   };
-  
+
   const openDemoVideo = () => {
     // Replace this URL with your actual demo video URL
     Linking.openURL('https://www.youtube.com/watch?v=premium_demo');
   };
-  
+
   return (
     <ImageBackground
-      source={{ uri: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80' }}
+      source={{
+        uri: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80',
+      }}
       style={styles.backgroundImage}
     >
       <StatusBar translucent backgroundColor="transparent" />
@@ -72,23 +76,30 @@ export default function PremiumSubscriptionScreen() {
         style={styles.overlay}
       >
         <SafeAreaView style={styles.safeArea}>
-          <ScrollView contentContainerStyle={[
-            styles.container,
-            {
-              paddingTop: insets.top > 0 ? 20 : StatusBar.currentHeight + 20,
-            }
-          ]}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.container,
+              {
+                paddingTop: insets.top > 0 ? 20 : StatusBar.currentHeight + 20,
+              },
+            ]}
+          >
             {/* Header with back button */}
-            <View style={[styles.header, { paddingTop: insets.top > 0 ? 0 : insets.top }]}>
-              <Pressable 
-                style={styles.backButton} 
+            <View
+              style={[
+                styles.header,
+                { paddingTop: insets.top > 0 ? 0 : insets.top },
+              ]}
+            >
+              <Pressable
+                style={styles.backButton}
                 onPress={() => router.back()}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Feather name="arrow-left" size={24} color="#fff" />
               </Pressable>
             </View>
-            
+
             {/* Premium logo and title */}
             <View style={styles.titleContainer}>
               <View style={styles.logoContainer}>
@@ -96,17 +107,19 @@ export default function PremiumSubscriptionScreen() {
               </View>
               <Text style={styles.title}>PREMIUM</Text>
               <Text style={styles.subtitle}>Elevate your fitness journey</Text>
-              
+
               {/* Demo Video Button */}
-              <Pressable
-                style={styles.demoVideoButton}
-                onPress={openDemoVideo}
-              >
-                <Feather name="play-circle" size={18} color="#fff" style={styles.playIcon} />
+              {/* <Pressable style={styles.demoVideoButton} onPress={openDemoVideo}>
+                <Feather
+                  name="play-circle"
+                  size={18}
+                  color="#fff"
+                  style={styles.playIcon}
+                />
                 <Text style={styles.demoVideoText}>Watch Demo Video</Text>
-              </Pressable>
+              </Pressable> */}
             </View>
-            
+
             {/* Plan selection */}
             <View style={styles.planContainer}>
               <Pressable
@@ -116,11 +129,32 @@ export default function PremiumSubscriptionScreen() {
                 ]}
                 onPress={() => setSelectedPlan('monthly')}
               >
-                <Text style={[styles.planType, selectedPlan === 'monthly' && styles.selectedPlanText]}>Monthly</Text>
-                <Text style={[styles.planPrice, selectedPlan === 'monthly' && styles.selectedPlanText]}>₹350</Text>
-                <Text style={[styles.planDescription, selectedPlan === 'monthly' && styles.selectedPlanText]}>per month</Text>
+                <Text
+                  style={[
+                    styles.planType,
+                    selectedPlan === 'monthly' && styles.selectedPlanText,
+                  ]}
+                >
+                  Monthly
+                </Text>
+                <Text
+                  style={[
+                    styles.planPrice,
+                    selectedPlan === 'monthly' && styles.selectedPlanText,
+                  ]}
+                >
+                  ₹350
+                </Text>
+                <Text
+                  style={[
+                    styles.planDescription,
+                    selectedPlan === 'monthly' && styles.selectedPlanText,
+                  ]}
+                >
+                  per month
+                </Text>
               </Pressable>
-              
+
               <Pressable
                 style={[
                   styles.planOption,
@@ -128,18 +162,39 @@ export default function PremiumSubscriptionScreen() {
                 ]}
                 onPress={() => setSelectedPlan('annual')}
               >
-                <Text style={[styles.planType, selectedPlan === 'annual' && styles.selectedPlanText]}>Annual</Text>
-                <Text style={[styles.planPrice, selectedPlan === 'annual' && styles.selectedPlanText]}>₹3,150</Text>
-                <Text style={[styles.planDescription, selectedPlan === 'annual' && styles.selectedPlanText]}>₹262/month · Save 25%</Text>
+                <Text
+                  style={[
+                    styles.planType,
+                    selectedPlan === 'annual' && styles.selectedPlanText,
+                  ]}
+                >
+                  Annual
+                </Text>
+                <Text
+                  style={[
+                    styles.planPrice,
+                    selectedPlan === 'annual' && styles.selectedPlanText,
+                  ]}
+                >
+                  ₹3,150
+                </Text>
+                <Text
+                  style={[
+                    styles.planDescription,
+                    selectedPlan === 'annual' && styles.selectedPlanText,
+                  ]}
+                >
+                  ₹262/month · Save 25%
+                </Text>
                 <View style={styles.bestValueTag}>
                   <Text style={styles.bestValueText}>BEST VALUE</Text>
                 </View>
               </Pressable>
             </View>
-            
+
             {/* Features list */}
             <Text style={styles.featuresTitle}>Premium Features</Text>
-            
+
             {/* Features content remains the same... */}
             {/* Feature 1 */}
             <View style={styles.featureContainer}>
@@ -148,14 +203,17 @@ export default function PremiumSubscriptionScreen() {
                   <Feather name="camera" size={20} color="#22c55e" />
                 </View>
                 <View style={styles.featureTextContainer}>
-                  <Text style={styles.featureText}>AI-powered food logging & calorie tracking</Text>
+                  <Text style={styles.featureText}>
+                    AI-powered food logging & calorie tracking
+                  </Text>
                   <Text style={styles.featureDescription}>
-                    Snap a photo of your meal and our AI will identify foods and calculate calories automatically.
+                    Snap a photo of your meal and our AI will identify foods and
+                    calculate calories automatically.
                   </Text>
                 </View>
               </View>
             </View>
-            
+
             {/* Feature 2 */}
             <View style={styles.featureContainer}>
               <View style={styles.featureContent}>
@@ -163,14 +221,17 @@ export default function PremiumSubscriptionScreen() {
                   <Feather name="bar-chart-2" size={20} color="#22c55e" />
                 </View>
                 <View style={styles.featureTextContainer}>
-                  <Text style={styles.featureText}>Advanced fitness & nutrition analytics</Text>
+                  <Text style={styles.featureText}>
+                    Advanced fitness & nutrition analytics
+                  </Text>
                   <Text style={styles.featureDescription}>
-                    Get detailed insights on your progress with advanced charts and personalized reports.
+                    Get detailed insights on your progress with advanced charts
+                    and personalized reports.
                   </Text>
                 </View>
               </View>
             </View>
-            
+
             {/* Feature 3 */}
             <View style={styles.featureContainer}>
               <View style={styles.featureContent}>
@@ -178,14 +239,17 @@ export default function PremiumSubscriptionScreen() {
                   <Feather name="calendar" size={20} color="#22c55e" />
                 </View>
                 <View style={styles.featureTextContainer}>
-                  <Text style={styles.featureText}>Personalized meal plans for your goals</Text>
+                  <Text style={styles.featureText}>
+                    Personalized meal plans for your goals
+                  </Text>
                   <Text style={styles.featureDescription}>
-                    Get weekly meal plans tailored to your dietary preferences and fitness goals.
+                    Get weekly meal plans tailored to your dietary preferences
+                    and fitness goals.
                   </Text>
                 </View>
               </View>
             </View>
-            
+
             {/* Feature 4 */}
             <View style={styles.featureContainer}>
               <View style={styles.featureContent}>
@@ -193,17 +257,23 @@ export default function PremiumSubscriptionScreen() {
                   <Feather name="award" size={20} color="#22c55e" />
                 </View>
                 <View style={styles.featureTextContainer}>
-                  <Text style={styles.featureText}>Nutritionist-designed meal recommendations</Text>
+                  <Text style={styles.featureText}>
+                    AI Nutritionist-designed meal recommendations
+                  </Text>
                   <Text style={styles.featureDescription}>
-                    Get expert recommendations from certified nutritionists based on your health data.
+                    Get expert recommendations from AI nutritionists based on
+                    your health data.
                   </Text>
                 </View>
               </View>
             </View>
-            
+
             {/* Subscribe button */}
             <Pressable
-              style={[styles.subscribeButton, loading && styles.subscribeButtonDisabled]}
+              style={[
+                styles.subscribeButton,
+                loading && styles.subscribeButtonDisabled,
+              ]}
               onPress={handleSubscribe}
               disabled={loading}
             >
@@ -212,16 +282,19 @@ export default function PremiumSubscriptionScreen() {
                 style={styles.subscribeButtonGradient}
               >
                 <Text style={styles.subscribeButtonText}>
-                  {loading ? 'Processing...' : 
-                  selectedPlan === 'monthly' ? 'Subscribe for ₹350/month' : 'Subscribe for ₹3,150/year'}
+                  {loading
+                    ? 'Processing...'
+                    : selectedPlan === 'monthly'
+                    ? 'Subscribe for ₹350/month'
+                    : 'Subscribe for ₹3,150/year'}
                 </Text>
               </LinearGradient>
             </Pressable>
-            
+
             {/* Terms and conditions */}
             <Text style={styles.termsText}>
-              By subscribing, you agree to our Terms of Service and Privacy Policy.
-              You can cancel your subscription anytime.
+              By subscribing, you agree to our Terms of Service and Privacy
+              Policy. You can cancel your subscription anytime.
             </Text>
           </ScrollView>
         </SafeAreaView>

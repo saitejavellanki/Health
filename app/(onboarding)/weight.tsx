@@ -137,10 +137,10 @@ export default function Weight() {
                   <Text style={styles.unitText}>Kgs</Text>
                 </View>
               </View>
-
+{/* 
               <Text style={styles.helperText}>
                 *Enter your current weight in Kgs
-              </Text>
+              </Text> */}
             </View>
 
             <View style={[styles.footer, { paddingBottom: Math.max(32, insets.bottom + 16) }]}>
