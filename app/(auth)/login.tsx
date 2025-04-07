@@ -51,6 +51,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loginSuccess, setLoginSuccess] = useState(false);
 
   // Configure Google Sign In
   const [googleRequest, googleResponse, googlePromptAsync] =
@@ -76,11 +77,13 @@ export default function Login() {
 
   // Handle navigation after successful authentication
   useEffect(() => {
-    // Only need to check if user exists - AuthContext will handle navigation
-    // if (user && !authLoading) {
-    //   console.log("User authenticated, letting AuthContext handle navigation");
-    // }
-  }, [user, authLoading]);
+    // Only check if user exists and we've successfully logged in
+    if (user && loginSuccess && !authLoading) {
+      // Keep showing the loading indicator until navigation happens
+      // The AuthContext will handle actual navigation
+      console.log("User authenticated, letting AuthContext handle navigation");
+    }
+  }, [user, authLoading, loginSuccess]);
 
   if (!fontsLoaded) {
     return null; // Prevent rendering until fonts are loaded
@@ -98,8 +101,11 @@ export default function Login() {
 
       // Sign in with Firebase
       await signInWithEmailAndPassword(auth, email, password);
+      
+      // Mark login as successful - we'll keep loading state until navigation completes
+      setLoginSuccess(true);
+      // We intentionally don't set loading to false here to keep showing the loader
 
-      // Don't navigate here - let the AuthContext handle it
     } catch (err) {
       // Customize error message based on Firebase error code
       let errorMessage = 'Failed to login. Please try again.';
@@ -123,8 +129,7 @@ export default function Login() {
 
       setError(errorMessage);
       Alert.alert('Login Failed', errorMessage);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only set loading to false on error
     }
   };
 
@@ -134,7 +139,6 @@ export default function Login() {
       await googlePromptAsync();
     } catch (error) {
       Alert.alert('Google Sign In Error', error.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -147,11 +151,13 @@ export default function Login() {
 
       // Sign in with credential - AuthContext will handle the state
       await signInWithCredential(auth, googleCredential);
+      
+      // Mark login as successful - keep showing loader
+      setLoginSuccess(true);
+      // We intentionally don't set loading to false here
 
-      // Navigation will be handled by the useEffect
     } catch (error) {
       Alert.alert('Authentication Error', error.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -174,14 +180,16 @@ export default function Login() {
 
       // Sign in with credential - AuthContext will handle the state
       await signInWithCredential(auth, credential);
+      
+      // Mark login as successful - keep showing loader
+      setLoginSuccess(true);
+      // We intentionally don't set loading to false here
 
-      // Navigation will be handled by the useEffect
     } catch (error) {
       // Ignore cancel errors
       if (error.code !== 'ERR_CANCELED') {
         Alert.alert('Apple Sign In Error', error.message);
       }
-    } finally {
       setLoading(false);
     }
   };
@@ -192,9 +200,6 @@ export default function Login() {
 
       <View style={styles.header}>
         <Image
-          // source={{
-          //   uri: '../../../assets/images/login_logo.jpg',
-          // }}
           source={require('../../assets/images/login_logo.jpg')}
           style={styles.headerImage}
         />
@@ -250,7 +255,7 @@ export default function Login() {
             onPress={handleLogin}
             disabled={loading || authLoading}
           >
-            {loading || authLoading ? (
+            {loading || authLoading || loginSuccess ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <>
@@ -259,38 +264,6 @@ export default function Login() {
               </>
             )}
           </Pressable>
-
-          {/* <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.divider} />
-          </View>
-
-          <View style={styles.socialButtonsContainer}>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={handleGoogleSignIn}
-              disabled={loading || authLoading}
-            >
-              <Image
-                source={require('../../assets/images/google-logo.png')}
-                style={styles.socialIcon}
-              />
-            </TouchableOpacity>
-
-            {Platform.OS === 'ios' && (
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={handleAppleSignIn}
-                disabled={loading || authLoading}
-              >
-                <Image
-                  source={require('../../assets/images/apple-logo.png')}
-                  style={styles.socialIcon}
-                />
-              </TouchableOpacity>
-            )}
-          </View> */}
 
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Don't have an account? </Text>
@@ -420,41 +393,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
     fontFamily: 'Poppins_Bold',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  dividerText: {
-    paddingHorizontal: 10,
-    color: '#666',
-    fontFamily: 'Poppins_Regular',
-  },
-  socialButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 24,
-  },
-  socialButton: {
-    width: 52,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 14,
-  },
-  socialIcon: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain',
   },
 });

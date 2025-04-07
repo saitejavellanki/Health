@@ -710,7 +710,7 @@ const PlanScreen = ({ userData: propUserData, route }) => {
     
     return (
       <View style={styles.tokenInfoContainer}>
-        <Text style={styles.tokenInfoTitle}>Free API Usage</Text>
+        <Text style={styles.tokenInfoTitle}>Your Tokens</Text>
         <View style={styles.tokenProgressContainer}>
           <View 
             style={[
